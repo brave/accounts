@@ -1,0 +1,18 @@
+networks:
+  accounts:
+
+services:
+  postgres:
+    image: public.ecr.aws/docker/library/postgres:17
+    ports:
+      - "5435:5432"
+    environment:
+      - POSTGRES_USER=accounts
+      - POSTGRES_PASSWORD=password
+    networks:
+      - accounts
+  localstack:
+    image: localstack/localstack
+    ports:
+      - "127.0.0.1:4566:4566"
+      - "127.0.0.1:4510-4559:4510-4559"
