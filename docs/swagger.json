@@ -1,0 +1,412 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "title": "Brave Accounts Service",
+        "contact": {}
+    },
+    "paths": {
+        "/v2/auth/validate": {
+            "get": {
+                "description": "Validates an auth token and returns session details",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Validate auth token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ValidateTokenResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/sessions": {
+            "get": {
+                "description": "Lists all active sessions for the authenticated account",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sessions"
+                ],
+                "summary": "List sessions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/datastore.Session"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/sessions/{id}": {
+            "delete": {
+                "description": "Deletes a specific session by ID",
+                "tags": [
+                    "Sessions"
+                ],
+                "summary": "Delete session / log out",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Session ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/verify/auth": {
+            "post": {
+                "description": "Exchanges a verify check token for an auth token after successful verification.\nIf the wait option is set to true, the server will up to 20 seconds for verification. Feel free\nto call this endpoint repeatedly to wait for verification.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Get authentication token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + verify check token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Auth token request params",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.VerifyGetAuthTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.VerifyGetAuthTokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/verify/complete": {
+            "get": {
+                "description": "Completes the email verification process",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Complete email verification",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Verification ID",
+                        "name": "verify_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Verification token",
+                        "name": "verify_token",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Email verification successful",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Missing/invalid verification parameters",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Verification not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/verify/init": {
+            "post": {
+                "description": "Starts email verification process by sending a verification email",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Initialize email verification",
+                "parameters": [
+                    {
+                        "description": "Verification request params",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.VerifyInitRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.VerifyInitResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "controllers.ValidateTokenResponse": {
+            "description": "Response containing validated token details",
+            "type": "object",
+            "properties": {
+                "accountId": {
+                    "description": "UUID of the account",
+                    "type": "string"
+                },
+                "email": {
+                    "description": "Email address associated with the account",
+                    "type": "string"
+                },
+                "sessionId": {
+                    "description": "UUID of the session associated with the account",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.VerifyGetAuthTokenRequest": {
+            "description": "Request for getting auth token after verification",
+            "type": "object",
+            "properties": {
+                "wait": {
+                    "description": "Whether to wait for verification to complete",
+                    "type": "boolean"
+                }
+            }
+        },
+        "controllers.VerifyGetAuthTokenResponse": {
+            "description": "Response containing auth token",
+            "type": "object",
+            "properties": {
+                "authToken": {
+                    "description": "JWT auth token, null if verification incomplete",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.VerifyInitRequest": {
+            "description": "Request to initialize email verification",
+            "type": "object",
+            "required": [
+                "email"
+            ],
+            "properties": {
+                "email": {
+                    "description": "Email address to verify",
+                    "type": "string",
+                    "example": "test@example.com"
+                },
+                "sessionName": {
+                    "description": "Optional name for the session",
+                    "type": "string",
+                    "maxLength": 35,
+                    "example": "Brave on Linux"
+                }
+            }
+        },
+        "controllers.VerifyInitResponse": {
+            "description": "Response containing verification check token",
+            "type": "object",
+            "properties": {
+                "verifyCheckToken": {
+                    "description": "JWT token for checking verification status",
+                    "type": "string"
+                }
+            }
+        },
+        "datastore.Session": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "description": "Session creation timestamp",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "Session UUID",
+                    "type": "string"
+                },
+                "sessionName": {
+                    "description": "Optional session name",
+                    "type": "string"
+                }
+            }
+        },
+        "util.ErrorResponse": {
+            "description": "Standard error response",
+            "type": "object",
+            "properties": {
+                "error": {
+                    "description": "Error message",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "HTTP status code",
+                    "type": "integer"
+                }
+            }
+        }
+    },
+    "externalDocs": {
+        "description": "OpenAPI",
+        "url": "https://swagger.io/resources/open-api/"
+    }
+}

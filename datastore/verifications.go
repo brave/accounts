@@ -31,7 +31,7 @@ const (
 var ErrVerificationNotFound = errors.New("verification not found or invalid token")
 
 func generateNotificationChannel(id uuid.UUID) string {
-	return fmt.Sprintf("notification-%s", id.String())
+	return fmt.Sprintf("verification_%s", id.String())
 }
 
 // CreateVerification creates a new verification record
@@ -113,7 +113,7 @@ func (d *Datastore) GetVerificationStatus(ctx context.Context, id uuid.UUID, wai
 	defer conn.Close(ctx)
 
 	channelName := generateNotificationChannel(id)
-	_, err = conn.Exec(ctx, "LISTEN "+channelName)
+	_, err = conn.Exec(ctx, "LISTEN \""+channelName+"\"")
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on channel: %w", err)
 	}

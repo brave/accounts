@@ -16,3 +16,5 @@ services:
     ports:
       - "127.0.0.1:4566:4566"
       - "127.0.0.1:4510-4559:4510-4559"
+    volumes:
+      - ./misc/add_verified_email.sh:/etc/localstack/init/ready.d/add_verified_email.sh

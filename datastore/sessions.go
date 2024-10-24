@@ -10,11 +10,16 @@ import (
 )
 
 type Session struct {
-	ID          uuid.UUID
-	AccountID   uuid.UUID
-	SessionName *string
-	CreatedAt   time.Time `gorm:"<-:false"`
-	Account     Account
+	// Session UUID
+	ID uuid.UUID `json:"id"`
+	// AccountID is excluded from JSON
+	AccountID uuid.UUID `json:"-"`
+	// Optional session name
+	SessionName *string `json:"sessionName"`
+	// Session creation timestamp
+	CreatedAt time.Time `json:"createdAt" gorm:"<-:false"`
+	// Account is excluded from JSON
+	Account Account `json:"-"`
 }
 
 var ErrSessionNotFound = errors.New("session not found")
