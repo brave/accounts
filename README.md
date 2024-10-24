@@ -7,3 +7,5 @@
 3. Run `go run .`
 
 Use `make get-emails` to get the contents of sent verification emails.
+
+View API documentation at http://localhost:8080/swagger/index.html.
