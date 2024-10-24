@@ -8,10 +8,12 @@ import (
 
 	"github.com/brave-experiments/accounts/controllers"
 	"github.com/brave-experiments/accounts/datastore"
+	_ "github.com/brave-experiments/accounts/docs"
 	"github.com/brave-experiments/accounts/middleware"
 	"github.com/brave-experiments/accounts/util"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/docgen"
+	"github.com/swaggo/http-swagger/v2"
 
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/rs/zerolog"
@@ -21,9 +23,21 @@ import (
 var routes = flag.Bool("routes", false, "Generate router documentation")
 
 const logPrettyEnv = "LOG_PRETTY"
+const logLevelEnv = "LOG_LEVEL"
+const serveSwaggerEnv = "SERVE_SWAGGER"
 
+// @title Brave Accounts Service
+// @externalDocs.description OpenAPI
+// @externalDocs.url https://swagger.io/resources/open-api/
 func main() {
 	flag.Parse()
+
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	if logLevel := os.Getenv(logLevelEnv); logLevel != "" {
+		if level, err := zerolog.ParseLevel(logLevel); err == nil {
+			zerolog.SetGlobalLevel(level)
+		}
+	}
 
 	if os.Getenv(logPrettyEnv) != "" {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
@@ -51,10 +65,16 @@ func main() {
 	authController := controllers.NewAuthController(datastore, jwtUtil, sesUtil)
 	sessionsController := controllers.NewSessionsController(datastore)
 
-	r.Route("/accounts", func(r chi.Router) {
+	r.Use(middleware.LoggerMiddleware)
+
+	r.Route("/v2", func(r chi.Router) {
 		r.Mount("/", authController.Router(authMiddleware))
 		r.Mount("/sessions", sessionsController.Router(authMiddleware))
 	})
+
+	if os.Getenv(serveSwaggerEnv) != "" {
+		r.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL("http://localhost:8080/swagger/doc.json")))
+	}
 
 	if *routes {
 		fmt.Println(docgen.MarkdownRoutesDoc(r, docgen.MarkdownOpts{
@@ -63,7 +83,7 @@ func main() {
 		return
 	}
 
-	log.Printf("Server listening on port 8080")
+	log.Info().Msg("Server listening on port 8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
 		log.Panic().Err(err).Msg("Failed to start server")
 	}

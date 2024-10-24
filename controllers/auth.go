@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	urlParamVerifyID    = "verify_id"
-	urlParamVerifyToken = "verify_token"
+	qsVerifyID    = "verify_id"
+	qsVerifyToken = "verify_token"
 )
 
 type AuthController struct {
@@ -26,27 +26,40 @@ type AuthController struct {
 	sesUtil   *util.SESUtil
 }
 
+// @Description	Request to initialize email verification
 type VerifyInitRequest struct {
-	Email       string  `validate:"required,email,ascii"`
-	SessionName *string `validate:"omitempty,max=35,ascii"`
+	// Email address to verify
+	Email string `json:"email" validate:"required,email,ascii" example:"test@example.com"`
+	// Optional name for the session
+	SessionName *string `json:"sessionName" validate:"omitempty,max=35,ascii" example:"Brave on Linux"`
 }
 
+// @Description	Response containing verification check token
 type VerifyInitResponse struct {
-	VerifyCheckToken string
+	// JWT token for checking verification status
+	VerifyCheckToken string `json:"verifyCheckToken"`
 }
 
+// @Description	Request for getting auth token after verification
 type VerifyGetAuthTokenRequest struct {
-	Wait bool
+	// Whether to wait for verification to complete
+	Wait bool `json:"wait"`
 }
 
+// @Description	Response containing auth token
 type VerifyGetAuthTokenResponse struct {
-	AuthToken *string
+	// JWT auth token, null if verification incomplete
+	AuthToken *string `json:"authToken"`
 }
 
+// @Description	Response containing validated token details
 type ValidateTokenResponse struct {
-	Email     string
-	AccountID string
-	SessionID string
+	// Email address associated with the account
+	Email string `json:"email"`
+	// UUID of the account
+	AccountID string `json:"accountId"`
+	// UUID of the session associated with the account
+	SessionID string `json:"sessionId"`
 }
 
 func NewAuthController(datastore *datastore.Datastore, jwtUtil *util.JWTUtil, sesUtil *util.SESUtil) *AuthController {
@@ -64,11 +77,21 @@ func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler)
 	r.Post("/verify/init", ac.VerifyInit)
 	r.Get("/verify/complete", ac.VerifyComplete)
 	r.Post("/verify/auth", ac.VerifyGetAuthToken)
-	r.With(authMiddleware).Post("/validate", ac.Validate)
+	r.With(authMiddleware).Get("/auth/validate", ac.Validate)
 
 	return r
 }
 
+// @Summary Initialize email verification
+// @Description Starts email verification process by sending a verification email
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body VerifyInitRequest true "Verification request params"
+// @Success 200 {object} VerifyInitResponse
+// @Failure 400 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/verify/init [post]
 func (ac *AuthController) VerifyInit(w http.ResponseWriter, r *http.Request) {
 	var requestData VerifyInitRequest
 	if err := render.DecodeJSON(r.Body, &requestData); err != nil {
@@ -98,7 +121,7 @@ func (ac *AuthController) VerifyInit(w http.ResponseWriter, r *http.Request) {
 		requestData.Email,
 		requestData.SessionName,
 		verification.ID.String(),
-		verifyCheckToken,
+		verification.Token,
 	); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, fmt.Errorf("failed to send verification email: %w", err))
 		return
@@ -112,9 +135,20 @@ func (ac *AuthController) VerifyInit(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, response)
 }
 
+// @Summary Complete email verification
+// @Description Completes the email verification process
+// @Tags Auth
+// @Produce text/plain
+// @Param verify_id query string true "Verification ID"
+// @Param verify_token query string true "Verification token"
+// @Success 200 {string} string "Email verification successful"
+// @Failure 400 {string} string "Missing/invalid verification parameters"
+// @Failure 404 {string} string "Verification not found"
+// @Failure 500 {string} string "Internal server error"
+// @Router /v2/verify/complete [get]
 func (ac *AuthController) VerifyComplete(w http.ResponseWriter, r *http.Request) {
-	verifyID := chi.URLParam(r, urlParamVerifyID)
-	verifyToken := chi.URLParam(r, urlParamVerifyToken)
+	verifyID := r.URL.Query().Get(qsVerifyID)
+	verifyToken := r.URL.Query().Get(qsVerifyToken)
 
 	if verifyID == "" || verifyToken == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -147,6 +181,20 @@ func (ac *AuthController) VerifyComplete(w http.ResponseWriter, r *http.Request)
 	render.PlainText(w, r, "Email verification successful")
 }
 
+// @Summary Get authentication token
+// @Description Exchanges a verify check token for an auth token after successful verification.
+// @Description If the wait option is set to true, the server will up to 20 seconds for verification. Feel free
+// @Description to call this endpoint repeatedly to wait for verification.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer + verify check token"
+// @Param request body VerifyGetAuthTokenRequest true "Auth token request params"
+// @Success 200 {object} VerifyGetAuthTokenResponse
+// @Failure 400 {object} util.ErrorResponse
+// @Failure 401 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/verify/auth [post]
 func (ac *AuthController) VerifyGetAuthToken(w http.ResponseWriter, r *http.Request) {
 	// Extract and validate token
 	tokenString, err := util.ExtractAuthToken(r)
@@ -211,6 +259,15 @@ func (ac *AuthController) VerifyGetAuthToken(w http.ResponseWriter, r *http.Requ
 	render.JSON(w, r, response)
 }
 
+// @Summary Validate auth token
+// @Description Validates an auth token and returns session details
+// @Tags Auth
+// @Produce json
+// @Param Authorization header string true "Bearer + auth token"
+// @Success 200 {object} ValidateTokenResponse
+// @Failure 401 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/auth/validate [get]
 func (ac *AuthController) Validate(w http.ResponseWriter, r *http.Request) {
 	session := r.Context().Value(middleware.ContextSession).(*datastore.Session)
 

@@ -7,12 +7,16 @@ import (
 	"strings"
 
 	"github.com/go-chi/render"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
+// @Description Standard error response
 type ErrorResponse struct {
-	Status int
-	Error  string
+	// HTTP status code
+	Status int `json:"status"`
+	// Error message
+	Error string `json:"error"`
 }
 
 func (e *ErrorResponse) Render(w http.ResponseWriter, r *http.Request) error {
@@ -22,13 +26,17 @@ func (e *ErrorResponse) Render(w http.ResponseWriter, r *http.Request) error {
 
 func RenderErrorResponse(w http.ResponseWriter, r *http.Request, status int, err error) {
 	var errStr string
-	if status == http.StatusInternalServerError {
-		errStr = "Internal server error"
-		log.Error().
+	if status != http.StatusBadRequest {
+		errStr = http.StatusText(status)
+		logLevel := zerolog.ErrorLevel
+		if status != http.StatusInternalServerError {
+			logLevel = zerolog.DebugLevel
+		}
+		log.WithLevel(logLevel).
 			Err(err).
 			Str("path", r.URL.Path).
 			Str("method", r.Method).
-			Msg("internal server error")
+			Msg(errStr)
 	} else {
 		errStr = err.Error()
 	}

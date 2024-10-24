@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ses"
 	"github.com/aws/aws-sdk-go-v2/service/ses/types"
 	"github.com/brave-experiments/accounts/templates"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -77,11 +78,14 @@ type verifyEmailData struct {
 }
 
 func (s *SESUtil) SendVerificationEmail(ctx context.Context, email string, sessionName *string, verificationID string, verificationToken string) error {
+	verifyURL := fmt.Sprintf("%s/v2/verify/complete?verify_id=%s&verify_token=%s", s.baseURL, verificationID, verificationToken)
 	data := verifyEmailData{
-		VerifyURL:   fmt.Sprintf("%s/accounts/verify/complete?verify_id=%s&verify_token=%s", s.baseURL, verificationID, verificationToken),
+		VerifyURL:   verifyURL,
 		Email:       email,
 		SessionName: sessionName,
 	}
+
+	log.Debug().Str("verify_url", verifyURL).Msg("Sent verification link")
 
 	var bodyContent bytes.Buffer
 	if err := s.tmpl.Execute(&bodyContent, data); err != nil {

@@ -22,6 +22,15 @@ func NewSessionsController(datastore *datastore.Datastore) *SessionsController {
 	}
 }
 
+// @Summary List sessions
+// @Description Lists all active sessions for the authenticated account
+// @Tags Sessions
+// @Produce json
+// @Param Authorization header string true "Bearer + auth token"
+// @Success 200 {array} datastore.Session
+// @Failure 401 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/sessions [get]
 func (sc *SessionsController) ListSessions(w http.ResponseWriter, r *http.Request) {
 	session := r.Context().Value(middleware.ContextSession).(*datastore.Session)
 
@@ -35,6 +44,17 @@ func (sc *SessionsController) ListSessions(w http.ResponseWriter, r *http.Reques
 	render.JSON(w, r, sessions)
 }
 
+// @Summary Delete session / log out
+// @Description Deletes a specific session by ID
+// @Tags Sessions
+// @Param Authorization header string true "Bearer + auth token"
+// @Param id path string true "Session ID (UUID)"
+// @Success 204 "No Content"
+// @Failure 400 {object} util.ErrorResponse
+// @Failure 401 {object} util.ErrorResponse
+// @Failure 404 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/sessions/{id} [delete]
 func (sc *SessionsController) DeleteSession(w http.ResponseWriter, r *http.Request) {
 	sessionID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
