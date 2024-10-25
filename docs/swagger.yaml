@@ -173,7 +173,7 @@ paths:
         If the wait option is set to true, the server will up to 20 seconds for verification. Feel free
         to call this endpoint repeatedly to wait for verification.
       parameters:
-      - description: Bearer + verify check token
+      - description: Bearer + verification token
         in: header
         name: Authorization
         required: true

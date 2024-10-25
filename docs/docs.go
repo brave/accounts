@@ -170,7 +170,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Bearer + verify check token",
+                        "description": "Bearer + verification token",
                         "name": "Authorization",
                         "in": "header",
                         "required": true
