@@ -16,6 +16,8 @@ type Session struct {
 	AccountID uuid.UUID `json:"-"`
 	// Optional session name
 	SessionName *string `json:"sessionName"`
+	// The accounts "phase" the session was created in
+	Version int `json:"-"`
 	// Session creation timestamp
 	CreatedAt time.Time `json:"createdAt" gorm:"<-:false"`
 	// Account is excluded from JSON
@@ -34,6 +36,7 @@ func (d *Datastore) CreateSession(accountID uuid.UUID, sessionName *string) (*Se
 		ID:          id,
 		AccountID:   accountID,
 		SessionName: sessionName,
+		Version:     1,
 	}
 
 	if err := d.db.Create(&session).Error; err != nil {

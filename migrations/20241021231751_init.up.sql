@@ -9,6 +9,7 @@ CREATE TABLE sessions (
     id UUID PRIMARY KEY,
     account_id UUID NOT NULL REFERENCES accounts(id),
     session_name TEXT,
+    version SMALLINT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
