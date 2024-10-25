@@ -12,20 +12,6 @@ definitions:
         description: UUID of the session associated with the account
         type: string
     type: object
-  controllers.VerifyGetAuthTokenRequest:
-    description: Request for getting auth token after verification
-    properties:
-      wait:
-        description: Whether to wait for verification to complete
-        type: boolean
-    type: object
-  controllers.VerifyGetAuthTokenResponse:
-    description: Response containing auth token
-    properties:
-      authToken:
-        description: JWT auth token, null if verification incomplete
-        type: string
-    type: object
   controllers.VerifyInitRequest:
     description: Request to initialize email verification
     properties:
@@ -42,6 +28,24 @@ definitions:
       verificationToken:
         description: JWT token for checking verification status
         type: string
+    type: object
+  controllers.VerifyResultRequest:
+    description: Request for getting auth token after verification
+    properties:
+      wait:
+        description: Whether to wait for verification to complete
+        type: boolean
+    type: object
+  controllers.VerifyResultResponse:
+    description: Response containing auth token
+    properties:
+      authToken:
+        description: JWT auth token, null if verification incomplete or if password
+          setup is required
+        type: string
+      verified:
+        description: Email verification status
+        type: boolean
     type: object
   datastore.Session:
     properties:
@@ -164,48 +168,6 @@ paths:
       summary: Delete session / log out
       tags:
       - Sessions
-  /v2/verify/auth:
-    post:
-      consumes:
-      - application/json
-      description: |-
-        Exchanges a verify check token for an auth token after successful verification.
-        If the wait option is set to true, the server will up to 20 seconds for verification. Feel free
-        to call this endpoint repeatedly to wait for verification.
-      parameters:
-      - description: Bearer + verification token
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: Auth token request params
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/controllers.VerifyGetAuthTokenRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/controllers.VerifyGetAuthTokenResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/util.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/util.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/util.ErrorResponse'
-      summary: Get authentication token
-      tags:
-      - Auth
   /v2/verify/complete:
     get:
       description: Completes the email verification process
@@ -241,7 +203,7 @@ paths:
             type: string
       summary: Complete email verification
       tags:
-      - Auth
+      - Email verification
   /v2/verify/init:
     post:
       consumes:
@@ -271,5 +233,47 @@ paths:
             $ref: '#/definitions/util.ErrorResponse'
       summary: Initialize email verification
       tags:
-      - Auth
+      - Email verification
+  /v2/verify/result:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Exchanges a verify check token for an auth token after successful verification.
+        If the wait option is set to true, the server will up to 20 seconds for verification. Feel free
+        to call this endpoint repeatedly to wait for verification.
+      parameters:
+      - description: Bearer + verification token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Auth token request params
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.VerifyResultRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.VerifyResultResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Query result of verification
+      tags:
+      - Email verification
 swagger: "2.0"
