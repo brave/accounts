@@ -1,4 +1,37 @@
 definitions:
+  controllers.PasswordFinalizeResponse:
+    properties:
+      authToken:
+        description: Authentication token
+        type: string
+    type: object
+  controllers.RegistrationRecord:
+    properties:
+      envelope:
+        type: string
+      maskingKey:
+        type: string
+      publicKey:
+        type: string
+    required:
+    - envelope
+    - maskingKey
+    - publicKey
+    type: object
+  controllers.RegistrationRequest:
+    properties:
+      blindedMessage:
+        type: string
+    required:
+    - blindedMessage
+    type: object
+  controllers.RegistrationResponse:
+    properties:
+      evaluatedMessage:
+        type: string
+      pks:
+        type: string
+    type: object
   controllers.ValidateTokenResponse:
     description: Response containing validated token details
     properties:
@@ -76,6 +109,170 @@ info:
   contact: {}
   title: Brave Accounts Service
 paths:
+  /v2/accounts/change_pwd/finalize:
+    post:
+      consumes:
+      - application/json
+      description: Complete the password change process and return auth token
+      parameters:
+      - description: Bearer + auth token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Registration record
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.RegistrationRecord'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.PasswordFinalizeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Finalize password setup
+      tags:
+      - Accounts
+  /v2/accounts/change_pwd/init:
+    post:
+      consumes:
+      - application/json
+      description: Start the password change process using OPAQUE protocol
+      parameters:
+      - description: Bearer + auth token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Registration request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.RegistrationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.RegistrationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Initialize password change
+      tags:
+      - Accounts
+  /v2/accounts/setup/finalize:
+    post:
+      consumes:
+      - application/json
+      description: Complete the password setup process and return auth token
+      parameters:
+      - description: Bearer + verification token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Registration record
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.RegistrationRecord'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.PasswordFinalizeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Finalize password setup
+      tags:
+      - Accounts
+  /v2/accounts/setup/init:
+    post:
+      consumes:
+      - application/json
+      description: Start the password setup process using OPAQUE protocol
+      parameters:
+      - description: Bearer + verification token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Registration request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.RegistrationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.RegistrationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Initialize password setup
+      tags:
+      - Accounts
   /v2/auth/validate:
     get:
       description: Validates an auth token and returns session details

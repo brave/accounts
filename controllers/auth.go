@@ -5,20 +5,23 @@ import (
 
 	"github.com/brave-experiments/accounts/datastore"
 	"github.com/brave-experiments/accounts/middleware"
+	"github.com/brave-experiments/accounts/services"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 )
 
-type AuthController struct{}
+type AuthController struct {
+	opaqueService *services.OpaqueService
+}
 
-func NewAuthController() *AuthController {
-	return &AuthController{}
+func NewAuthController(opaqueService *services.OpaqueService) *AuthController {
+	return &AuthController{opaqueService}
 }
 
 func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler) chi.Router {
 	r := chi.NewRouter()
 
-	r.With(authMiddleware).Get("/auth/validate", ac.Validate)
+	r.With(authMiddleware).Get("/validate", ac.Validate)
 
 	return r
 }

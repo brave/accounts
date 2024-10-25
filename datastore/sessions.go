@@ -79,3 +79,11 @@ func (d *Datastore) DeleteSession(sessionID uuid.UUID, accountID uuid.UUID) erro
 
 	return nil
 }
+
+func (d *Datastore) DeleteAllSessions(accountID uuid.UUID) error {
+	result := d.db.Delete(&Session{}, "account_id = ?", accountID)
+	if result.Error != nil {
+		return fmt.Errorf("failed to delete all sessions: %w", result.Error)
+	}
+	return nil
+}

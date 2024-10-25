@@ -10,9 +10,11 @@ import (
 )
 
 type Account struct {
-	ID        uuid.UUID
-	Email     string
-	CreatedAt time.Time `gorm:"<-:false"`
+	ID                 uuid.UUID
+	Email              string
+	OprfSeedID         *int   `json:"-"`
+	OpaqueRegistration []byte `json:"-"`
+	CreatedAt          time.Time
 }
 
 func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
@@ -48,4 +50,25 @@ func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
 	}
 
 	return &account, nil
+}
+
+// split into two methods for seed id and registration. use the struct for updates!
+func (d *Datastore) UpdateOpaqueRegistration(accountID uuid.UUID, oprfSeedID int, opaqueRegistration []byte) error {
+	result := d.db.Model(&Account{}).
+		Where("id = ?", accountID).
+		Updates(Account{
+			OprfSeedID:         &oprfSeedID,
+			OpaqueRegistration: opaqueRegistration,
+			CreatedAt:          time.Now(),
+		})
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to update account keys: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("account not found")
+	}
+
+	return nil
 }

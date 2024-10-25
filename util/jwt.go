@@ -12,6 +12,7 @@ import (
 const (
 	sessionIdClaim      = "session_id"
 	verificationIdClaim = "verification_id"
+	akeStateIdClaim     = "ake_state_id"
 	jwtKeyEnv           = "JWT_KEY"
 )
 
@@ -30,23 +31,32 @@ func NewJWTUtil() (*JWTUtil, error) {
 	}, nil
 }
 
+func (j *JWTUtil) createToken(claims jwt.MapClaims) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(j.key)
+}
+
 func (j *JWTUtil) CreateVerificationToken(verificationID uuid.UUID, expiration time.Duration) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+	return j.createToken(jwt.MapClaims{
 		verificationIdClaim: verificationID.String(),
 		"exp":               time.Now().Add(expiration).Unix(),
 		"iat":               time.Now().Unix(),
 	})
-
-	return token.SignedString(j.key)
 }
 
-func (j *JWTUtil) CreateAuthToken(sessionId uuid.UUID) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		sessionIdClaim: sessionId.String(),
+func (j *JWTUtil) CreateAuthToken(sessionID uuid.UUID) (string, error) {
+	return j.createToken(jwt.MapClaims{
+		sessionIdClaim: sessionID.String(),
 		"iat":          time.Now().Unix(),
 	})
+}
 
-	return token.SignedString(j.key)
+func (j *JWTUtil) CreateEphemeralAKEToken(akeStateID uuid.UUID, expiration time.Duration) (string, error) {
+	return j.createToken(jwt.MapClaims{
+		akeStateIdClaim: akeStateID.String(),
+		"exp":           time.Now().Add(expiration).Unix(),
+		"iat":           time.Now().Unix(),
+	})
 }
 
 func (j *JWTUtil) parseToken(tokenString string, claimKey string) (uuid.UUID, error) {
@@ -78,4 +88,8 @@ func (j *JWTUtil) ValidateVerificationToken(tokenString string) (uuid.UUID, erro
 
 func (j *JWTUtil) ValidateAuthToken(tokenString string) (uuid.UUID, error) {
 	return j.parseToken(tokenString, sessionIdClaim)
+}
+
+func (j *JWTUtil) ValidateEphemeralAKEToken(tokenString string) (uuid.UUID, error) {
+	return j.parseToken(tokenString, akeStateIdClaim)
 }
