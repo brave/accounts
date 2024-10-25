@@ -33,18 +33,13 @@ definitions:
         description: Email address to verify
         example: test@example.com
         type: string
-      sessionName:
-        description: Optional name for the session
-        example: Brave on Linux
-        maxLength: 35
-        type: string
     required:
     - email
     type: object
   controllers.VerifyInitResponse:
     description: Response containing verification check token
     properties:
-      verifyCheckToken:
+      verificationToken:
         description: JWT token for checking verification status
         type: string
     type: object
@@ -220,9 +215,9 @@ paths:
         name: verify_id
         required: true
         type: string
-      - description: Verification token
+      - description: Verification code
         in: query
-        name: verify_token
+        name: verify_code
         required: true
         type: string
       produces:

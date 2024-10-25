@@ -15,8 +15,7 @@ CREATE TABLE sessions (
 CREATE TABLE verifications (
     id UUID PRIMARY KEY,
     email TEXT NOT NULL,
-    token TEXT NOT NULL,
-    session_name TEXT,
+    code TEXT NOT NULL,
     verified BOOL NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

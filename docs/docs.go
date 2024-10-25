@@ -233,8 +233,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Verification token",
-                        "name": "verify_token",
+                        "description": "Verification code",
+                        "name": "verify_code",
                         "in": "query",
                         "required": true
                     }
@@ -364,12 +364,6 @@ const docTemplate = `{
                     "description": "Email address to verify",
                     "type": "string",
                     "example": "test@example.com"
-                },
-                "sessionName": {
-                    "description": "Optional name for the session",
-                    "type": "string",
-                    "maxLength": 35,
-                    "example": "Brave on Linux"
                 }
             }
         },
@@ -377,7 +371,7 @@ const docTemplate = `{
             "description": "Response containing verification check token",
             "type": "object",
             "properties": {
-                "verifyCheckToken": {
+                "verificationToken": {
                     "description": "JWT token for checking verification status",
                     "type": "string"
                 }
