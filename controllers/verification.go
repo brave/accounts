@@ -20,10 +20,11 @@ const (
 )
 
 type VerificationController struct {
-	datastore *datastore.Datastore
-	validate  *validator.Validate
-	jwtUtil   *util.JWTUtil
-	sesUtil   *util.SESUtil
+	datastore           *datastore.Datastore
+	validate            *validator.Validate
+	jwtUtil             *util.JWTUtil
+	sesUtil             *util.SESUtil
+	passwordAuthEnabled bool
 }
 
 // @Description	Request to initialize email verification
@@ -62,12 +63,13 @@ type ValidateTokenResponse struct {
 	SessionID string `json:"sessionId"`
 }
 
-func NewVerificationController(datastore *datastore.Datastore, jwtUtil *util.JWTUtil, sesUtil *util.SESUtil) *VerificationController {
+func NewVerificationController(datastore *datastore.Datastore, jwtUtil *util.JWTUtil, sesUtil *util.SESUtil, passwordAuthEnabled bool) *VerificationController {
 	return &VerificationController{
-		datastore: datastore,
-		validate:  validator.New(validator.WithRequiredStructEnabled()),
-		jwtUtil:   jwtUtil,
-		sesUtil:   sesUtil,
+		datastore:           datastore,
+		validate:            validator.New(validator.WithRequiredStructEnabled()),
+		jwtUtil:             jwtUtil,
+		sesUtil:             sesUtil,
+		passwordAuthEnabled: passwordAuthEnabled,
 	}
 }
 
@@ -219,31 +221,35 @@ func (vc *VerificationController) VerifyQueryResult(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if err := vc.datastore.DeleteVerification(verification.ID); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
+	var authToken *string
+	if !vc.passwordAuthEnabled {
+		if err := vc.datastore.DeleteVerification(verification.ID); err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
 
-	account, err := vc.datastore.GetOrCreateAccount(verification.Email)
-	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
+		account, err := vc.datastore.GetOrCreateAccount(verification.Email)
+		if err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
 
-	session, err := vc.datastore.CreateSession(account.ID, nil)
-	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
+		session, err := vc.datastore.CreateSession(account.ID, nil)
+		if err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
 
-	authToken, err := vc.jwtUtil.CreateAuthToken(session.ID)
-	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
+		authTokenResult, err := vc.jwtUtil.CreateAuthToken(session.ID)
+		if err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
+		authToken = &authTokenResult
 	}
 
 	response := VerifyResultResponse{
-		AuthToken: &authToken,
+		AuthToken: authToken,
 		Verified:  true,
 	}
 

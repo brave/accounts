@@ -85,13 +85,18 @@ func (d *Datastore) UpdateVerificationStatus(id uuid.UUID, code string) error {
 // GetVerificationStatus checks if email is verified with given token
 func (d *Datastore) GetVerificationStatus(id uuid.UUID) (*Verification, error) {
 	var verification Verification
-	result := d.db.Where("id = ? AND created_at > ?", id, time.Now().Add(-VerificationExpiration)).First(&verification)
-
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+	if err := d.db.First(&verification, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrVerificationNotFound
 		}
-		return nil, fmt.Errorf("error fetching verification: %w", result.Error)
+		return nil, fmt.Errorf("error fetching verification: %w", err)
+	}
+
+	if time.Since(verification.CreatedAt) > VerificationExpiration {
+		if err := d.db.Delete(&verification).Error; err != nil {
+			return nil, fmt.Errorf("error deleting expired verification: %w", err)
+		}
+		return nil, ErrVerificationNotFound
 	}
 
 	return &verification, nil
