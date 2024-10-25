@@ -69,12 +69,12 @@ func NewAuthController(datastore *datastore.Datastore, jwtUtil *util.JWTUtil, se
 	}
 }
 
-func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler) chi.Router {
+func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler, verificationAuthMiddleware func(http.Handler) http.Handler) chi.Router {
 	r := chi.NewRouter()
 
 	r.Post("/verify/init", ac.VerifyInit)
 	r.Get("/verify/complete", ac.VerifyComplete)
-	r.Post("/verify/auth", ac.VerifyGetAuthToken)
+	r.With(verificationAuthMiddleware).Post("/verify/auth", ac.VerifyGetAuthToken)
 	r.With(authMiddleware).Get("/auth/validate", ac.Validate)
 
 	return r
@@ -193,39 +193,32 @@ func (ac *AuthController) VerifyComplete(w http.ResponseWriter, r *http.Request)
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/verify/auth [post]
 func (ac *AuthController) VerifyGetAuthToken(w http.ResponseWriter, r *http.Request) {
-	// Extract and validate token
-	tokenString, err := util.ExtractAuthToken(r)
-	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
-		return
-	}
-
-	verificationID, err := ac.jwtUtil.ValidateVerificationToken(tokenString)
-	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
-		return
-	}
-
 	var requestData VerifyGetAuthTokenRequest
 	if err := render.DecodeJSON(r.Body, &requestData); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
 		return
 	}
 
+	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
+
 	var responseData VerifyGetAuthTokenResponse
 
-	verification, err := ac.datastore.GetVerificationStatus(r.Context(), verificationID, requestData.Wait)
-	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
+	if !verification.Verified && requestData.Wait {
+		verified, err := ac.datastore.WaitOnVerification(r.Context(), verification.ID)
+		if err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
+		verification.Verified = verified
 	}
+
 	if !verification.Verified {
 		render.Status(r, http.StatusOK)
 		render.JSON(w, r, responseData)
 		return
 	}
 
-	if err = ac.datastore.DeleteVerification(verificationID); err != nil {
+	if err := ac.datastore.DeleteVerification(verification.ID); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}

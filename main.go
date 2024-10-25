@@ -59,6 +59,7 @@ func main() {
 	}
 
 	authMiddleware := middleware.AuthMiddleware(jwtUtil, datastore)
+	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(jwtUtil, datastore)
 
 	r := chi.NewRouter()
 
@@ -68,7 +69,7 @@ func main() {
 	r.Use(middleware.LoggerMiddleware)
 
 	r.Route("/v2", func(r chi.Router) {
-		r.Mount("/", authController.Router(authMiddleware))
+		r.Mount("/", authController.Router(authMiddleware, verificationAuthMiddleware))
 		r.Mount("/sessions", sessionsController.Router(authMiddleware))
 	})
 
