@@ -26,7 +26,7 @@ func (e *ErrorResponse) Render(w http.ResponseWriter, r *http.Request) error {
 
 func RenderErrorResponse(w http.ResponseWriter, r *http.Request, status int, err error) {
 	var errStr string
-	if status != http.StatusBadRequest {
+	if status != http.StatusBadRequest && status != http.StatusNotFound {
 		errStr = http.StatusText(status)
 		logLevel := zerolog.ErrorLevel
 		if status != http.StatusInternalServerError {

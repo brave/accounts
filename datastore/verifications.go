@@ -83,8 +83,7 @@ func (d *Datastore) UpdateVerificationStatus(id uuid.UUID, code string) error {
 }
 
 // GetVerificationStatus checks if email is verified with given token
-func (d *Datastore) GetVerificationStatus(ctx context.Context, id uuid.UUID, wait bool) (*Verification, error) {
-	// Check current status first
+func (d *Datastore) GetVerificationStatus(id uuid.UUID) (*Verification, error) {
 	var verification Verification
 	result := d.db.Where("id = ? AND created_at > ?", id, time.Now().Add(-VerificationExpiration)).First(&verification)
 
@@ -95,27 +94,34 @@ func (d *Datastore) GetVerificationStatus(ctx context.Context, id uuid.UUID, wai
 		return nil, fmt.Errorf("error fetching verification: %w", result.Error)
 	}
 
-	if verification.Verified {
-		return &verification, nil
-	}
+	return &verification, nil
+}
 
-	if !wait {
-		return &verification, nil
-	}
-
+func (d *Datastore) WaitOnVerification(ctx context.Context, id uuid.UUID) (bool, error) {
 	// Setup notification listening
 	conn, err := pgx.ConnectConfig(ctx, d.dbConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
+		return false, fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer conn.Close(ctx)
 
 	channelName := generateNotificationChannel(id)
 	_, err = conn.Exec(ctx, "LISTEN \""+channelName+"\"")
 	if err != nil {
-		return nil, fmt.Errorf("failed to listen on channel: %w", err)
+		return false, fmt.Errorf("failed to listen on channel: %w", err)
 	}
 	defer conn.Exec(ctx, "UNLISTEN "+channelName)
+
+	// Check the database to see if the verification status changed
+	// while setting up the listener.
+	var verification Verification
+	result := d.db.Select("verified").Where("id = ?", id).First(&verification)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	if verification.Verified {
+		return true, nil
+	}
 
 	// Wait for notification with timeout
 	ctx, cancel := context.WithTimeout(ctx, verifyWaitMaxDuration)
@@ -124,13 +130,12 @@ func (d *Datastore) GetVerificationStatus(ctx context.Context, id uuid.UUID, wai
 	_, err = conn.WaitForNotification(ctx)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return &verification, nil
+			return false, nil
 		}
-		return nil, fmt.Errorf("error waiting for notification: %w", err)
+		return false, fmt.Errorf("error waiting for notification: %w", err)
 	}
 
-	verification.Verified = true
-	return &verification, nil
+	return true, nil
 }
 
 func (d *Datastore) DeleteVerification(id uuid.UUID) error {
