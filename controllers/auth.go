@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	qsVerifyID    = "verify_id"
-	qsVerifyToken = "verify_token"
+	qsVerifyID   = "verify_id"
+	qsVerifyCode = "verify_code"
 )
 
 type AuthController struct {
@@ -30,14 +30,12 @@ type AuthController struct {
 type VerifyInitRequest struct {
 	// Email address to verify
 	Email string `json:"email" validate:"required,email,ascii" example:"test@example.com"`
-	// Optional name for the session
-	SessionName *string `json:"sessionName" validate:"omitempty,max=35,ascii" example:"Brave on Linux"`
 }
 
 // @Description	Response containing verification check token
 type VerifyInitResponse struct {
 	// JWT token for checking verification status
-	VerifyCheckToken string `json:"verifyCheckToken"`
+	VerificationToken string `json:"verificationToken"`
 }
 
 // @Description	Request for getting auth token after verification
@@ -104,13 +102,13 @@ func (ac *AuthController) VerifyInit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	verification, err := ac.datastore.CreateVerification(requestData.Email, requestData.SessionName)
+	verification, err := ac.datastore.CreateVerification(requestData.Email)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
 
-	verifyCheckToken, err := ac.jwtUtil.CreateVerifyCheckToken(verification.ID, datastore.VerificationExpiration)
+	verificationToken, err := ac.jwtUtil.CreateVerificationToken(verification.ID, datastore.VerificationExpiration)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
@@ -119,16 +117,15 @@ func (ac *AuthController) VerifyInit(w http.ResponseWriter, r *http.Request) {
 	if err := ac.sesUtil.SendVerificationEmail(
 		r.Context(),
 		requestData.Email,
-		requestData.SessionName,
 		verification.ID.String(),
-		verification.Token,
+		verification.Code,
 	); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, fmt.Errorf("failed to send verification email: %w", err))
 		return
 	}
 
 	response := VerifyInitResponse{
-		VerifyCheckToken: verifyCheckToken,
+		VerificationToken: verificationToken,
 	}
 
 	render.Status(r, http.StatusOK)
@@ -140,7 +137,7 @@ func (ac *AuthController) VerifyInit(w http.ResponseWriter, r *http.Request) {
 // @Tags Auth
 // @Produce text/plain
 // @Param verify_id query string true "Verification ID"
-// @Param verify_token query string true "Verification token"
+// @Param verify_code query string true "Verification code"
 // @Success 200 {string} string "Email verification successful"
 // @Failure 400 {string} string "Missing/invalid verification parameters"
 // @Failure 404 {string} string "Verification not found"
@@ -148,7 +145,7 @@ func (ac *AuthController) VerifyInit(w http.ResponseWriter, r *http.Request) {
 // @Router /v2/verify/complete [get]
 func (ac *AuthController) VerifyComplete(w http.ResponseWriter, r *http.Request) {
 	verifyID := r.URL.Query().Get(qsVerifyID)
-	verifyToken := r.URL.Query().Get(qsVerifyToken)
+	verifyToken := r.URL.Query().Get(qsVerifyCode)
 
 	if verifyID == "" || verifyToken == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -188,7 +185,7 @@ func (ac *AuthController) VerifyComplete(w http.ResponseWriter, r *http.Request)
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer + verify check token"
+// @Param Authorization header string true "Bearer + verification token"
 // @Param request body VerifyGetAuthTokenRequest true "Auth token request params"
 // @Success 200 {object} VerifyGetAuthTokenResponse
 // @Failure 400 {object} util.ErrorResponse
@@ -203,7 +200,7 @@ func (ac *AuthController) VerifyGetAuthToken(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	verificationID, err := ac.jwtUtil.ValidateVerifyCheckToken(tokenString)
+	verificationID, err := ac.jwtUtil.ValidateVerificationToken(tokenString)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 		return
@@ -239,7 +236,7 @@ func (ac *AuthController) VerifyGetAuthToken(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	session, err := ac.datastore.CreateSession(account.ID, verification.SessionName)
+	session, err := ac.datastore.CreateSession(account.ID, nil)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return

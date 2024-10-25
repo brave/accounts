@@ -72,17 +72,15 @@ func NewSESUtil() (*SESUtil, error) {
 }
 
 type verifyEmailData struct {
-	VerifyURL   string
-	Email       string
-	SessionName *string
+	VerifyURL string
+	Email     string
 }
 
-func (s *SESUtil) SendVerificationEmail(ctx context.Context, email string, sessionName *string, verificationID string, verificationToken string) error {
-	verifyURL := fmt.Sprintf("%s/v2/verify/complete?verify_id=%s&verify_token=%s", s.baseURL, verificationID, verificationToken)
+func (s *SESUtil) SendVerificationEmail(ctx context.Context, email string, verificationID string, verificationCode string) error {
+	verifyURL := fmt.Sprintf("%s/v2/verify/complete?verify_id=%s&verify_code=%s", s.baseURL, verificationID, verificationCode)
 	data := verifyEmailData{
-		VerifyURL:   verifyURL,
-		Email:       email,
-		SessionName: sessionName,
+		VerifyURL: verifyURL,
+		Email:     email,
 	}
 
 	log.Debug().Str("verify_url", verifyURL).Msg("Sent verification link")

@@ -14,16 +14,15 @@ import (
 )
 
 type Verification struct {
-	ID          uuid.UUID
-	Email       string
-	Token       string
-	SessionName *string
-	Verified    bool
-	CreatedAt   time.Time `gorm:"<-:false"`
+	ID        uuid.UUID
+	Email     string
+	Code      string
+	Verified  bool
+	CreatedAt time.Time `gorm:"<-:false"`
 }
 
 const (
-	tokenLength            = 60
+	codeLength             = 60
 	verifyWaitMaxDuration  = 20 * time.Second
 	VerificationExpiration = 30 * time.Minute
 )
@@ -35,8 +34,8 @@ func generateNotificationChannel(id uuid.UUID) string {
 }
 
 // CreateVerification creates a new verification record
-func (d *Datastore) CreateVerification(email string, sessionName *string) (*Verification, error) {
-	token := util.GenerateRandomString(tokenLength)
+func (d *Datastore) CreateVerification(email string) (*Verification, error) {
+	code := util.GenerateRandomString(codeLength)
 
 	id, err := uuid.NewV7()
 	if err != nil {
@@ -44,11 +43,10 @@ func (d *Datastore) CreateVerification(email string, sessionName *string) (*Veri
 	}
 
 	verification := Verification{
-		ID:          id,
-		Email:       strings.TrimSpace(email),
-		SessionName: sessionName,
-		Token:       token,
-		Verified:    false,
+		ID:       id,
+		Email:    strings.TrimSpace(email),
+		Code:     code,
+		Verified: false,
 	}
 
 	if err := d.db.Create(&verification).Error; err != nil {
@@ -59,9 +57,9 @@ func (d *Datastore) CreateVerification(email string, sessionName *string) (*Veri
 }
 
 // UpdateVerificationStatus updates the verification status for a given email
-func (d *Datastore) UpdateVerificationStatus(id uuid.UUID, token string) error {
+func (d *Datastore) UpdateVerificationStatus(id uuid.UUID, code string) error {
 	result := d.db.Model(&Verification{}).
-		Where("id = ? AND token = ?", id, token).
+		Where("id = ? AND code = ?", id, code).
 		Update("verified", true)
 
 	if result.Error != nil {

@@ -30,7 +30,7 @@ func NewJWTUtil() (*JWTUtil, error) {
 	}, nil
 }
 
-func (j *JWTUtil) CreateVerifyCheckToken(verificationID uuid.UUID, expiration time.Duration) (string, error) {
+func (j *JWTUtil) CreateVerificationToken(verificationID uuid.UUID, expiration time.Duration) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		verificationIdClaim: verificationID.String(),
 		"exp":               time.Now().Add(expiration).Unix(),
@@ -72,7 +72,7 @@ func (j *JWTUtil) parseToken(tokenString string, claimKey string) (uuid.UUID, er
 	return uuid.Nil, fmt.Errorf("invalid token claims")
 }
 
-func (j *JWTUtil) ValidateVerifyCheckToken(tokenString string) (uuid.UUID, error) {
+func (j *JWTUtil) ValidateVerificationToken(tokenString string) (uuid.UUID, error) {
 	return j.parseToken(tokenString, verificationIdClaim)
 }
 
