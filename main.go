@@ -63,13 +63,15 @@ func main() {
 
 	r := chi.NewRouter()
 
-	authController := controllers.NewAuthController(datastore, jwtUtil, sesUtil)
+	authController := controllers.NewAuthController()
+	verificationController := controllers.NewVerificationController(datastore, jwtUtil, sesUtil)
 	sessionsController := controllers.NewSessionsController(datastore)
 
 	r.Use(middleware.LoggerMiddleware)
 
 	r.Route("/v2", func(r chi.Router) {
-		r.Mount("/", authController.Router(authMiddleware, verificationAuthMiddleware))
+		r.Mount("/", authController.Router(authMiddleware))
+		r.Mount("/verify", verificationController.Router(verificationAuthMiddleware))
 		r.Mount("/sessions", sessionsController.Router(authMiddleware))
 	})
 

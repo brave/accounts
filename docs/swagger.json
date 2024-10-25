@@ -144,65 +144,6 @@
                 }
             }
         },
-        "/v2/verify/auth": {
-            "post": {
-                "description": "Exchanges a verify check token for an auth token after successful verification.\nIf the wait option is set to true, the server will up to 20 seconds for verification. Feel free\nto call this endpoint repeatedly to wait for verification.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Auth"
-                ],
-                "summary": "Get authentication token",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer + verification token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "description": "Auth token request params",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/controllers.VerifyGetAuthTokenRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/controllers.VerifyGetAuthTokenResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/util.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/util.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/util.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/v2/verify/complete": {
             "get": {
                 "description": "Completes the email verification process",
@@ -210,7 +151,7 @@
                     "text/plain"
                 ],
                 "tags": [
-                    "Auth"
+                    "Email verification"
                 ],
                 "summary": "Complete email verification",
                 "parameters": [
@@ -267,7 +208,7 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Auth"
+                    "Email verification"
                 ],
                 "summary": "Initialize email verification",
                 "parameters": [
@@ -302,6 +243,65 @@
                     }
                 }
             }
+        },
+        "/v2/verify/result": {
+            "post": {
+                "description": "Exchanges a verify check token for an auth token after successful verification.\nIf the wait option is set to true, the server will up to 20 seconds for verification. Feel free\nto call this endpoint repeatedly to wait for verification.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Email verification"
+                ],
+                "summary": "Query result of verification",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + verification token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Auth token request params",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.VerifyResultRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.VerifyResultResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -319,26 +319,6 @@
                 },
                 "sessionId": {
                     "description": "UUID of the session associated with the account",
-                    "type": "string"
-                }
-            }
-        },
-        "controllers.VerifyGetAuthTokenRequest": {
-            "description": "Request for getting auth token after verification",
-            "type": "object",
-            "properties": {
-                "wait": {
-                    "description": "Whether to wait for verification to complete",
-                    "type": "boolean"
-                }
-            }
-        },
-        "controllers.VerifyGetAuthTokenResponse": {
-            "description": "Response containing auth token",
-            "type": "object",
-            "properties": {
-                "authToken": {
-                    "description": "JWT auth token, null if verification incomplete",
                     "type": "string"
                 }
             }
@@ -364,6 +344,30 @@
                 "verificationToken": {
                     "description": "JWT token for checking verification status",
                     "type": "string"
+                }
+            }
+        },
+        "controllers.VerifyResultRequest": {
+            "description": "Request for getting auth token after verification",
+            "type": "object",
+            "properties": {
+                "wait": {
+                    "description": "Whether to wait for verification to complete",
+                    "type": "boolean"
+                }
+            }
+        },
+        "controllers.VerifyResultResponse": {
+            "description": "Response containing auth token",
+            "type": "object",
+            "properties": {
+                "authToken": {
+                    "description": "JWT auth token, null if verification incomplete or if password setup is required",
+                    "type": "string"
+                },
+                "verified": {
+                    "description": "Email verification status",
+                    "type": "boolean"
                 }
             }
         },
