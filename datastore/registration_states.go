@@ -28,15 +28,17 @@ func (d *Datastore) GetRegistrationStateSeedID(email string) (int, error) {
 		return 0, fmt.Errorf("failed to get registration state: %w", err)
 	}
 
+	var err error
 	if time.Since(state.CreatedAt) > registrationStateExpiration {
-		if err := d.db.Delete(&state).Error; err != nil {
-			return 0, fmt.Errorf("failed to delete expired registration state: %w", err)
-		}
-		return 0, ErrRegistrationStateExpired
+		err = ErrRegistrationStateExpired
 	}
 
-	if err := d.db.Delete(&state).Error; err != nil {
-		return 0, fmt.Errorf("failed to delete registration state: %w", err)
+	if dbErr := d.db.Delete(&state).Error; dbErr != nil {
+		return 0, fmt.Errorf("failed to delete registration state: %w", dbErr)
+	}
+
+	if err != nil {
+		return 0, err
 	}
 
 	return state.OprfSeedID, nil

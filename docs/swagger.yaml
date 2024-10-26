@@ -1,4 +1,52 @@
 definitions:
+  controllers.KE1:
+    properties:
+      blindedMessage:
+        type: string
+      clientEphemeralPublicKey:
+        type: string
+      clientNonce:
+        type: string
+      email:
+        example: test@example.com
+        type: string
+    required:
+    - blindedMessage
+    - clientEphemeralPublicKey
+    - clientNonce
+    - email
+    type: object
+  controllers.KE2:
+    properties:
+      akeToken:
+        type: string
+      evaluatedMessage:
+        type: string
+      maskedResponse:
+        type: string
+      maskingNonce:
+        type: string
+      serverEphemeralPublicKey:
+        type: string
+      serverMac:
+        type: string
+      serverNonce:
+        type: string
+    type: object
+  controllers.KE3:
+    properties:
+      clientMac:
+        type: string
+      sessionName:
+        type: string
+    required:
+    - clientMac
+    type: object
+  controllers.LoginFinalizeResponse:
+    properties:
+      authToken:
+        type: string
+    type: object
   controllers.PasswordFinalizeResponse:
     properties:
       authToken:
@@ -273,6 +321,75 @@ paths:
       summary: Initialize password setup
       tags:
       - Accounts
+  /v2/auth/login/finalize:
+    post:
+      consumes:
+      - application/json
+      description: Final step of login flow, verifies KE3 message and creates session
+      parameters:
+      - description: Bearer + ake token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: KE3 message
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.KE3'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.LoginFinalizeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Finalize login
+      tags:
+      - Auth
+  /v2/auth/login/init:
+    post:
+      consumes:
+      - application/json
+      description: First step of OPAQUE login flow, generates KE2 message
+      parameters:
+      - description: KE1 message
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.KE1'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.KE2'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Initialize login
+      tags:
+      - Auth
   /v2/auth/validate:
     get:
       description: Validates an auth token and returns session details
@@ -291,6 +408,10 @@ paths:
             $ref: '#/definitions/controllers.ValidateTokenResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/util.ErrorResponse'
         "500":

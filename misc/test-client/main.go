@@ -21,6 +21,8 @@ func postReq(fields map[string]interface{}, url string, verificationToken string
 		log.Fatal(err)
 	}
 
+	log.Printf("request body: %+v", fields)
+
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		log.Fatal(err)
@@ -49,6 +51,9 @@ func postReq(fields map[string]interface{}, url string, verificationToken string
 	if err := decoder.Decode(&respBody); err != nil {
 		log.Fatal(err)
 	}
+
+	log.Printf("response body: %+v", respBody)
+
 	return respBody
 }
 

@@ -46,9 +46,9 @@ func (d *Datastore) CreateSession(accountID uuid.UUID, sessionName *string) (*Se
 	return &session, nil
 }
 
-func (d *Datastore) ListSessions(accountID uuid.UUID) ([]Session, error) {
+func (d *Datastore) ListSessions(accountID uuid.UUID, minSessionVersion int) ([]Session, error) {
 	var sessions []Session
-	if err := d.db.Where("account_id = ?", accountID).Find(&sessions).Error; err != nil {
+	if err := d.db.Where("account_id = ? AND version >= ?", accountID, minSessionVersion).Find(&sessions).Error; err != nil {
 		return nil, fmt.Errorf("failed to list sessions: %w", err)
 	}
 

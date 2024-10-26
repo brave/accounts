@@ -253,6 +253,111 @@
                 }
             }
         },
+        "/v2/auth/login/finalize": {
+            "post": {
+                "description": "Final step of login flow, verifies KE3 message and creates session",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Finalize login",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + ake token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "KE3 message",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.KE3"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.LoginFinalizeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/auth/login/init": {
+            "post": {
+                "description": "First step of OPAQUE login flow, generates KE2 message",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Initialize login",
+                "parameters": [
+                    {
+                        "description": "KE1 message",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.KE1"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.KE2"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v2/auth/validate": {
             "get": {
                 "description": "Validates an auth token and returns session details",
@@ -281,6 +386,12 @@
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/util.ErrorResponse"
                         }
@@ -553,6 +664,78 @@
         }
     },
     "definitions": {
+        "controllers.KE1": {
+            "type": "object",
+            "required": [
+                "blindedMessage",
+                "clientEphemeralPublicKey",
+                "clientNonce",
+                "email"
+            ],
+            "properties": {
+                "blindedMessage": {
+                    "type": "string"
+                },
+                "clientEphemeralPublicKey": {
+                    "type": "string"
+                },
+                "clientNonce": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string",
+                    "example": "test@example.com"
+                }
+            }
+        },
+        "controllers.KE2": {
+            "type": "object",
+            "properties": {
+                "akeToken": {
+                    "type": "string"
+                },
+                "evaluatedMessage": {
+                    "type": "string"
+                },
+                "maskedResponse": {
+                    "type": "string"
+                },
+                "maskingNonce": {
+                    "type": "string"
+                },
+                "serverEphemeralPublicKey": {
+                    "type": "string"
+                },
+                "serverMac": {
+                    "type": "string"
+                },
+                "serverNonce": {
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.KE3": {
+            "type": "object",
+            "required": [
+                "clientMac"
+            ],
+            "properties": {
+                "clientMac": {
+                    "type": "string"
+                },
+                "sessionName": {
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.LoginFinalizeResponse": {
+            "type": "object",
+            "properties": {
+                "authToken": {
+                    "type": "string"
+                }
+            }
+        },
         "controllers.PasswordFinalizeResponse": {
             "type": "object",
             "properties": {

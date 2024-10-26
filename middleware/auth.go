@@ -12,7 +12,7 @@ import (
 const ContextSession = "session"
 const ContextVerification = "verification"
 
-func AuthMiddleware(jwtUtil *util.JWTUtil, ds *datastore.Datastore) func(http.Handler) http.Handler {
+func AuthMiddleware(jwtUtil *util.JWTUtil, ds *datastore.Datastore, minSessionVersion int) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token, err := util.ExtractAuthToken(r)
@@ -34,6 +34,11 @@ func AuthMiddleware(jwtUtil *util.JWTUtil, ds *datastore.Datastore) func(http.Ha
 					return
 				}
 				util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+				return
+			}
+
+			if session.Version < minSessionVersion {
+				util.RenderErrorResponse(w, r, http.StatusForbidden, errors.New("outdated session"))
 				return
 			}
 
