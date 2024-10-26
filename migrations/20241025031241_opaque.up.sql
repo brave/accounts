@@ -9,7 +9,8 @@ ALTER TABLE accounts ADD COLUMN opaque_registration BYTEA;
 
 CREATE TABLE ake_states (
     id UUID PRIMARY KEY,
-    account_id UUID NOT NULL REFERENCES accounts(id),
+    account_id UUID REFERENCES accounts(id),
+    oprf_seed_id INT REFERENCES oprf_seeds(id),
     state BYTEA NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

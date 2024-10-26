@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 
@@ -9,12 +10,15 @@ import (
 	"github.com/bytemare/crypto"
 	"github.com/bytemare/opaque"
 	opaqueMsg "github.com/bytemare/opaque/message"
+	"github.com/google/uuid"
 )
 
 const (
 	opaqueSecretKeyEnv = "OPAQUE_SECRET_KEY"
 	opaquePublicKeyEnv = "OPAQUE_PUBLIC_KEY"
 )
+
+var ErrIncorrectCredentials = errors.New("incorrect credentials")
 
 type OpaqueService struct {
 	ds            *datastore.Datastore
@@ -62,18 +66,33 @@ func NewOpaqueService(ds *datastore.Datastore) (*OpaqueService, error) {
 	return &OpaqueService{ds, oprfSeeds, currentSeedId, secretKey, publicKey, config}, nil
 }
 
-func (o *OpaqueService) SetupPasswordInit(email string, request *opaqueMsg.RegistrationRequest) (*opaqueMsg.RegistrationResponse, error) {
+func (o *OpaqueService) NewElement() *crypto.Element {
+	return o.config.OPRF.Group().NewElement()
+}
+
+func (o *OpaqueService) newOpaqueServer(seedID int) (*opaque.Server, error) {
 	server, err := opaque.NewServer(o.config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init opaque server: %w", err)
+	}
+	if err = server.SetKeyMaterial(nil, o.secretKey, o.publicKey, o.oprfSeeds[seedID]); err != nil {
+		return nil, fmt.Errorf("failed to set key material for opaque server: %w", err)
+	}
+	return server, nil
+}
+
+func (o *OpaqueService) SetupPasswordInit(email string, request *opaqueMsg.RegistrationRequest) (*opaqueMsg.RegistrationResponse, error) {
+	seedID := o.currentSeedId
+
+	server, err := o.newOpaqueServer(seedID)
+	if err != nil {
+		return nil, err
 	}
 
 	publicKeyElement := o.NewElement()
 	if err = publicKeyElement.UnmarshalBinary(o.publicKey); err != nil {
 		return nil, fmt.Errorf("failed to decode public key during password init: %w", err)
 	}
-
-	seedID := o.currentSeedId
 
 	if err = o.ds.UpsertRegistrationState(email, seedID); err != nil {
 		return nil, err
@@ -105,6 +124,92 @@ func (o *OpaqueService) SetupPasswordFinalize(email string, registration *opaque
 	return account, nil
 }
 
-func (o *OpaqueService) NewElement() *crypto.Element {
-	return o.config.OPRF.Group().NewElement()
+func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.KE2, *datastore.AKEState, error) {
+	account, err := o.ds.GetAccount(nil, email)
+	if err != nil {
+		if errors.Is(err, datastore.ErrAccountNotFound) {
+			err = nil
+		} else {
+			return nil, nil, fmt.Errorf("failed to get account during login init: %w", err)
+		}
+	}
+
+	useFakeRecord := account == nil || account.OpaqueRegistration == nil || account.OprfSeedID == nil
+
+	seedID := o.currentSeedId
+	if !useFakeRecord {
+		seedID = *account.OprfSeedID
+	}
+
+	server, err := o.newOpaqueServer(seedID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var opaqueRecord *opaque.ClientRecord
+	if useFakeRecord {
+		// Get fake record and continue with process to prevent
+		// client enumeration attacks
+		opaqueRecord, err = o.config.GetFakeRecord([]byte(email))
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get fake opaque registration: %w", err)
+		}
+	} else {
+		deserializer, err := o.config.Deserializer()
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get opaque deserializer: %w", err)
+		}
+		opaqueRegistration, err := deserializer.RegistrationRecord(account.OpaqueRegistration)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to deserialize opaque registration: %w", err)
+		}
+		opaqueRecord = &opaque.ClientRecord{
+			RegistrationRecord:   opaqueRegistration,
+			CredentialIdentifier: []byte(email),
+			ClientIdentity:       nil,
+			TestMaskNonce:        nil,
+		}
+	}
+
+	ke2, err := server.LoginInit(ke1, opaqueRecord)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate ke2: %w", err)
+	}
+
+	var accountID *uuid.UUID
+	if !useFakeRecord {
+		accountID = &account.ID
+	}
+	akeState, err := o.ds.CreateAKEState(accountID, server.SerializeState(), seedID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to store AKE state: %w", err)
+	}
+
+	return ke2, akeState, nil
+}
+
+func (o *OpaqueService) LoginFinalize(akeStateID uuid.UUID, ke3 *opaqueMsg.KE3) (*uuid.UUID, error) {
+	akeState, err := o.ds.GetAKEState(akeStateID)
+	if err != nil {
+		return nil, err
+	}
+
+	server, err := o.newOpaqueServer(akeState.OprfSeedID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = server.SetAKEState(akeState.State); err != nil {
+		return nil, fmt.Errorf("failed to set AKE state for login finalize: %w", err)
+	}
+
+	if err = server.LoginFinish(ke3); err != nil {
+		return nil, ErrIncorrectCredentials
+	}
+
+	if akeState.AccountID == nil {
+		return nil, ErrIncorrectCredentials
+	}
+
+	return akeState.AccountID, nil
 }

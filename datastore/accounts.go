@@ -17,17 +17,37 @@ type Account struct {
 	CreatedAt          time.Time
 }
 
-func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
+var ErrAccountNotFound = errors.New("account not found")
+
+func (d *Datastore) GetAccount(tx *gorm.DB, email string) (*Account, error) {
 	var account Account
+	if tx == nil {
+		tx = d.db
+	}
+	result := tx.Where("email = ?", email).First(&account)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, ErrAccountNotFound
+		}
+		return nil, fmt.Errorf("error fetching account: %w", result.Error)
+	}
+	return &account, nil
+}
+
+func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
+	var account *Account
 
 	err := d.db.Transaction(func(tx *gorm.DB) error {
-		result := tx.Where("email = ?", email).First(&account)
-		if result.Error == nil {
-			return nil
-		}
+		account, err := d.GetAccount(tx, email)
 
-		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("error fetching account: %w", result.Error)
+		if err != nil {
+			if errors.Is(err, ErrAccountNotFound) {
+				err = nil
+			} else {
+				return err
+			}
+		} else {
+			return nil
 		}
 
 		id, err := uuid.NewV7()
@@ -35,8 +55,10 @@ func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
 			return err
 		}
 
-		account.ID = id
-		account.Email = email
+		account = &Account{
+			ID:    id,
+			Email: email,
+		}
 
 		if err := tx.Create(&account).Error; err != nil {
 			return fmt.Errorf("error creating account: %w", err)
@@ -49,7 +71,7 @@ func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
 		return nil, err
 	}
 
-	return &account, nil
+	return account, nil
 }
 
 // split into two methods for seed id and registration. use the struct for updates!

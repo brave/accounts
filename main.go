@@ -67,15 +67,20 @@ func main() {
 		log.Panic().Err(err).Msg("Failed to init OPAQUE service")
 	}
 
-	authMiddleware := middleware.AuthMiddleware(jwtUtil, datastore)
+	minSessionVersion := 1
+	if passwordAuthEnabled {
+		minSessionVersion = 2
+	}
+
+	authMiddleware := middleware.AuthMiddleware(jwtUtil, datastore, minSessionVersion)
 	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(jwtUtil, datastore)
 
 	r := chi.NewRouter()
 
-	authController := controllers.NewAuthController(opaqueService)
+	authController := controllers.NewAuthController(opaqueService, jwtUtil, datastore)
 	accountsController := controllers.NewAccountsController(opaqueService, jwtUtil, datastore)
 	verificationController := controllers.NewVerificationController(datastore, jwtUtil, sesUtil, passwordAuthEnabled)
-	sessionsController := controllers.NewSessionsController(datastore)
+	sessionsController := controllers.NewSessionsController(datastore, minSessionVersion)
 
 	r.Use(middleware.LoggerMiddleware)
 
