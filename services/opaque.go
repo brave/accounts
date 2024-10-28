@@ -14,19 +14,21 @@ import (
 )
 
 const (
-	opaqueSecretKeyEnv = "OPAQUE_SECRET_KEY"
-	opaquePublicKeyEnv = "OPAQUE_PUBLIC_KEY"
+	opaqueSecretKeyEnv  = "OPAQUE_SECRET_KEY"
+	opaquePublicKeyEnv  = "OPAQUE_PUBLIC_KEY"
+	opaqueFakeRecordEnv = "OPAQUE_FAKE_RECORD"
 )
 
 var ErrIncorrectCredentials = errors.New("incorrect credentials")
 
 type OpaqueService struct {
-	ds            *datastore.Datastore
-	oprfSeeds     map[int][]byte
-	currentSeedId int
-	secretKey     []byte
-	publicKey     []byte
-	config        *opaque.Configuration
+	ds                *datastore.Datastore
+	oprfSeeds         map[int][]byte
+	currentSeedId     int
+	secretKey         []byte
+	publicKey         []byte
+	config            *opaque.Configuration
+	fakeRecordEnabled bool
 }
 
 func NewOpaqueService(ds *datastore.Datastore) (*OpaqueService, error) {
@@ -56,6 +58,8 @@ func NewOpaqueService(ds *datastore.Datastore) (*OpaqueService, error) {
 		return nil, fmt.Errorf("failed to get/create oprf seeds: %w", err)
 	}
 
+	fakeRecordEnabled := os.Getenv(opaqueFakeRecordEnv) == "true"
+
 	currentSeedId := 0
 	for k := range oprfSeeds {
 		if k > currentSeedId {
@@ -63,7 +67,7 @@ func NewOpaqueService(ds *datastore.Datastore) (*OpaqueService, error) {
 		}
 	}
 
-	return &OpaqueService{ds, oprfSeeds, currentSeedId, secretKey, publicKey, config}, nil
+	return &OpaqueService{ds, oprfSeeds, currentSeedId, secretKey, publicKey, config, fakeRecordEnabled}, nil
 }
 
 func (o *OpaqueService) NewElement() *crypto.Element {
@@ -132,6 +136,10 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 		} else {
 			return nil, nil, fmt.Errorf("failed to get account during login init: %w", err)
 		}
+	}
+
+	if account == nil && !o.fakeRecordEnabled {
+		return nil, nil, ErrIncorrectCredentials
 	}
 
 	useFakeRecord := account == nil || account.OpaqueRegistration == nil || account.OprfSeedID == nil

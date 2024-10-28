@@ -159,6 +159,7 @@ func (ac *AuthController) Validate(w http.ResponseWriter, r *http.Request) {
 // @Param request body KE1 true "KE1 message"
 // @Success 200 {object} KE2
 // @Failure 400 {object} util.ErrorResponse
+// @Failure 401 {object} util.ErrorResponse
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/auth/login/init [post]
 func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
@@ -181,6 +182,10 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 
 	ke2, akeState, err := ac.opaqueService.LoginInit(requestData.Email, opaqueReq)
 	if err != nil {
+		if errors.Is(err, services.ErrIncorrectCredentials) {
+			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
+			return
+		}
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
