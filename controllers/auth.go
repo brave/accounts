@@ -122,8 +122,8 @@ func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler)
 	r := chi.NewRouter()
 
 	r.With(authMiddleware).Get("/validate", ac.Validate)
-	r.With(authMiddleware).Post("/login/init", ac.LoginInit)
-	r.With(authMiddleware).Post("/login/finalize", ac.LoginInit)
+	r.Post("/login/init", ac.LoginInit)
+	r.Post("/login/finalize", ac.LoginFinalize)
 
 	return r
 }

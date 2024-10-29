@@ -13,14 +13,12 @@ import (
 )
 
 type SessionsController struct {
-	datastore         *datastore.Datastore
-	minSessionVersion int
+	datastore *datastore.Datastore
 }
 
-func NewSessionsController(datastore *datastore.Datastore, minSessionVersion int) *SessionsController {
+func NewSessionsController(datastore *datastore.Datastore) *SessionsController {
 	return &SessionsController{
 		datastore,
-		minSessionVersion,
 	}
 }
 
@@ -36,7 +34,7 @@ func NewSessionsController(datastore *datastore.Datastore, minSessionVersion int
 func (sc *SessionsController) ListSessions(w http.ResponseWriter, r *http.Request) {
 	session := r.Context().Value(middleware.ContextSession).(*datastore.Session)
 
-	sessions, err := sc.datastore.ListSessions(session.AccountID, sc.minSessionVersion)
+	sessions, err := sc.datastore.ListSessions(session.AccountID, nil)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return

@@ -174,8 +174,7 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 		opaqueRecord = &opaque.ClientRecord{
 			RegistrationRecord:   opaqueRegistration,
 			CredentialIdentifier: []byte(email),
-			ClientIdentity:       nil,
-			TestMaskNonce:        nil,
+			ClientIdentity:       []byte(email),
 		}
 	}
 

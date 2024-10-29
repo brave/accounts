@@ -47,7 +47,12 @@ func main() {
 
 	passwordAuthEnabled := os.Getenv(passwordAuthEnabledEnv) == "true"
 
-	datastore, err := datastore.NewDatastore()
+	minSessionVersion := 1
+	if passwordAuthEnabled {
+		minSessionVersion = 2
+	}
+
+	datastore, err := datastore.NewDatastore(minSessionVersion)
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to init datastore")
 	}
@@ -67,11 +72,6 @@ func main() {
 		log.Panic().Err(err).Msg("Failed to init OPAQUE service")
 	}
 
-	minSessionVersion := 1
-	if passwordAuthEnabled {
-		minSessionVersion = 2
-	}
-
 	authMiddleware := middleware.AuthMiddleware(jwtUtil, datastore, minSessionVersion)
 	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(jwtUtil, datastore)
 
@@ -80,7 +80,7 @@ func main() {
 	authController := controllers.NewAuthController(opaqueService, jwtUtil, datastore)
 	accountsController := controllers.NewAccountsController(opaqueService, jwtUtil, datastore)
 	verificationController := controllers.NewVerificationController(datastore, jwtUtil, sesUtil, passwordAuthEnabled)
-	sessionsController := controllers.NewSessionsController(datastore, minSessionVersion)
+	sessionsController := controllers.NewSessionsController(datastore)
 
 	r.Use(middleware.LoggerMiddleware)
 
