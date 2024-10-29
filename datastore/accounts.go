@@ -38,7 +38,8 @@ func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
 	var account *Account
 
 	err := d.db.Transaction(func(tx *gorm.DB) error {
-		account, err := d.GetAccount(tx, email)
+		var err error
+		account, err = d.GetAccount(tx, email)
 
 		if err != nil {
 			if errors.Is(err, ErrAccountNotFound) {
@@ -60,7 +61,7 @@ func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
 			Email: email,
 		}
 
-		if err := tx.Create(&account).Error; err != nil {
+		if err := tx.Create(account).Error; err != nil {
 			return fmt.Errorf("error creating account: %w", err)
 		}
 
