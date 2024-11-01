@@ -19,7 +19,7 @@ type Session struct {
 	// The accounts "phase" the session was created in
 	Version int `json:"-"`
 	// Expiration timestamp
-	ExpiresAt *time.Time `json:"expiresAt" gorm:"<-:false"`
+	ExpiresAt *time.Time `json:"expiresAt"`
 	// Session creation timestamp
 	CreatedAt time.Time `json:"createdAt" gorm:"<-:false"`
 	// Account is excluded from JSON

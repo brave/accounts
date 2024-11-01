@@ -55,7 +55,7 @@ type VerifyInitRequest struct {
 // @Description	Response containing verification check token
 type VerifyInitResponse struct {
 	// JWT token for checking verification status
-	VerificationToken string `json:"verificationToken"`
+	VerificationToken *string `json:"verificationToken"`
 }
 
 // @Description	Request for getting auth token after verification
@@ -160,10 +160,14 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	verificationToken, err := vc.jwtUtil.CreateVerificationToken(verification.ID, datastore.VerificationExpiration)
-	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
+	var verificationToken *string
+	if requestData.Intent == authTokenIntent || requestData.Intent == verificationIntent {
+		token, err := vc.jwtUtil.CreateVerificationToken(verification.ID, datastore.VerificationExpiration)
+		if err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
+		verificationToken = &token
 	}
 
 	if err := vc.sesUtil.SendVerificationEmail(
