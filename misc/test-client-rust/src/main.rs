@@ -160,7 +160,7 @@ fn login() {
     let credential_finalization_hex = hex::encode(client_login_finish_result.message.serialize());
 
     let mut body: HashMap<&str, Value> = HashMap::new();
-    body.insert("serializedKE3", credential_finalization_hex.into());
+    body.insert("clientMac", credential_finalization_hex.into());
 
     let resp = post_request(
         "http://localhost:8080/v2/auth/login/finalize",

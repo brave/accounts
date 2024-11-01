@@ -25,26 +25,41 @@ type AccountsController struct {
 	ds            *datastore.Datastore
 }
 
+// @Description Response for password setup or change
 type PasswordFinalizeResponse struct {
 	// Authentication token
 	AuthToken string `json:"authToken"`
 }
 
+// @Description Request to register a new account
 type RegistrationRequest struct {
-	BlindedMessage    string `json:"blindedMessage" validate:"required"`
-	SerializeResponse bool   `json:"serializeResponse"`
+	// Serialized OPAQUE registration request
+	BlindedMessage string `json:"blindedMessage" validate:"required"`
+	// Whether to serialize the response into binary/hex
+	SerializeResponse bool `json:"serializeResponse"`
 }
 
+// @Description Response for registering a new account
 type RegistrationResponse struct {
-	EvaluatedMessage   *string `json:"evaluatedMessage,omitempty"`
-	Pks                *string `json:"pks,omitempty"`
+	// Evaluated message of the OPAQUE registration response
+	EvaluatedMessage *string `json:"evaluatedMessage,omitempty"`
+	// PKS of the OPAQUE registration response
+	Pks *string `json:"pks,omitempty"`
+	// Serialized OPAQUE registration response
 	SerializedResponse *string `json:"serializedResponse,omitempty"`
 }
 
+// @Description OPAQUE registration record for a new account
 type RegistrationRecord struct {
-	PublicKey        *string `json:"publicKey" validate:"required_without=SerializedRecord"`
-	MaskingKey       *string `json:"maskingKey" validate:"required_without=SerializedRecord"`
-	Envelope         *string `json:"envelope" validate:"required_without=SerializedRecord"`
+	// Public key of registation record
+	PublicKey *string `json:"publicKey" validate:"required_without=SerializedRecord"`
+	// Masking key of registation record
+	MaskingKey *string `json:"maskingKey" validate:"required_without=SerializedRecord"`
+	// Envelope of registation record
+	Envelope *string `json:"envelope" validate:"required_without=SerializedRecord"`
+	// Optional name of the new session
+	SessionName *string `json:"sessionName" validate:"omitempty,max=50"`
+	// Serialized registration record
 	SerializedRecord *string `json:"serializedRecord" validate:"required_without_all=PublicKey MaskingKey Envelope"`
 }
 
@@ -214,13 +229,13 @@ func (ac *AccountsController) setupPasswordFinalizeHelper(email string, w http.R
 		return nil
 	}
 
-	session, err := ac.ds.CreateSession(account.ID, nil)
+	session, err := ac.ds.CreateSession(account.ID, requestData.SessionName, nil)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return nil
 	}
 
-	authToken, err := ac.jwtUtil.CreateAuthToken(session.ID)
+	authToken, err := ac.jwtUtil.CreateAuthToken(session.ID, nil)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return nil
@@ -232,7 +247,9 @@ func (ac *AccountsController) setupPasswordFinalizeHelper(email string, w http.R
 }
 
 // @Summary Initialize password setup
-// @Description Start the password setup process using OPAQUE protocol
+// @Description Start the password setup process using OPAQUE protocol.
+// @Description If `serializeResponse` is set to true, the `serializedResponse` field will be populated
+// @Description in the response, with other fields omitted.
 // @Tags Accounts
 // @Accept json
 // @Produce json
@@ -241,6 +258,7 @@ func (ac *AccountsController) setupPasswordFinalizeHelper(email string, w http.R
 // @Success 200 {object} RegistrationResponse
 // @Failure 400 {object} util.ErrorResponse
 // @Failure 401 {object} util.ErrorResponse
+// @Failure 403 {object} util.ErrorResponse
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/accounts/setup/init [post]
 func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.Request) {
@@ -254,7 +272,9 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 }
 
 // @Summary Finalize password setup
-// @Description Complete the password setup process and return auth token
+// @Description Complete the password setup process and return auth token.
+// @Description Either `publicKey`, `maskingKey` and `envelope` must be provided together,
+// @Description or `serializedRecord` must be provided.
 // @Tags Accounts
 // @Accept json
 // @Produce json
@@ -263,6 +283,7 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 // @Success 200 {object} PasswordFinalizeResponse
 // @Failure 400 {object} util.ErrorResponse
 // @Failure 401 {object} util.ErrorResponse
+// @Failure 403 {object} util.ErrorResponse
 // @Failure 404 {object} util.ErrorResponse
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/accounts/setup/finalize [post]
@@ -288,7 +309,9 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 }
 
 // @Summary Initialize password change
-// @Description Start the password change process using OPAQUE protocol
+// @Description Start the password change process using OPAQUE protocol.
+// @Description If `serializeResponse` is set to true, the `serializedResponse` field will be populated
+// @Description in the response, with other fields omitted.
 // @Tags Accounts
 // @Accept json
 // @Produce json
@@ -307,6 +330,8 @@ func (ac *AccountsController) ChangePasswordInit(w http.ResponseWriter, r *http.
 
 // @Summary Finalize password setup
 // @Description Complete the password change process and return auth token
+// @Description Either `publicKey`, `maskingKey` and `envelope` must be provided together,
+// @Description or `serializedRecord` must be provided.
 // @Tags Accounts
 // @Accept json
 // @Produce json

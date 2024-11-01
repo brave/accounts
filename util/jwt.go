@@ -44,11 +44,15 @@ func (j *JWTUtil) CreateVerificationToken(verificationID uuid.UUID, expiration t
 	})
 }
 
-func (j *JWTUtil) CreateAuthToken(sessionID uuid.UUID) (string, error) {
-	return j.createToken(jwt.MapClaims{
+func (j *JWTUtil) CreateAuthToken(sessionID uuid.UUID, expiration *time.Duration) (string, error) {
+	claims := jwt.MapClaims{
 		sessionIdClaim: sessionID.String(),
 		"iat":          time.Now().Unix(),
-	})
+	}
+	if expiration != nil {
+		claims["exp"] = time.Now().Add(*expiration).Unix()
+	}
+	return j.createToken(claims)
 }
 
 func (j *JWTUtil) CreateEphemeralAKEToken(akeStateID uuid.UUID, expiration time.Duration) (string, error) {

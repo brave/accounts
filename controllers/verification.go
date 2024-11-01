@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/brave-experiments/accounts/datastore"
 	"github.com/brave-experiments/accounts/middleware"
@@ -12,25 +14,42 @@ import (
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 const (
-	qsVerifyID   = "verify_id"
-	qsVerifyCode = "verify_code"
+	qsVerifyID                = "verify_id"
+	qsVerifyCode              = "verify_code"
+	authTokenIntent           = "auth_token"
+	authTokenRedirectIntent   = "auth_token_redirect"
+	verificationIntent        = "verification"
+	premiumAuthRedirectURLEnv = "PREMIUM_AUTH_REDIRECT_URL"
+
+	accountsServiceName              = "accounts"
+	premiumServiceName               = "premium"
+	inboxAliasesServiceName          = "inbox-aliases"
+	premiumSessionExpirationDuration = 10 * time.Minute
 )
 
+var ErrIntentNotAllowed = errors.New("intent not allowed")
+
 type VerificationController struct {
-	datastore           *datastore.Datastore
-	validate            *validator.Validate
-	jwtUtil             *util.JWTUtil
-	sesUtil             *util.SESUtil
-	passwordAuthEnabled bool
+	datastore              *datastore.Datastore
+	validate               *validator.Validate
+	jwtUtil                *util.JWTUtil
+	sesUtil                *util.SESUtil
+	passwordAuthEnabled    bool
+	premiumAuthRedirectURL string
 }
 
 // @Description	Request to initialize email verification
 type VerifyInitRequest struct {
 	// Email address to verify
 	Email string `json:"email" validate:"required,email,ascii" example:"test@example.com"`
+	// Purpose of verification (e.g., get auth token, get auth token & redirect, simple verification)
+	Intent string `json:"intent" validate:"required,oneof=auth_token auth_token_redirect verification" example:"verification"`
+	// Service requesting the verification
+	Service string `json:"service" validate:"required,oneof=accounts premium inbox-aliases" example:"accounts"`
 }
 
 // @Description	Response containing verification check token
@@ -51,6 +70,8 @@ type VerifyResultResponse struct {
 	AuthToken *string `json:"authToken"`
 	// Email verification status
 	Verified bool `json:"verified"`
+	// Email associated wiith the verification
+	Email string `json:"email"`
 }
 
 // @Description	Response containing validated token details
@@ -64,12 +85,18 @@ type ValidateTokenResponse struct {
 }
 
 func NewVerificationController(datastore *datastore.Datastore, jwtUtil *util.JWTUtil, sesUtil *util.SESUtil, passwordAuthEnabled bool) *VerificationController {
+	premiumAuthRedirectURL := os.Getenv(premiumAuthRedirectURLEnv)
+	if premiumAuthRedirectURL == "" {
+		log.Fatal().Msg("PREMIUM_AUTH_REDIRECT_URL environment variable is required")
+	}
+
 	return &VerificationController{
-		datastore:           datastore,
-		validate:            validator.New(validator.WithRequiredStructEnabled()),
-		jwtUtil:             jwtUtil,
-		sesUtil:             sesUtil,
-		passwordAuthEnabled: passwordAuthEnabled,
+		datastore:              datastore,
+		validate:               validator.New(validator.WithRequiredStructEnabled()),
+		jwtUtil:                jwtUtil,
+		sesUtil:                sesUtil,
+		passwordAuthEnabled:    passwordAuthEnabled,
+		premiumAuthRedirectURL: premiumAuthRedirectURL,
 	}
 }
 
@@ -105,7 +132,29 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	verification, err := vc.datastore.CreateVerification(requestData.Email)
+	intentAllowed := true
+	switch requestData.Intent {
+	case authTokenIntent:
+		if vc.passwordAuthEnabled || requestData.Service != inboxAliasesServiceName {
+			intentAllowed = false
+		}
+	case authTokenRedirectIntent:
+		if requestData.Service != premiumServiceName {
+			intentAllowed = false
+		}
+	case verificationIntent:
+		if requestData.Service != inboxAliasesServiceName && requestData.Service != accountsServiceName {
+			intentAllowed = false
+		}
+	default:
+		intentAllowed = false
+	}
+	if !intentAllowed {
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, ErrIntentNotAllowed)
+		return
+	}
+
+	verification, err := vc.datastore.CreateVerification(requestData.Email, requestData.Service, requestData.Intent)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
@@ -133,6 +182,32 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, response)
+}
+
+func (vc *VerificationController) deleteVerificationAndGetAuthToken(w http.ResponseWriter, r *http.Request, verification *datastore.Verification, expiration *time.Duration) *string {
+	if err := vc.datastore.DeleteVerification(verification.ID); err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return nil
+	}
+
+	account, err := vc.datastore.GetOrCreateAccount(verification.Email)
+	if err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return nil
+	}
+
+	session, err := vc.datastore.CreateSession(account.ID, nil, expiration)
+	if err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return nil
+	}
+
+	authTokenResult, err := vc.jwtUtil.CreateAuthToken(session.ID, expiration)
+	if err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return nil
+	}
+	return &authTokenResult
 }
 
 // @Summary Complete email verification
@@ -164,14 +239,38 @@ func (vc *VerificationController) VerifyComplete(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Update verification status
-	err = vc.datastore.UpdateVerificationStatus(id, verifyToken)
+	verification, err := vc.datastore.GetVerificationStatus(id)
 	if err != nil {
 		if errors.Is(err, datastore.ErrVerificationNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 			render.PlainText(w, r, err.Error())
 			return
 		}
+		log.Err(err).Msg("failed to get verification status")
+		w.WriteHeader(http.StatusInternalServerError)
+		render.PlainText(w, r, "Internal server error")
+		return
+	}
+
+	if verification.Intent == authTokenRedirectIntent {
+		var expiration *time.Duration
+		if verification.Service == premiumServiceName {
+			expirationClone := premiumSessionExpirationDuration
+			expiration = &expirationClone
+		}
+		authToken := vc.deleteVerificationAndGetAuthToken(w, r, verification, expiration)
+		if authToken == nil {
+			return
+		}
+		redirectURL := vc.premiumAuthRedirectURL + *authToken
+		http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
+		return
+	}
+
+	// Update verification status
+	err = vc.datastore.UpdateVerificationStatus(id, verifyToken)
+	if err != nil {
+		log.Err(err).Msg("failed to update verification status")
 		w.WriteHeader(http.StatusInternalServerError)
 		render.PlainText(w, r, "Internal server error")
 		return
@@ -182,7 +281,7 @@ func (vc *VerificationController) VerifyComplete(w http.ResponseWriter, r *http.
 }
 
 // @Summary Query result of verification
-// @Description Exchanges a verify check token for an auth token after successful verification.
+// @Description Provides the status of a pending or successful verification.
 // @Description If the wait option is set to true, the server will up to 20 seconds for verification. Feel free
 // @Description to call this endpoint repeatedly to wait for verification.
 // @Tags Email verification
@@ -222,35 +321,17 @@ func (vc *VerificationController) VerifyQueryResult(w http.ResponseWriter, r *ht
 	}
 
 	var authToken *string
-	if !vc.passwordAuthEnabled {
-		if err := vc.datastore.DeleteVerification(verification.ID); err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+	if verification.Intent == authTokenIntent {
+		authToken = vc.deleteVerificationAndGetAuthToken(w, r, verification, nil)
+		if authToken == nil {
 			return
 		}
-
-		account, err := vc.datastore.GetOrCreateAccount(verification.Email)
-		if err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-
-		session, err := vc.datastore.CreateSession(account.ID, nil)
-		if err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-
-		authTokenResult, err := vc.jwtUtil.CreateAuthToken(session.ID)
-		if err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-		authToken = &authTokenResult
 	}
 
 	response := VerifyResultResponse{
 		AuthToken: authToken,
 		Verified:  true,
+		Email:     verification.Email,
 	}
 
 	render.Status(r, http.StatusOK)

@@ -23,36 +23,55 @@ type AuthController struct {
 	ds            *datastore.Datastore
 }
 
-type KE1 struct {
-	Email          string  `json:"email" validate:"required,email,ascii" example:"test@example.com"`
+// @Description Request for account login
+type LoginInitRequest struct {
+	// Email address of the account
+	Email string `json:"email" validate:"required,email,ascii" example:"test@example.com"`
+	// Blinded message component of KE1
 	BlindedMessage *string `json:"blindedMessage" validate:"required_without=SerializedKE1"`
-	EpkU           *string `json:"clientEphemeralPublicKey" validate:"required_without=SerializedKE1"`
-	NonceU         *string `json:"clientNonce" validate:"required_without=SerializedKE1"`
-	SerializedKE1  *string `json:"serializedKE1" validate:"required_without_all=BlindedMessage EpkU NonceU"`
+	// Client ephemeral public key of KE1
+	EpkU *string `json:"clientEphemeralPublicKey" validate:"required_without=SerializedKE1"`
+	// Client nonce of KE1
+	NonceU *string `json:"clientNonce" validate:"required_without=SerializedKE1"`
+	// Serialized KE1 message
+	SerializedKE1 *string `json:"serializedKE1" validate:"required_without_all=BlindedMessage EpkU NonceU"`
 }
 
-type KE2 struct {
-	AkeToken         string  `json:"akeToken"`
+// @Description Response for account login
+type LoginInitResponse struct {
+	// Interim authentication token for future login finalization
+	AkeToken string `json:"akeToken"`
+	// Evaluated message component of KE2
 	EvaluatedMessage *string `json:"evaluatedMessage,omitempty"`
-	MaskingNonce     *string `json:"maskingNonce,omitempty"`
-	MaskedResponse   *string `json:"maskedResponse,omitempty"`
-	EpkS             *string `json:"serverEphemeralPublicKey,omitempty"`
-	NonceS           *string `json:"serverNonce,omitempty"`
-	Mac              *string `json:"serverMac,omitempty"`
-	SerializedKE2    *string `json:"serializedKE2,omitempty"`
+	// Server masking nonce of KE2
+	MaskingNonce *string `json:"maskingNonce,omitempty"`
+	// Server masked response of KE2
+	MaskedResponse *string `json:"maskedResponse,omitempty"`
+	// Server ephemeral public key of KE2
+	EpkS *string `json:"serverEphemeralPublicKey,omitempty"`
+	// Server nonce of KE2
+	NonceS *string `json:"serverNonce,omitempty"`
+	// Server MAC of KE2
+	Mac *string `json:"serverMac,omitempty"`
+	// Serialized KE2 message
+	SerializedKE2 *string `json:"serializedKE2,omitempty"`
 }
 
-type KE3 struct {
-	Mac           *string `json:"clientMac" validate:"required_without=SerializedKE3"`
-	SerializedKE3 *string `json:"serializedKE3" validate:"required_without=Mac"`
-	SessionName   *string `json:"sessionName"`
+// @Description Request to finalize login
+type LoginFinalizeRequest struct {
+	// Client MAC of KE3
+	Mac *string `json:"clientMac" validate:"required"`
+	// Optional name for the new session
+	SessionName *string `json:"sessionName"`
 }
 
+// @Description Response containing auth token after successful login
 type LoginFinalizeResponse struct {
+	// Authentication token for future requests
 	AuthToken string `json:"authToken"`
 }
 
-func (req *KE1) ToOpaqueKE1(opaqueService *services.OpaqueService) (*opaqueMsg.KE1, error) {
+func (req *LoginInitRequest) ToOpaqueKE1(opaqueService *services.OpaqueService) (*opaqueMsg.KE1, error) {
 	if req.SerializedKE1 != nil {
 		serializedBin, err := hex.DecodeString(*req.SerializedKE1)
 		if err != nil {
@@ -98,10 +117,10 @@ func (req *KE1) ToOpaqueKE1(opaqueService *services.OpaqueService) (*opaqueMsg.K
 	}, nil
 }
 
-func FromOpaqueKE2(opaqueResp *opaqueMsg.KE2, akeToken string, useBinary bool) (*KE2, error) {
+func FromOpaqueKE2(opaqueResp *opaqueMsg.KE2, akeToken string, useBinary bool) (*LoginInitResponse, error) {
 	if useBinary {
 		serializedBin := hex.EncodeToString(opaqueResp.Serialize())
-		return &KE2{
+		return &LoginInitResponse{
 			AkeToken:      akeToken,
 			SerializedKE2: &serializedBin,
 		}, nil
@@ -121,7 +140,7 @@ func FromOpaqueKE2(opaqueResp *opaqueMsg.KE2, akeToken string, useBinary bool) (
 	nonce := hex.EncodeToString(opaqueResp.ServerNonce)
 	mac := hex.EncodeToString(opaqueResp.ServerMac)
 
-	return &KE2{
+	return &LoginInitResponse{
 		AkeToken:         akeToken,
 		EvaluatedMessage: &evalMsg,
 		MaskingNonce:     &maskNonce,
@@ -132,22 +151,7 @@ func FromOpaqueKE2(opaqueResp *opaqueMsg.KE2, akeToken string, useBinary bool) (
 	}, nil
 }
 
-func (req *KE3) ToOpaqueKE3(opaqueService *services.OpaqueService) (*opaqueMsg.KE3, error) {
-	if req.SerializedKE3 != nil {
-		serializedBin, err := hex.DecodeString(*req.SerializedKE3)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode serialized KE1 hex: %w", err)
-		}
-		deserializer, err := opaqueService.BinaryDeserializer()
-		if err != nil {
-			return nil, err
-		}
-		opaqueMsg, err := deserializer.KE3(serializedBin)
-		if err != nil {
-			return nil, err
-		}
-		return opaqueMsg, nil
-	}
+func (req *LoginFinalizeRequest) ToOpaqueKE3(opaqueService *services.OpaqueService) (*opaqueMsg.KE3, error) {
 	mac, err := hex.DecodeString(*req.Mac)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode mac: %w", err)
@@ -200,18 +204,22 @@ func (ac *AuthController) Validate(w http.ResponseWriter, r *http.Request) {
 }
 
 // @Summary Initialize login
-// @Description First step of OPAQUE login flow, generates KE2 message
+// @Description First step of OPAQUE login flow, generates KE2 message.
+// @Description Either `blindedMessage`, `clientEphemeralPublicKey` and `clientNonce` must be provided together,
+// @Description or `serializedKE1` must be provided.
+// @Description If the latter is provided, `serializedKE2` will be included in the response with other
+// @Description KE2 fields omitted.
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param request body KE1 true "KE1 message"
-// @Success 200 {object} KE2
+// @Param request body LoginInitRequest true "login init request"
+// @Success 200 {object} LoginInitResponse
 // @Failure 400 {object} util.ErrorResponse
 // @Failure 401 {object} util.ErrorResponse
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/auth/login/init [post]
 func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
-	var requestData KE1
+	var requestData LoginInitRequest
 	if err := render.DecodeJSON(r.Body, &requestData); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
 		return
@@ -255,12 +263,12 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 }
 
 // @Summary Finalize login
-// @Description Final step of login flow, verifies KE3 message and creates session
+// @Description Final step of login flow, verifies KE3 message and creates session.
 // @Tags Auth
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + ake token"
-// @Param request body KE3 true "KE3 message"
+// @Param request body LoginFinalizeRequest true "login finalize request"
 // @Success 200 {object} LoginFinalizeResponse
 // @Failure 400 {object} util.ErrorResponse
 // @Failure 401 {object} util.ErrorResponse
@@ -279,7 +287,7 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var requestData KE3
+	var requestData LoginFinalizeRequest
 	if err := render.DecodeJSON(r.Body, &requestData); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
 		return
@@ -308,13 +316,13 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	session, err := ac.ds.CreateSession(*accountID, requestData.SessionName)
+	session, err := ac.ds.CreateSession(*accountID, requestData.SessionName, nil)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
 
-	authToken, err := ac.jwtUtil.CreateAuthToken(session.ID)
+	authToken, err := ac.jwtUtil.CreateAuthToken(session.ID, nil)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return

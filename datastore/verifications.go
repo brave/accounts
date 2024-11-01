@@ -18,6 +18,8 @@ type Verification struct {
 	Email     string
 	Code      string
 	Verified  bool
+	Service   string
+	Intent    string
 	CreatedAt time.Time `gorm:"<-:false"`
 }
 
@@ -34,7 +36,7 @@ func generateNotificationChannel(id uuid.UUID) string {
 }
 
 // CreateVerification creates a new verification record
-func (d *Datastore) CreateVerification(email string) (*Verification, error) {
+func (d *Datastore) CreateVerification(email string, service string, intent string) (*Verification, error) {
 	code := util.GenerateRandomString(codeLength)
 
 	id, err := uuid.NewV7()
@@ -46,6 +48,8 @@ func (d *Datastore) CreateVerification(email string) (*Verification, error) {
 		ID:       id,
 		Email:    strings.TrimSpace(email),
 		Code:     code,
+		Service:  service,
+		Intent:   intent,
 		Verified: false,
 	}
 
