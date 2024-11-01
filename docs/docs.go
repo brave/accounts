@@ -17,7 +17,7 @@ const docTemplate = `{
     "paths": {
         "/v2/accounts/change_pwd/finalize": {
             "post": {
-                "description": "Complete the password change process and return auth token",
+                "description": "Complete the password change process and return auth token\nEither ` + "`" + `publicKey` + "`" + `, ` + "`" + `maskingKey` + "`" + ` and ` + "`" + `envelope` + "`" + ` must be provided together,\nor ` + "`" + `serializedRecord` + "`" + ` must be provided.",
                 "consumes": [
                     "application/json"
                 ],
@@ -82,7 +82,7 @@ const docTemplate = `{
         },
         "/v2/accounts/change_pwd/init": {
             "post": {
-                "description": "Start the password change process using OPAQUE protocol",
+                "description": "Start the password change process using OPAQUE protocol.\nIf ` + "`" + `serializeResponse` + "`" + ` is set to true, the ` + "`" + `serializedResponse` + "`" + ` field will be populated\nin the response, with other fields omitted.",
                 "consumes": [
                     "application/json"
                 ],
@@ -141,7 +141,7 @@ const docTemplate = `{
         },
         "/v2/accounts/setup/finalize": {
             "post": {
-                "description": "Complete the password setup process and return auth token",
+                "description": "Complete the password setup process and return auth token.\nEither ` + "`" + `publicKey` + "`" + `, ` + "`" + `maskingKey` + "`" + ` and ` + "`" + `envelope` + "`" + ` must be provided together,\nor ` + "`" + `serializedRecord` + "`" + ` must be provided.",
                 "consumes": [
                     "application/json"
                 ],
@@ -189,6 +189,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -206,7 +212,7 @@ const docTemplate = `{
         },
         "/v2/accounts/setup/init": {
             "post": {
-                "description": "Start the password setup process using OPAQUE protocol",
+                "description": "Start the password setup process using OPAQUE protocol.\nIf ` + "`" + `serializeResponse` + "`" + ` is set to true, the ` + "`" + `serializedResponse` + "`" + ` field will be populated\nin the response, with other fields omitted.",
                 "consumes": [
                     "application/json"
                 ],
@@ -254,6 +260,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -265,7 +277,7 @@ const docTemplate = `{
         },
         "/v2/auth/login/finalize": {
             "post": {
-                "description": "Final step of login flow, verifies KE3 message and creates session",
+                "description": "Final step of login flow, verifies KE3 message and creates session.",
                 "consumes": [
                     "application/json"
                 ],
@@ -285,12 +297,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "KE3 message",
+                        "description": "login finalize request",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/controllers.KE3"
+                            "$ref": "#/definitions/controllers.LoginFinalizeRequest"
                         }
                     }
                 ],
@@ -324,7 +336,7 @@ const docTemplate = `{
         },
         "/v2/auth/login/init": {
             "post": {
-                "description": "First step of OPAQUE login flow, generates KE2 message",
+                "description": "First step of OPAQUE login flow, generates KE2 message.\nEither ` + "`" + `blindedMessage` + "`" + `, ` + "`" + `clientEphemeralPublicKey` + "`" + ` and ` + "`" + `clientNonce` + "`" + ` must be provided together,\nor ` + "`" + `serializedKE1` + "`" + ` must be provided.\nIf the latter is provided, ` + "`" + `serializedKE2` + "`" + ` will be included in the response with other\nKE2 fields omitted.",
                 "consumes": [
                     "application/json"
                 ],
@@ -337,12 +349,12 @@ const docTemplate = `{
                 "summary": "Initialize login",
                 "parameters": [
                     {
-                        "description": "KE1 message",
+                        "description": "login init request",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/controllers.KE1"
+                            "$ref": "#/definitions/controllers.LoginInitRequest"
                         }
                     }
                 ],
@@ -350,11 +362,17 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/controllers.KE2"
+                            "$ref": "#/definitions/controllers.LoginInitResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/util.ErrorResponse"
                         }
@@ -615,7 +633,7 @@ const docTemplate = `{
         },
         "/v2/verify/result": {
             "post": {
-                "description": "Exchanges a verify check token for an auth token after successful verification.\nIf the wait option is set to true, the server will up to 20 seconds for verification. Feel free\nto call this endpoint repeatedly to wait for verification.",
+                "description": "Provides the status of a pending or successful verification.\nIf the wait option is set to true, the server will up to 20 seconds for verification. Feel free\nto call this endpoint repeatedly to wait for verification.",
                 "consumes": [
                     "application/json"
                 ],
@@ -674,79 +692,103 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "controllers.KE1": {
-            "type": "object",
-            "required": [
-                "blindedMessage",
-                "clientEphemeralPublicKey",
-                "clientNonce",
-                "email"
-            ],
-            "properties": {
-                "blindedMessage": {
-                    "type": "string"
-                },
-                "clientEphemeralPublicKey": {
-                    "type": "string"
-                },
-                "clientNonce": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string",
-                    "example": "test@example.com"
-                }
-            }
-        },
-        "controllers.KE2": {
-            "type": "object",
-            "properties": {
-                "akeToken": {
-                    "type": "string"
-                },
-                "evaluatedMessage": {
-                    "type": "string"
-                },
-                "maskedResponse": {
-                    "type": "string"
-                },
-                "maskingNonce": {
-                    "type": "string"
-                },
-                "serverEphemeralPublicKey": {
-                    "type": "string"
-                },
-                "serverMac": {
-                    "type": "string"
-                },
-                "serverNonce": {
-                    "type": "string"
-                }
-            }
-        },
-        "controllers.KE3": {
+        "controllers.LoginFinalizeRequest": {
+            "description": "Request to finalize login",
             "type": "object",
             "required": [
                 "clientMac"
             ],
             "properties": {
                 "clientMac": {
+                    "description": "Client MAC of KE3",
                     "type": "string"
                 },
                 "sessionName": {
+                    "description": "Optional name for the new session",
                     "type": "string"
                 }
             }
         },
         "controllers.LoginFinalizeResponse": {
+            "description": "Response containing auth token after successful login",
             "type": "object",
             "properties": {
                 "authToken": {
+                    "description": "Authentication token for future requests",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.LoginInitRequest": {
+            "description": "Request for account login",
+            "type": "object",
+            "required": [
+                "email"
+            ],
+            "properties": {
+                "blindedMessage": {
+                    "description": "Blinded message component of KE1",
+                    "type": "string"
+                },
+                "clientEphemeralPublicKey": {
+                    "description": "Client ephemeral public key of KE1",
+                    "type": "string"
+                },
+                "clientNonce": {
+                    "description": "Client nonce of KE1",
+                    "type": "string"
+                },
+                "email": {
+                    "description": "Email address of the account",
+                    "type": "string",
+                    "example": "test@example.com"
+                },
+                "serializedKE1": {
+                    "description": "Serialized KE1 message",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.LoginInitResponse": {
+            "description": "Response for account login",
+            "type": "object",
+            "properties": {
+                "akeToken": {
+                    "description": "Interim authentication token for future login finalization",
+                    "type": "string"
+                },
+                "evaluatedMessage": {
+                    "description": "Evaluated message component of KE2",
+                    "type": "string"
+                },
+                "maskedResponse": {
+                    "description": "Server masked response of KE2",
+                    "type": "string"
+                },
+                "maskingNonce": {
+                    "description": "Server masking nonce of KE2",
+                    "type": "string"
+                },
+                "serializedKE2": {
+                    "description": "Serialized KE2 message",
+                    "type": "string"
+                },
+                "serverEphemeralPublicKey": {
+                    "description": "Server ephemeral public key of KE2",
+                    "type": "string"
+                },
+                "serverMac": {
+                    "description": "Server MAC of KE2",
+                    "type": "string"
+                },
+                "serverNonce": {
+                    "description": "Server nonce of KE2",
                     "type": "string"
                 }
             }
         },
         "controllers.PasswordFinalizeResponse": {
+            "description": "Response for password setup or change",
             "type": "object",
             "properties": {
                 "authToken": {
@@ -756,42 +798,63 @@ const docTemplate = `{
             }
         },
         "controllers.RegistrationRecord": {
+            "description": "OPAQUE registration record for a new account",
             "type": "object",
-            "required": [
-                "envelope",
-                "maskingKey",
-                "publicKey"
-            ],
             "properties": {
                 "envelope": {
+                    "description": "Envelope of registation record",
                     "type": "string"
                 },
                 "maskingKey": {
+                    "description": "Masking key of registation record",
                     "type": "string"
                 },
                 "publicKey": {
+                    "description": "Public key of registation record",
                     "type": "string"
+                },
+                "serializedRecord": {
+                    "description": "Serialized registration record",
+                    "type": "string"
+                },
+                "sessionName": {
+                    "description": "Optional name of the new session",
+                    "type": "string",
+                    "maxLength": 50
                 }
             }
         },
         "controllers.RegistrationRequest": {
+            "description": "Request to register a new account",
             "type": "object",
             "required": [
                 "blindedMessage"
             ],
             "properties": {
                 "blindedMessage": {
+                    "description": "Serialized OPAQUE registration request",
                     "type": "string"
+                },
+                "serializeResponse": {
+                    "description": "Whether to serialize the response into binary/hex",
+                    "type": "boolean"
                 }
             }
         },
         "controllers.RegistrationResponse": {
+            "description": "Response for registering a new account",
             "type": "object",
             "properties": {
                 "evaluatedMessage": {
+                    "description": "Evaluated message of the OPAQUE registration response",
                     "type": "string"
                 },
                 "pks": {
+                    "description": "PKS of the OPAQUE registration response",
+                    "type": "string"
+                },
+                "serializedResponse": {
+                    "description": "Serialized OPAQUE registration response",
                     "type": "string"
                 }
             }
@@ -818,13 +881,35 @@ const docTemplate = `{
             "description": "Request to initialize email verification",
             "type": "object",
             "required": [
-                "email"
+                "email",
+                "intent",
+                "service"
             ],
             "properties": {
                 "email": {
                     "description": "Email address to verify",
                     "type": "string",
                     "example": "test@example.com"
+                },
+                "intent": {
+                    "description": "Purpose of verification (e.g., get auth token, get auth token \u0026 redirect, simple verification)",
+                    "type": "string",
+                    "enum": [
+                        "auth_token",
+                        "auth_token_redirect",
+                        "verification"
+                    ],
+                    "example": "verification"
+                },
+                "service": {
+                    "description": "Service requesting the verification",
+                    "type": "string",
+                    "enum": [
+                        "accounts",
+                        "premium",
+                        "inbox-aliases"
+                    ],
+                    "example": "accounts"
                 }
             }
         },
@@ -856,6 +941,10 @@ const docTemplate = `{
                     "description": "JWT auth token, null if verification incomplete or if password setup is required",
                     "type": "string"
                 },
+                "email": {
+                    "description": "Email associated wiith the verification",
+                    "type": "string"
+                },
                 "verified": {
                     "description": "Email verification status",
                     "type": "boolean"
@@ -867,6 +956,10 @@ const docTemplate = `{
             "properties": {
                 "createdAt": {
                     "description": "Session creation timestamp",
+                    "type": "string"
+                },
+                "expiresAt": {
+                    "description": "Expiration timestamp",
                     "type": "string"
                 },
                 "id": {

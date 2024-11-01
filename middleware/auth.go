@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/brave-experiments/accounts/datastore"
 	"github.com/brave-experiments/accounts/util"
@@ -35,6 +36,13 @@ func AuthMiddleware(jwtUtil *util.JWTUtil, ds *datastore.Datastore, minSessionVe
 				}
 				util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 				return
+			}
+
+			if session.ExpiresAt != nil {
+				if time.Now().After(*session.ExpiresAt) {
+					util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
+					return
+				}
 			}
 
 			if session.Version < minSessionVersion {

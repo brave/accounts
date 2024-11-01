@@ -1,83 +1,123 @@
 definitions:
-  controllers.KE1:
-    properties:
-      blindedMessage:
-        type: string
-      clientEphemeralPublicKey:
-        type: string
-      clientNonce:
-        type: string
-      email:
-        example: test@example.com
-        type: string
-    required:
-    - blindedMessage
-    - clientEphemeralPublicKey
-    - clientNonce
-    - email
-    type: object
-  controllers.KE2:
-    properties:
-      akeToken:
-        type: string
-      evaluatedMessage:
-        type: string
-      maskedResponse:
-        type: string
-      maskingNonce:
-        type: string
-      serverEphemeralPublicKey:
-        type: string
-      serverMac:
-        type: string
-      serverNonce:
-        type: string
-    type: object
-  controllers.KE3:
+  controllers.LoginFinalizeRequest:
+    description: Request to finalize login
     properties:
       clientMac:
+        description: Client MAC of KE3
         type: string
       sessionName:
+        description: Optional name for the new session
         type: string
     required:
     - clientMac
     type: object
   controllers.LoginFinalizeResponse:
+    description: Response containing auth token after successful login
     properties:
       authToken:
+        description: Authentication token for future requests
+        type: string
+    type: object
+  controllers.LoginInitRequest:
+    description: Request for account login
+    properties:
+      blindedMessage:
+        description: Blinded message component of KE1
+        type: string
+      clientEphemeralPublicKey:
+        description: Client ephemeral public key of KE1
+        type: string
+      clientNonce:
+        description: Client nonce of KE1
+        type: string
+      email:
+        description: Email address of the account
+        example: test@example.com
+        type: string
+      serializedKE1:
+        description: Serialized KE1 message
+        type: string
+    required:
+    - email
+    type: object
+  controllers.LoginInitResponse:
+    description: Response for account login
+    properties:
+      akeToken:
+        description: Interim authentication token for future login finalization
+        type: string
+      evaluatedMessage:
+        description: Evaluated message component of KE2
+        type: string
+      maskedResponse:
+        description: Server masked response of KE2
+        type: string
+      maskingNonce:
+        description: Server masking nonce of KE2
+        type: string
+      serializedKE2:
+        description: Serialized KE2 message
+        type: string
+      serverEphemeralPublicKey:
+        description: Server ephemeral public key of KE2
+        type: string
+      serverMac:
+        description: Server MAC of KE2
+        type: string
+      serverNonce:
+        description: Server nonce of KE2
         type: string
     type: object
   controllers.PasswordFinalizeResponse:
+    description: Response for password setup or change
     properties:
       authToken:
         description: Authentication token
         type: string
     type: object
   controllers.RegistrationRecord:
+    description: OPAQUE registration record for a new account
     properties:
       envelope:
+        description: Envelope of registation record
         type: string
       maskingKey:
+        description: Masking key of registation record
         type: string
       publicKey:
+        description: Public key of registation record
         type: string
-    required:
-    - envelope
-    - maskingKey
-    - publicKey
+      serializedRecord:
+        description: Serialized registration record
+        type: string
+      sessionName:
+        description: Optional name of the new session
+        maxLength: 50
+        type: string
     type: object
   controllers.RegistrationRequest:
+    description: Request to register a new account
     properties:
       blindedMessage:
+        description: Serialized OPAQUE registration request
         type: string
+      serializeResponse:
+        description: Whether to serialize the response into binary/hex
+        type: boolean
     required:
     - blindedMessage
     type: object
   controllers.RegistrationResponse:
+    description: Response for registering a new account
     properties:
       evaluatedMessage:
+        description: Evaluated message of the OPAQUE registration response
         type: string
       pks:
+        description: PKS of the OPAQUE registration response
+        type: string
+      serializedResponse:
+        description: Serialized OPAQUE registration response
         type: string
     type: object
   controllers.ValidateTokenResponse:
@@ -100,8 +140,27 @@ definitions:
         description: Email address to verify
         example: test@example.com
         type: string
+      intent:
+        description: Purpose of verification (e.g., get auth token, get auth token
+          & redirect, simple verification)
+        enum:
+        - auth_token
+        - auth_token_redirect
+        - verification
+        example: verification
+        type: string
+      service:
+        description: Service requesting the verification
+        enum:
+        - accounts
+        - premium
+        - inbox-aliases
+        example: accounts
+        type: string
     required:
     - email
+    - intent
+    - service
     type: object
   controllers.VerifyInitResponse:
     description: Response containing verification check token
@@ -124,6 +183,9 @@ definitions:
         description: JWT auth token, null if verification incomplete or if password
           setup is required
         type: string
+      email:
+        description: Email associated wiith the verification
+        type: string
       verified:
         description: Email verification status
         type: boolean
@@ -132,6 +194,9 @@ definitions:
     properties:
       createdAt:
         description: Session creation timestamp
+        type: string
+      expiresAt:
+        description: Expiration timestamp
         type: string
       id:
         description: Session UUID
@@ -161,7 +226,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Complete the password change process and return auth token
+      description: |-
+        Complete the password change process and return auth token
+        Either `publicKey`, `maskingKey` and `envelope` must be provided together,
+        or `serializedRecord` must be provided.
       parameters:
       - description: Bearer + auth token
         in: header
@@ -204,7 +272,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Start the password change process using OPAQUE protocol
+      description: |-
+        Start the password change process using OPAQUE protocol.
+        If `serializeResponse` is set to true, the `serializedResponse` field will be populated
+        in the response, with other fields omitted.
       parameters:
       - description: Bearer + auth token
         in: header
@@ -243,7 +314,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Complete the password setup process and return auth token
+      description: |-
+        Complete the password setup process and return auth token.
+        Either `publicKey`, `maskingKey` and `envelope` must be provided together,
+        or `serializedRecord` must be provided.
       parameters:
       - description: Bearer + verification token
         in: header
@@ -271,6 +345,10 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/util.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
         "404":
           description: Not Found
           schema:
@@ -286,7 +364,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Start the password setup process using OPAQUE protocol
+      description: |-
+        Start the password setup process using OPAQUE protocol.
+        If `serializeResponse` is set to true, the `serializedResponse` field will be populated
+        in the response, with other fields omitted.
       parameters:
       - description: Bearer + verification token
         in: header
@@ -314,6 +395,10 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/util.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -325,19 +410,19 @@ paths:
     post:
       consumes:
       - application/json
-      description: Final step of login flow, verifies KE3 message and creates session
+      description: Final step of login flow, verifies KE3 message and creates session.
       parameters:
       - description: Bearer + ake token
         in: header
         name: Authorization
         required: true
         type: string
-      - description: KE3 message
+      - description: login finalize request
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/controllers.KE3'
+          $ref: '#/definitions/controllers.LoginFinalizeRequest'
       produces:
       - application/json
       responses:
@@ -364,23 +449,32 @@ paths:
     post:
       consumes:
       - application/json
-      description: First step of OPAQUE login flow, generates KE2 message
+      description: |-
+        First step of OPAQUE login flow, generates KE2 message.
+        Either `blindedMessage`, `clientEphemeralPublicKey` and `clientNonce` must be provided together,
+        or `serializedKE1` must be provided.
+        If the latter is provided, `serializedKE2` will be included in the response with other
+        KE2 fields omitted.
       parameters:
-      - description: KE1 message
+      - description: login init request
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/controllers.KE1'
+          $ref: '#/definitions/controllers.LoginInitRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/controllers.KE2'
+            $ref: '#/definitions/controllers.LoginInitResponse'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
           schema:
             $ref: '#/definitions/util.ErrorResponse'
         "500":
@@ -557,7 +651,7 @@ paths:
       consumes:
       - application/json
       description: |-
-        Exchanges a verify check token for an auth token after successful verification.
+        Provides the status of a pending or successful verification.
         If the wait option is set to true, the server will up to 20 seconds for verification. Feel free
         to call this endpoint repeatedly to wait for verification.
       parameters:
