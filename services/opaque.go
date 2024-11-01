@@ -17,7 +17,13 @@ const (
 	opaqueSecretKeyEnv  = "OPAQUE_SECRET_KEY"
 	opaquePublicKeyEnv  = "OPAQUE_PUBLIC_KEY"
 	opaqueFakeRecordEnv = "OPAQUE_FAKE_RECORD"
+
+	opaqueArgon2TimeParam     = 2
+	opaqueArgon2ParallelParam = 1
+	opaqueArgon2MemoryParam   = 19456
 )
+
+var opaqueArgon2Salt = make([]byte, 16)
 
 var ErrIncorrectCredentials = errors.New("incorrect credentials")
 
@@ -53,6 +59,14 @@ func NewOpaqueService(ds *datastore.Datastore) (*OpaqueService, error) {
 	}
 
 	config := opaque.DefaultConfiguration()
+
+	config.KSF.Parameters = []int{
+		opaqueArgon2TimeParam,
+		opaqueArgon2MemoryParam,
+		opaqueArgon2ParallelParam,
+	}
+	config.KSF.Salt = opaqueArgon2Salt
+
 	oprfSeeds, err := ds.GetOrCreateOPRFSeeds(config.GenerateOPRFSeed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get/create oprf seeds: %w", err)
@@ -72,6 +86,10 @@ func NewOpaqueService(ds *datastore.Datastore) (*OpaqueService, error) {
 
 func (o *OpaqueService) NewElement() *crypto.Element {
 	return o.config.OPRF.Group().NewElement()
+}
+
+func (o *OpaqueService) BinaryDeserializer() (*opaque.Deserializer, error) {
+	return o.config.Deserializer()
 }
 
 func (o *OpaqueService) newOpaqueServer(seedID int) (*opaque.Server, error) {
@@ -178,7 +196,7 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 		}
 	}
 
-	ke2, err := server.LoginInit(ke1, opaqueRecord)
+	ke2, err := server.GenerateKE2(ke1, opaqueRecord)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate ke2: %w", err)
 	}

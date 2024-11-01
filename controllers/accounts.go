@@ -16,6 +16,8 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+var ErrEmailNotVerified = errors.New("email not verified")
+
 type AccountsController struct {
 	opaqueService *services.OpaqueService
 	validate      *validator.Validate
@@ -29,18 +31,21 @@ type PasswordFinalizeResponse struct {
 }
 
 type RegistrationRequest struct {
-	BlindedMessage string `json:"blindedMessage" validate:"required"`
+	BlindedMessage    string `json:"blindedMessage" validate:"required"`
+	SerializeResponse bool   `json:"serializeResponse"`
 }
 
 type RegistrationResponse struct {
-	EvaluatedMessage string `json:"evaluatedMessage"`
-	Pks              string `json:"pks"`
+	EvaluatedMessage   *string `json:"evaluatedMessage,omitempty"`
+	Pks                *string `json:"pks,omitempty"`
+	SerializedResponse *string `json:"serializedResponse,omitempty"`
 }
 
 type RegistrationRecord struct {
-	PublicKey  string `json:"publicKey" validate:"required"`
-	MaskingKey string `json:"maskingKey" validate:"required"`
-	Envelope   string `json:"envelope" validate:"required"`
+	PublicKey        *string `json:"publicKey" validate:"required_without=SerializedRecord"`
+	MaskingKey       *string `json:"maskingKey" validate:"required_without=SerializedRecord"`
+	Envelope         *string `json:"envelope" validate:"required_without=SerializedRecord"`
+	SerializedRecord *string `json:"serializedRecord" validate:"required_without_all=PublicKey MaskingKey Envelope"`
 }
 
 func (req *RegistrationRequest) ToOpaqueRequest(opaqueService *services.OpaqueService) (*opaqueMsg.RegistrationRequest, error) {
@@ -59,7 +64,22 @@ func (req *RegistrationRequest) ToOpaqueRequest(opaqueService *services.OpaqueSe
 }
 
 func (rec *RegistrationRecord) ToOpaqueRecord(opaqueService *services.OpaqueService) (*opaqueMsg.RegistrationRecord, error) {
-	publicKey, err := hex.DecodeString(rec.PublicKey)
+	if rec.SerializedRecord != nil {
+		serializedBin, err := hex.DecodeString(*rec.SerializedRecord)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode serialized record hex: %w", err)
+		}
+		deserializer, err := opaqueService.BinaryDeserializer()
+		if err != nil {
+			return nil, err
+		}
+		opaqueRec, err := deserializer.RegistrationRecord(serializedBin)
+		if err != nil {
+			return nil, err
+		}
+		return opaqueRec, nil
+	}
+	publicKey, err := hex.DecodeString(*rec.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode public key: %w", err)
 	}
@@ -68,12 +88,12 @@ func (rec *RegistrationRecord) ToOpaqueRecord(opaqueService *services.OpaqueServ
 		return nil, fmt.Errorf("failed to decode public key to element: %w", err)
 	}
 
-	maskingKey, err := hex.DecodeString(rec.MaskingKey)
+	maskingKey, err := hex.DecodeString(*rec.MaskingKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode masking key: %w", err)
 	}
 
-	envelope, err := hex.DecodeString(rec.Envelope)
+	envelope, err := hex.DecodeString(*rec.Envelope)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode envelope: %w", err)
 	}
@@ -85,7 +105,13 @@ func (rec *RegistrationRecord) ToOpaqueRecord(opaqueService *services.OpaqueServ
 	}, nil
 }
 
-func FromOpaqueRegistrationResponse(opaqueResp *opaqueMsg.RegistrationResponse) (*RegistrationResponse, error) {
+func FromOpaqueRegistrationResponse(opaqueResp *opaqueMsg.RegistrationResponse, useBinary bool) (*RegistrationResponse, error) {
+	if useBinary {
+		serializedBin := hex.EncodeToString(opaqueResp.Serialize())
+		return &RegistrationResponse{
+			SerializedResponse: &serializedBin,
+		}, nil
+	}
 	evalMsgBin, err := opaqueResp.EvaluatedMessage.MarshalBinary()
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize evaluated message: %w", err)
@@ -94,9 +120,12 @@ func FromOpaqueRegistrationResponse(opaqueResp *opaqueMsg.RegistrationResponse) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize pks: %w", err)
 	}
+	evalMsg := hex.EncodeToString(evalMsgBin)
+	pks := hex.EncodeToString(pksBin)
+
 	return &RegistrationResponse{
-		EvaluatedMessage: hex.EncodeToString(evalMsgBin),
-		Pks:              hex.EncodeToString(pksBin),
+		EvaluatedMessage: &evalMsg,
+		Pks:              &pks,
 	}, nil
 }
 
@@ -144,7 +173,7 @@ func (ac *AccountsController) setupPasswordInitHelper(email string, w http.Respo
 		return
 	}
 
-	response, err := FromOpaqueRegistrationResponse(opaqueResponse)
+	response, err := FromOpaqueRegistrationResponse(opaqueResponse, requestData.SerializeResponse)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
@@ -217,6 +246,10 @@ func (ac *AccountsController) setupPasswordFinalizeHelper(email string, w http.R
 func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.Request) {
 	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
 
+	if !verification.Verified {
+		util.RenderErrorResponse(w, r, http.StatusForbidden, ErrEmailNotVerified)
+	}
+
 	ac.setupPasswordInitHelper(verification.Email, w, r)
 }
 
@@ -235,6 +268,10 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 // @Router /v2/accounts/setup/finalize [post]
 func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *http.Request) {
 	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
+
+	if !verification.Verified {
+		util.RenderErrorResponse(w, r, http.StatusForbidden, ErrEmailNotVerified)
+	}
 
 	response := ac.setupPasswordFinalizeHelper(verification.Email, w, r)
 	if response == nil {

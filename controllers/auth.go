@@ -24,25 +24,28 @@ type AuthController struct {
 }
 
 type KE1 struct {
-	Email          string `json:"email" validate:"required,email,ascii" example:"test@example.com"`
-	BlindedMessage string `json:"blindedMessage" validate:"required"`
-	EpkU           string `json:"clientEphemeralPublicKey" validate:"required"`
-	NonceU         string `json:"clientNonce" validate:"required"`
+	Email          string  `json:"email" validate:"required,email,ascii" example:"test@example.com"`
+	BlindedMessage *string `json:"blindedMessage" validate:"required_without=SerializedKE1"`
+	EpkU           *string `json:"clientEphemeralPublicKey" validate:"required_without=SerializedKE1"`
+	NonceU         *string `json:"clientNonce" validate:"required_without=SerializedKE1"`
+	SerializedKE1  *string `json:"serializedKE1" validate:"required_without_all=BlindedMessage EpkU NonceU"`
 }
 
 type KE2 struct {
-	AkeToken         string `json:"akeToken"`
-	EvaluatedMessage string `json:"evaluatedMessage"`
-	MaskingNonce     string `json:"maskingNonce"`
-	MaskedResponse   string `json:"maskedResponse"`
-	EpkS             string `json:"serverEphemeralPublicKey"`
-	NonceS           string `json:"serverNonce"`
-	Mac              string `json:"serverMac"`
+	AkeToken         string  `json:"akeToken"`
+	EvaluatedMessage *string `json:"evaluatedMessage,omitempty"`
+	MaskingNonce     *string `json:"maskingNonce,omitempty"`
+	MaskedResponse   *string `json:"maskedResponse,omitempty"`
+	EpkS             *string `json:"serverEphemeralPublicKey,omitempty"`
+	NonceS           *string `json:"serverNonce,omitempty"`
+	Mac              *string `json:"serverMac,omitempty"`
+	SerializedKE2    *string `json:"serializedKE2,omitempty"`
 }
 
 type KE3 struct {
-	Mac         string  `json:"clientMac" validate:"required"`
-	SessionName *string `json:"sessionName"`
+	Mac           *string `json:"clientMac" validate:"required_without=SerializedKE3"`
+	SerializedKE3 *string `json:"serializedKE3" validate:"required_without=Mac"`
+	SessionName   *string `json:"sessionName"`
 }
 
 type LoginFinalizeResponse struct {
@@ -50,15 +53,30 @@ type LoginFinalizeResponse struct {
 }
 
 func (req *KE1) ToOpaqueKE1(opaqueService *services.OpaqueService) (*opaqueMsg.KE1, error) {
-	blindedMessage, err := hex.DecodeString(req.BlindedMessage)
+	if req.SerializedKE1 != nil {
+		serializedBin, err := hex.DecodeString(*req.SerializedKE1)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode serialized KE1 hex: %w", err)
+		}
+		deserializer, err := opaqueService.BinaryDeserializer()
+		if err != nil {
+			return nil, err
+		}
+		opaqueMsg, err := deserializer.KE1(serializedBin)
+		if err != nil {
+			return nil, err
+		}
+		return opaqueMsg, nil
+	}
+	blindedMessage, err := hex.DecodeString(*req.BlindedMessage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode blinded message: %w", err)
 	}
-	epk, err := hex.DecodeString(req.EpkU)
+	epk, err := hex.DecodeString(*req.EpkU)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode epk: %w", err)
 	}
-	nonce, err := hex.DecodeString(req.NonceU)
+	nonce, err := hex.DecodeString(*req.NonceU)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode nonce: %w", err)
 	}
@@ -75,37 +93,67 @@ func (req *KE1) ToOpaqueKE1(opaqueService *services.OpaqueService) (*opaqueMsg.K
 		CredentialRequest: &opaqueMsg.CredentialRequest{
 			BlindedMessage: blindedMessageElement,
 		},
-		EpkU:   epkElement,
-		NonceU: nonce,
+		ClientPublicKeyshare: epkElement,
+		ClientNonce:          nonce,
 	}, nil
 }
 
-func FromOpaqueKE2(opaqueResp *opaqueMsg.KE2) (*KE2, error) {
+func FromOpaqueKE2(opaqueResp *opaqueMsg.KE2, akeToken string, useBinary bool) (*KE2, error) {
+	if useBinary {
+		serializedBin := hex.EncodeToString(opaqueResp.Serialize())
+		return &KE2{
+			AkeToken:      akeToken,
+			SerializedKE2: &serializedBin,
+		}, nil
+	}
 	evalMsgBin, err := opaqueResp.EvaluatedMessage.MarshalBinary()
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize evaluated message: %w", err)
 	}
-	epkBin, err := opaqueResp.EpkS.MarshalBinary()
+	epkBin, err := opaqueResp.ServerPublicKeyshare.MarshalBinary()
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize evaluated message: %w", err)
 	}
+	evalMsg := hex.EncodeToString(evalMsgBin)
+	maskNonce := hex.EncodeToString(opaqueResp.MaskingNonce)
+	maskResp := hex.EncodeToString(opaqueResp.MaskedResponse)
+	epk := hex.EncodeToString(epkBin)
+	nonce := hex.EncodeToString(opaqueResp.ServerNonce)
+	mac := hex.EncodeToString(opaqueResp.ServerMac)
+
 	return &KE2{
-		EvaluatedMessage: hex.EncodeToString(evalMsgBin),
-		MaskingNonce:     hex.EncodeToString(opaqueResp.MaskingNonce),
-		MaskedResponse:   hex.EncodeToString(opaqueResp.MaskedResponse),
-		EpkS:             hex.EncodeToString(epkBin),
-		NonceS:           hex.EncodeToString(opaqueResp.NonceS),
-		Mac:              hex.EncodeToString(opaqueResp.Mac),
+		AkeToken:         akeToken,
+		EvaluatedMessage: &evalMsg,
+		MaskingNonce:     &maskNonce,
+		MaskedResponse:   &maskResp,
+		EpkS:             &epk,
+		NonceS:           &nonce,
+		Mac:              &mac,
 	}, nil
 }
 
-func (req *KE3) ToOpaqueKE3() (*opaqueMsg.KE3, error) {
-	mac, err := hex.DecodeString(req.Mac)
+func (req *KE3) ToOpaqueKE3(opaqueService *services.OpaqueService) (*opaqueMsg.KE3, error) {
+	if req.SerializedKE3 != nil {
+		serializedBin, err := hex.DecodeString(*req.SerializedKE3)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode serialized KE1 hex: %w", err)
+		}
+		deserializer, err := opaqueService.BinaryDeserializer()
+		if err != nil {
+			return nil, err
+		}
+		opaqueMsg, err := deserializer.KE3(serializedBin)
+		if err != nil {
+			return nil, err
+		}
+		return opaqueMsg, nil
+	}
+	mac, err := hex.DecodeString(*req.Mac)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode mac: %w", err)
 	}
 	return &opaqueMsg.KE3{
-		Mac: mac,
+		ClientMac: mac,
 	}, nil
 }
 
@@ -196,12 +244,11 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, err := FromOpaqueKE2(ke2)
+	response, err := FromOpaqueKE2(ke2, akeToken, requestData.SerializedKE1 != nil)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
-	response.AkeToken = akeToken
 
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, response)
@@ -243,7 +290,7 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	opaqueReq, err := requestData.ToOpaqueKE3()
+	opaqueReq, err := requestData.ToOpaqueKE3(ac.opaqueService)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
 		return
