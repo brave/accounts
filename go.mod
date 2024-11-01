@@ -4,6 +4,8 @@ go 1.23.1
 
 require (
 	github.com/aws/aws-sdk-go-v2/config v1.28.0
+	github.com/bytemare/crypto v0.6.0
+	github.com/bytemare/opaque v0.0.0
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-chi/docgen v1.3.0
 	github.com/go-playground/validator/v10 v10.22.1
@@ -31,12 +33,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.32.2 // indirect
 	github.com/aws/smithy-go v1.22.0 // indirect
-	github.com/bytemare/crypto v0.4.3 // indirect
-	github.com/bytemare/hash v0.1.5 // indirect
-	github.com/bytemare/hash2curve v0.2.2 // indirect
+	github.com/bytemare/hash v0.3.0 // indirect
+	github.com/bytemare/hash2curve v0.3.0 // indirect
 	github.com/bytemare/ksf v0.1.0 // indirect
-	github.com/bytemare/opaque v0.10.0 // indirect
-	github.com/bytemare/secp256k1 v0.1.0 // indirect
+	github.com/bytemare/secp256k1 v0.1.2 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
@@ -80,3 +80,5 @@ require (
 	golang.org/x/text v0.19.0 // indirect
 	gorm.io/driver/postgres v1.5.9
 )
+
+replace github.com/bytemare/opaque v0.0.0 => github.com/brave-experiments/opaque v0.0.0-20241101041742-9ecb8a57b3d4

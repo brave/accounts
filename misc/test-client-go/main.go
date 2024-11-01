@@ -72,6 +72,9 @@ func scanCredentials() (string, string) {
 	fmt.Print("Enter password: ")
 	scanner.Scan()
 	password := scanner.Text()
+
+	email = strings.TrimSpace(email)
+	password = strings.TrimSpace(password)
 	return email, password
 }
 
@@ -148,9 +151,9 @@ func login() {
 		log.Fatalln(err)
 	}
 
-	initReq := client.LoginInit([]byte(password))
+	initReq := client.GenerateKE1([]byte(password))
 	blindedMessage, err := initReq.BlindedMessage.MarshalBinary()
-	epk, err := initReq.EpkU.MarshalBinary()
+	epk, err := initReq.ClientPublicKeyshare.MarshalBinary()
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -158,7 +161,7 @@ func login() {
 		"email":                    email,
 		"blindedMessage":           hex.EncodeToString(blindedMessage),
 		"clientEphemeralPublicKey": hex.EncodeToString(epk),
-		"clientNonce":              hex.EncodeToString(initReq.NonceU),
+		"clientNonce":              hex.EncodeToString(initReq.ClientNonce),
 	}
 
 	resp := postReq(initFields, "http://localhost:8080/v2/auth/login/init", nil)
@@ -202,12 +205,12 @@ func login() {
 			MaskingNonce:     maskingNonce,
 			MaskedResponse:   maskedResponse,
 		},
-		EpkS:   epkElement,
-		NonceS: serverNonce,
-		Mac:    serverMac,
+		ServerPublicKeyshare: epkElement,
+		ServerNonce:          serverNonce,
+		ServerMac:            serverMac,
 	}
 
-	ke3, _, err := client.LoginFinish(&opaqueResp, opaque.ClientLoginFinishOptions{
+	ke3, _, err := client.GenerateKE3(&opaqueResp, opaque.GenerateKE3Options{
 		ClientIdentity: []byte(email),
 	})
 	if err != nil {
@@ -215,7 +218,7 @@ func login() {
 	}
 
 	finalizeFields := map[string]interface{}{
-		"clientMac": hex.EncodeToString(ke3.Mac),
+		"clientMac": hex.EncodeToString(ke3.ClientMac),
 	}
 	akeToken := resp["akeToken"].(string)
 	resp = postReq(finalizeFields, "http://localhost:8080/v2/auth/login/finalize", &akeToken)
@@ -224,6 +227,9 @@ func login() {
 }
 
 func main() {
+	conf.KSF.Parameters = []int{2, 19456, 1}
+	conf.KSF.Salt = make([]byte, 16)
+
 	fmt.Println("1. Login")
 	fmt.Println("2. Register")
 	fmt.Print("Choose an option (1-2): ")
