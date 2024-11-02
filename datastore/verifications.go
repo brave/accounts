@@ -24,12 +24,14 @@ type Verification struct {
 }
 
 const (
-	codeLength             = 60
-	verifyWaitMaxDuration  = 20 * time.Second
-	VerificationExpiration = 30 * time.Minute
+	codeLength              = 60
+	verifyWaitMaxDuration   = 20 * time.Second
+	VerificationExpiration  = 30 * time.Minute
+	maxPendingVerifications = 3
 )
 
 var ErrVerificationNotFound = errors.New("verification not found or invalid token")
+var ErrTooManyVerifications = errors.New("too many pending verification requests for email")
 
 func generateNotificationChannel(id uuid.UUID) string {
 	return fmt.Sprintf("verification_%s", id.String())
@@ -53,6 +55,18 @@ func (d *Datastore) CreateVerification(email string, service string, intent stri
 		Verified: false,
 	}
 
+	var existingCount int64
+	if err := d.db.Model(&Verification{}).
+		Where("email = ? AND verified = false AND created_at > ?",
+			email,
+			time.Now().Add(-VerificationExpiration)).
+		Count(&existingCount).Error; err != nil {
+		return nil, fmt.Errorf("error counting verifications: %w", err)
+	}
+
+	if existingCount >= maxPendingVerifications {
+		return nil, ErrTooManyVerifications
+	}
 	if err := d.db.Create(&verification).Error; err != nil {
 		return nil, fmt.Errorf("error creating verification: %w", err)
 	}

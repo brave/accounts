@@ -50,6 +50,8 @@ type VerifyInitRequest struct {
 	Intent string `json:"intent" validate:"required,oneof=auth_token auth_token_redirect verification" example:"verification"`
 	// Service requesting the verification
 	Service string `json:"service" validate:"required,oneof=accounts premium inbox-aliases" example:"accounts"`
+	// Locale for verification email
+	Locale string `json:"language" validate:"max=8" example:"en-US"`
 }
 
 // @Description	Response containing verification check token
@@ -156,6 +158,10 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 
 	verification, err := vc.datastore.CreateVerification(requestData.Email, requestData.Service, requestData.Intent)
 	if err != nil {
+		if errors.Is(err, datastore.ErrTooManyVerifications) {
+			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+			return
+		}
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
@@ -175,6 +181,7 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		requestData.Email,
 		verification.ID.String(),
 		verification.Code,
+		requestData.Locale,
 	); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, fmt.Errorf("failed to send verification email: %w", err))
 		return

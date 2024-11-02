@@ -901,6 +901,12 @@ const docTemplate = `{
                     ],
                     "example": "verification"
                 },
+                "language": {
+                    "description": "Locale for verification email",
+                    "type": "string",
+                    "maxLength": 8,
+                    "example": "en-US"
+                },
                 "service": {
                     "description": "Service requesting the verification",
                     "type": "string",

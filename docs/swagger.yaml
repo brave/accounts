@@ -149,6 +149,11 @@ definitions:
         - verification
         example: verification
         type: string
+      language:
+        description: Locale for verification email
+        example: en-US
+        maxLength: 8
+        type: string
       service:
         description: Service requesting the verification
         enum:
