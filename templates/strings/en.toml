@@ -1,0 +1,31 @@
+[VerifyEmailSubject]
+description = "Email subject for email verification"
+other = "Verify Your Email"
+
+[VerifyEmailTitle]
+description = "Title of the email verification message"
+other = "Verify Your Email Address"
+
+[VerifyEmailGreeting]
+description = "Greeting in the email verification message"
+other = "Hello,"
+
+[VerifyEmailInstructions]
+description = "Instructions to verify email address"
+other = "Please verify your email address {{.Email}}."
+
+[VerifyEmailButton]
+description = "Text on the email verification button"
+other = "Verify Email"
+
+[VerifyEmailIgnore]
+description = "Message to ignore if verification wasn't requested"
+other = "If you didn't request this verification, please ignore this email."
+
+[VerifyEmailSignature]
+description = "Email signature"
+other = "Best regards, Brave Team"
+
+[VerifyEmailFallbackInstructions]
+description = "Instructions for manual link usage if button doesn't work"
+other = "If the button doesn't work, copy and paste this link into your browser:"

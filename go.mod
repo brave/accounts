@@ -3,6 +3,7 @@ module github.com/brave-experiments/accounts
 go 1.23.1
 
 require (
+	github.com/BurntSushi/toml v1.4.0
 	github.com/aws/aws-sdk-go-v2/config v1.28.0
 	github.com/bytemare/crypto v0.6.0
 	github.com/bytemare/opaque v0.0.0
@@ -12,6 +13,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/golang-migrate/migrate/v4 v4.18.1
 	github.com/google/uuid v1.6.0
+	github.com/nicksnyder/go-i18n/v2 v2.4.1
 	github.com/swaggo/http-swagger/v2 v2.0.2
 	github.com/swaggo/swag v1.16.4
 	gorm.io/gorm v1.25.12
@@ -77,7 +79,7 @@ require (
 	golang.org/x/crypto v0.28.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.26.0 // indirect
-	golang.org/x/text v0.19.0 // indirect
+	golang.org/x/text v0.19.0
 	gorm.io/driver/postgres v1.5.9
 )
 

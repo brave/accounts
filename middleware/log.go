@@ -13,5 +13,9 @@ func LoggerMiddleware(next http.Handler) http.Handler {
 			Str("path", r.URL.Path).
 			Msg("Start request")
 		next.ServeHTTP(w, r)
+		log.Debug().
+			Str("method", r.Method).
+			Str("path", r.URL.Path).
+			Msg("Request finish")
 	})
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/brave-experiments/accounts/controllers"
 	"github.com/brave-experiments/accounts/datastore"
@@ -42,7 +43,7 @@ func main() {
 	}
 
 	if os.Getenv(logPrettyEnv) == "true" {
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 	}
 
 	passwordAuthEnabled := os.Getenv(passwordAuthEnabledEnv) == "true"
@@ -62,7 +63,12 @@ func main() {
 		log.Panic().Err(err).Msg("Failed to init JWT util")
 	}
 
-	sesUtil, err := util.NewSESUtil()
+	i18nBundle, err := util.CreateI18nBundle()
+	if err != nil {
+		log.Panic().Err(err).Msg("Failed to init i18n bundle")
+	}
+
+	sesUtil, err := util.NewSESUtil(i18nBundle)
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to init SES util")
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ses"
 	"github.com/aws/aws-sdk-go-v2/service/ses/types"
 	"github.com/brave-experiments/accounts/templates"
+	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/rs/zerolog/log"
 )
 
@@ -27,13 +28,14 @@ const (
 )
 
 type SESUtil struct {
-	client      *ses.Client
-	tmpl        *template.Template
-	fromAddress string
-	baseURL     string
+	client         *ses.Client
+	verifyTemplate *template.Template
+	fromAddress    string
+	baseURL        string
+	i18nBundle     *i18n.Bundle
 }
 
-func NewSESUtil() (*SESUtil, error) {
+func NewSESUtil(i18nBundle *i18n.Bundle) (*SESUtil, error) {
 	// Create AWS config
 	cfg, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
@@ -68,25 +70,41 @@ func NewSESUtil() (*SESUtil, error) {
 		tmpl,
 		fromAddress,
 		baseURL,
+		i18nBundle,
 	}, nil
 }
 
 type verifyEmailData struct {
-	VerifyURL string
-	Email     string
+	VerifyURL            string
+	Subject              string
+	Title                string
+	Greeting             string
+	Instructions         string
+	Button               string
+	Ignore               string
+	Signature            string
+	FallbackInstructions string
 }
 
-func (s *SESUtil) SendVerificationEmail(ctx context.Context, email string, verificationID string, verificationCode string) error {
+func (s *SESUtil) SendVerificationEmail(ctx context.Context, email string, verificationID string, verificationCode string, locale string) error {
 	verifyURL := fmt.Sprintf("%s/v2/verify/complete?verify_id=%s&verify_code=%s", s.baseURL, verificationID, verificationCode)
+	localizer := i18n.NewLocalizer(s.i18nBundle, locale)
 	data := verifyEmailData{
-		VerifyURL: verifyURL,
-		Email:     email,
+		VerifyURL:            verifyURL,
+		Subject:              localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailSubject"}),
+		Title:                localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailTitle"}),
+		Greeting:             localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailGreeting"}),
+		Instructions:         localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailInstructions", TemplateData: map[string]string{"Email": email}}),
+		Button:               localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailButton"}),
+		Ignore:               localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailIgnore"}),
+		Signature:            localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailSignature"}),
+		FallbackInstructions: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailFallbackInstructions"}),
 	}
 
 	log.Debug().Str("verify_url", verifyURL).Msg("Sent verification link")
 
 	var bodyContent bytes.Buffer
-	if err := s.tmpl.Execute(&bodyContent, data); err != nil {
+	if err := s.verifyTemplate.Execute(&bodyContent, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
 	bodyContentString := bodyContent.String()
