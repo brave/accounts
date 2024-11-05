@@ -26,4 +26,5 @@ View API documentation at http://localhost:8080/swagger/index.html.
 | LOG_LEVEL | No | Logging level (default: info) |
 | SERVE_SWAGGER | No | Serve Swagger UI if set to 'true' |
 | PASSWORD_AUTH_ENABLED | No | Enable password authentication if set to 'true' |
+| EMAIL_AUTH_DISABLED | No | Disable email `auth_token` authentication if set to 'true' |
 | OPAQUE_FAKE_RECORD | No | Use OPAQUE fake record to prevent client enumeration attacks |
