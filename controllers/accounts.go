@@ -17,6 +17,7 @@ import (
 )
 
 var ErrEmailNotVerified = errors.New("email not verified")
+var ErrIncorrectVerificationIntent = errors.New("incorrect verification intent")
 
 type AccountsController struct {
 	opaqueService *services.OpaqueService
@@ -153,13 +154,13 @@ func NewAccountsController(opaqueService *services.OpaqueService, jwtUtil *util.
 	}
 }
 
-func (ac *AccountsController) Router(authMiddleware func(http.Handler) http.Handler, verificationAuthMiddleware func(http.Handler) http.Handler) chi.Router {
+func (ac *AccountsController) Router(permissiveAuthMiddleware func(http.Handler) http.Handler, verificationAuthMiddleware func(http.Handler) http.Handler) chi.Router {
 	r := chi.NewRouter()
 
 	r.With(verificationAuthMiddleware).Post("/setup/init", ac.SetupPasswordInit)
 	r.With(verificationAuthMiddleware).Post("/setup/finalize", ac.SetupPasswordFinalize)
-	r.With(authMiddleware).Post("/change_pwd/init", ac.ChangePasswordInit)
-	r.With(authMiddleware).Post("/change_pwd/finalize", ac.ChangePasswordFinalize)
+	r.With(permissiveAuthMiddleware).Post("/change_pwd/init", ac.ChangePasswordInit)
+	r.With(permissiveAuthMiddleware).Post("/change_pwd/finalize", ac.ChangePasswordFinalize)
 
 	return r
 }
@@ -229,7 +230,7 @@ func (ac *AccountsController) setupPasswordFinalizeHelper(email string, w http.R
 		return nil
 	}
 
-	session, err := ac.ds.CreateSession(account.ID, requestData.SessionName, nil)
+	session, err := ac.ds.CreateSession(account.ID, PasswordAuthSessionVersion, requestData.SessionName, nil)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return nil
@@ -244,6 +245,19 @@ func (ac *AccountsController) setupPasswordFinalizeHelper(email string, w http.R
 	return &PasswordFinalizeResponse{
 		AuthToken: authToken,
 	}
+}
+
+func checkVerificationStatusAndIntent(w http.ResponseWriter, r *http.Request, verification *datastore.Verification) bool {
+	if !verification.Verified {
+		util.RenderErrorResponse(w, r, http.StatusForbidden, ErrEmailNotVerified)
+		return false
+	}
+
+	if verification.Intent != registrationIntent && verification.Intent != resetIntent {
+		util.RenderErrorResponse(w, r, http.StatusForbidden, ErrIncorrectVerificationIntent)
+		return false
+	}
+	return true
 }
 
 // @Summary Initialize password setup
@@ -264,8 +278,8 @@ func (ac *AccountsController) setupPasswordFinalizeHelper(email string, w http.R
 func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.Request) {
 	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
 
-	if !verification.Verified {
-		util.RenderErrorResponse(w, r, http.StatusForbidden, ErrEmailNotVerified)
+	if !checkVerificationStatusAndIntent(w, r, verification) {
+		return
 	}
 
 	ac.setupPasswordInitHelper(verification.Email, w, r)
@@ -290,8 +304,8 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *http.Request) {
 	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
 
-	if !verification.Verified {
-		util.RenderErrorResponse(w, r, http.StatusForbidden, ErrEmailNotVerified)
+	if !checkVerificationStatusAndIntent(w, r, verification) {
+		return
 	}
 
 	response := ac.setupPasswordFinalizeHelper(verification.Email, w, r)
@@ -310,6 +324,7 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 
 // @Summary Initialize password change
 // @Description Start the password change process using OPAQUE protocol.
+// @Description This endpoint should also be used to upgrade a Phase 1 account to a Phase 2 account.
 // @Description If `serializeResponse` is set to true, the `serializedResponse` field will be populated
 // @Description in the response, with other fields omitted.
 // @Tags Accounts

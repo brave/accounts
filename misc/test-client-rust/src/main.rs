@@ -68,13 +68,13 @@ pub fn prompt_credentials() -> (String, String) {
     (email, password)
 }
 
-fn register() {
-    print!("Enter verification token: ");
+fn set_password(change_password: bool) {
+    print!("Enter verification/auth token: ");
     stdout().flush().unwrap();
-    let mut verification_token = String::new();
-    stdin().read_line(&mut verification_token).unwrap();
+    let mut token = String::new();
+    stdin().read_line(&mut token).unwrap();
 
-    verification_token = verification_token.trim().to_string();
+    token = token.trim().to_string();
     let (email, password) = prompt_credentials();
 
     let mut client_rng = OsRng;
@@ -88,11 +88,12 @@ fn register() {
     body.insert("blindedMessage", registration_request_hex.into());
     body.insert("serializeResponse", true.into());
 
-    let resp = post_request(
-        "http://localhost:8080/v2/accounts/setup/init",
-        Some(&verification_token),
-        body,
-    );
+    let init_url = if change_password {
+        "http://localhost:8080/v2/accounts/change_pwd/init"
+    } else {
+        "http://localhost:8080/v2/accounts/setup/init"
+    };
+    let resp = post_request(init_url, Some(&token), body);
 
     let resp_bin = hex::decode(resp.get("serializedResponse").unwrap()).unwrap();
 
@@ -116,11 +117,12 @@ fn register() {
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("serializedRecord", record_hex.into());
 
-    let resp = post_request(
-        "http://localhost:8080/v2/accounts/setup/finalize",
-        Some(&verification_token),
-        body,
-    );
+    let finalize_url = if change_password {
+        "http://localhost:8080/v2/accounts/change_pwd/finalize"
+    } else {
+        "http://localhost:8080/v2/accounts/setup/finalize"
+    };
+    let resp = post_request(finalize_url, Some(&token), body);
 
     println!("auth token: {}", resp.get("authToken").unwrap())
 }
@@ -172,7 +174,7 @@ fn login() {
 }
 
 fn main() {
-    print!("1. Login\n2. Register\nEnter choice (1 or 2): ");
+    print!("1. Login\n2. Register\n3. Change password\nEnter choice (1, 2 or 3): ");
     stdout().flush().unwrap();
 
     let mut choice = String::new();
@@ -180,7 +182,8 @@ fn main() {
 
     match choice.trim() {
         "1" => login(),
-        "2" => register(),
+        "2" => set_password(false),
+        "3" => set_password(true),
         _ => println!("Invalid choice"),
     }
 }

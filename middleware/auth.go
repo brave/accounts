@@ -43,9 +43,10 @@ func AuthMiddleware(jwtUtil *util.JWTUtil, ds *datastore.Datastore, minSessionVe
 					util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 					return
 				}
-			}
-
-			if session.Version < minSessionVersion {
+			} else if session.Version < minSessionVersion {
+				// Using `else if` to exclude checking versions for ephemeral sessions
+				// i.e. non-Brave Premium sessions using email auth
+				// Ephemeral sessions are exceptions to the session version check
 				util.RenderErrorResponse(w, r, http.StatusForbidden, errors.New("outdated session"))
 				return
 			}
