@@ -28,7 +28,7 @@ type Session struct {
 
 var ErrSessionNotFound = errors.New("session not found")
 
-func (d *Datastore) CreateSession(accountID uuid.UUID, sessionName *string, expiration *time.Duration) (*Session, error) {
+func (d *Datastore) CreateSession(accountID uuid.UUID, sessionVersion int, sessionName *string, expiration *time.Duration) (*Session, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
@@ -38,11 +38,11 @@ func (d *Datastore) CreateSession(accountID uuid.UUID, sessionName *string, expi
 		ID:          id,
 		AccountID:   accountID,
 		SessionName: sessionName,
-		Version:     d.newSessionVersion,
+		Version:     sessionVersion,
 	}
 
 	if expiration != nil {
-		expiresAt := time.Now().Add(*expiration)
+		expiresAt := time.Now().Add(*expiration).UTC()
 		session.ExpiresAt = &expiresAt
 	}
 
@@ -56,9 +56,9 @@ func (d *Datastore) CreateSession(accountID uuid.UUID, sessionName *string, expi
 func (d *Datastore) ListSessions(accountID uuid.UUID, minSessionVersion *int) ([]Session, error) {
 	var sessions []Session
 	if minSessionVersion == nil {
-		minSessionVersion = &d.newSessionVersion
+		minSessionVersion = &d.minSessionVersion
 	}
-	if err := d.db.Where("account_id = ? AND version >= ? AND expired_at IS NULL", accountID, *minSessionVersion).Find(&sessions).Error; err != nil {
+	if err := d.db.Where("account_id = ? AND version >= ? AND expires_at IS NULL", accountID, *minSessionVersion).Find(&sessions).Error; err != nil {
 		return nil, fmt.Errorf("failed to list sessions: %w", err)
 	}
 

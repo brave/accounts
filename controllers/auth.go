@@ -16,6 +16,11 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+const (
+	EmailAuthSessionVersion    = 1
+	PasswordAuthSessionVersion = 2
+)
+
 type AuthController struct {
 	opaqueService *services.OpaqueService
 	validate      *validator.Validate
@@ -316,7 +321,7 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	session, err := ac.ds.CreateSession(*accountID, requestData.SessionName, nil)
+	session, err := ac.ds.CreateSession(*accountID, PasswordAuthSessionVersion, requestData.SessionName, nil)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return

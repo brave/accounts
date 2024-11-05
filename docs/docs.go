@@ -82,7 +82,7 @@ const docTemplate = `{
         },
         "/v2/accounts/change_pwd/init": {
             "post": {
-                "description": "Start the password change process using OPAQUE protocol.\nIf ` + "`" + `serializeResponse` + "`" + ` is set to true, the ` + "`" + `serializedResponse` + "`" + ` field will be populated\nin the response, with other fields omitted.",
+                "description": "Start the password change process using OPAQUE protocol.\nThis endpoint should also be used to upgrade a Phase 1 account to a Phase 2 account.\nIf ` + "`" + `serializeResponse` + "`" + ` is set to true, the ` + "`" + `serializedResponse` + "`" + ` field will be populated\nin the response, with other fields omitted.",
                 "consumes": [
                     "application/json"
                 ],
@@ -587,7 +587,7 @@ const docTemplate = `{
         },
         "/v2/verify/init": {
             "post": {
-                "description": "Starts email verification process by sending a verification email",
+                "description": "Starts email verification process by sending a verification email\nOne of the following intents must be provided with the request:\n- ` + "`" + `auth_token` + "`" + `: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the \"query result\" endpoint.\n- ` + "`" + `auth_token_redirect` + "`" + `: After verification, create an account if one does not exist, and generate an auth token. Redirect to the URL associated with the service name, with the auth token.\n- ` + "`" + `verification` + "`" + `: After verification, do not create an account, but indicate that the email was verified in the \"query result\" response. Do not allow registration after verification.\n- ` + "`" + `registration` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. An account may be created by setting a password.\n- ` + "`" + `reset` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. A password may be set for the existing account.\n\nOne of the following service names must be provided with the request: ` + "`" + `inbox-aliases` + "`" + `, ` + "`" + `accounts` + "`" + `, ` + "`" + `premium` + "`" + `.",
                 "consumes": [
                     "application/json"
                 ],
@@ -892,14 +892,16 @@ const docTemplate = `{
                     "example": "test@example.com"
                 },
                 "intent": {
-                    "description": "Purpose of verification (e.g., get auth token, get auth token \u0026 redirect, simple verification)",
+                    "description": "Purpose of verification (e.g., get auth token, get auth token \u0026 redirect, simple verification, registration)",
                     "type": "string",
                     "enum": [
                         "auth_token",
                         "auth_token_redirect",
-                        "verification"
+                        "verification",
+                        "registration",
+                        "reset"
                     ],
-                    "example": "verification"
+                    "example": "registration"
                 },
                 "language": {
                     "description": "Locale for verification email",

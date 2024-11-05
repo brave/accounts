@@ -20,10 +20,10 @@ const databaseURLEnv = "DATABASE_URL"
 type Datastore struct {
 	dbConfig          *pgx.ConnConfig
 	db                *gorm.DB
-	newSessionVersion int
+	minSessionVersion int
 }
 
-func NewDatastore(newSessionVersion int) (*Datastore, error) {
+func NewDatastore(minSessionVersion int) (*Datastore, error) {
 	dbURL := os.Getenv(databaseURLEnv)
 	if dbURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL environment variable not set")
@@ -60,5 +60,5 @@ func NewDatastore(newSessionVersion int) (*Datastore, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	return &Datastore{dbConfig: dbConfig, db: db, newSessionVersion: newSessionVersion}, nil
+	return &Datastore{dbConfig: dbConfig, db: db, minSessionVersion: minSessionVersion}, nil
 }

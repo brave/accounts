@@ -24,10 +24,13 @@ import (
 
 var routes = flag.Bool("routes", false, "Generate router documentation")
 
-const logPrettyEnv = "LOG_PRETTY"
-const logLevelEnv = "LOG_LEVEL"
-const serveSwaggerEnv = "SERVE_SWAGGER"
-const passwordAuthEnabledEnv = "PASSWORD_AUTH_ENABLED"
+const (
+	logPrettyEnv           = "LOG_PRETTY"
+	logLevelEnv            = "LOG_LEVEL"
+	serveSwaggerEnv        = "SERVE_SWAGGER"
+	passwordAuthEnabledEnv = "PASSWORD_AUTH_ENABLED"
+	emailAuthDisabledEnv   = "EMAIL_AUTH_DISABLED"
+)
 
 // @title Brave Accounts Service
 // @externalDocs.description OpenAPI
@@ -47,9 +50,10 @@ func main() {
 	}
 
 	passwordAuthEnabled := os.Getenv(passwordAuthEnabledEnv) == "true"
+	emailAuthDisabled := os.Getenv(emailAuthDisabledEnv) == "true"
 
 	minSessionVersion := 1
-	if passwordAuthEnabled {
+	if passwordAuthEnabled && emailAuthDisabled {
 		minSessionVersion = 2
 	}
 
@@ -78,25 +82,26 @@ func main() {
 		log.Panic().Err(err).Msg("Failed to init OPAQUE service")
 	}
 
-	authMiddleware := middleware.AuthMiddleware(jwtUtil, datastore, minSessionVersion)
+	restrictiveAuthMiddleware := middleware.AuthMiddleware(jwtUtil, datastore, minSessionVersion)
+	permissiveAuthMiddleware := middleware.AuthMiddleware(jwtUtil, datastore, 0)
 	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(jwtUtil, datastore)
 
 	r := chi.NewRouter()
 
 	authController := controllers.NewAuthController(opaqueService, jwtUtil, datastore)
 	accountsController := controllers.NewAccountsController(opaqueService, jwtUtil, datastore)
-	verificationController := controllers.NewVerificationController(datastore, jwtUtil, sesUtil, passwordAuthEnabled)
+	verificationController := controllers.NewVerificationController(datastore, jwtUtil, sesUtil, passwordAuthEnabled, emailAuthDisabled)
 	sessionsController := controllers.NewSessionsController(datastore)
 
 	r.Use(middleware.LoggerMiddleware)
 
 	r.Route("/v2", func(r chi.Router) {
-		r.Mount("/auth", authController.Router(authMiddleware))
+		r.Mount("/auth", authController.Router(restrictiveAuthMiddleware))
 		if passwordAuthEnabled {
-			r.Mount("/accounts", accountsController.Router(authMiddleware, verificationAuthMiddleware))
+			r.Mount("/accounts", accountsController.Router(permissiveAuthMiddleware, verificationAuthMiddleware))
 		}
 		r.Mount("/verify", verificationController.Router(verificationAuthMiddleware))
-		r.Mount("/sessions", sessionsController.Router(authMiddleware))
+		r.Mount("/sessions", sessionsController.Router(restrictiveAuthMiddleware))
 	})
 
 	if os.Getenv(serveSwaggerEnv) == "true" {

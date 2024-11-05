@@ -142,12 +142,14 @@ definitions:
         type: string
       intent:
         description: Purpose of verification (e.g., get auth token, get auth token
-          & redirect, simple verification)
+          & redirect, simple verification, registration)
         enum:
         - auth_token
         - auth_token_redirect
         - verification
-        example: verification
+        - registration
+        - reset
+        example: registration
         type: string
       language:
         description: Locale for verification email
@@ -279,6 +281,7 @@ paths:
       - application/json
       description: |-
         Start the password change process using OPAQUE protocol.
+        This endpoint should also be used to upgrade a Phase 1 account to a Phase 2 account.
         If `serializeResponse` is set to true, the `serializedResponse` field will be populated
         in the response, with other fields omitted.
       parameters:
@@ -625,7 +628,16 @@ paths:
     post:
       consumes:
       - application/json
-      description: Starts email verification process by sending a verification email
+      description: |-
+        Starts email verification process by sending a verification email
+        One of the following intents must be provided with the request:
+        - `auth_token`: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the "query result" endpoint.
+        - `auth_token_redirect`: After verification, create an account if one does not exist, and generate an auth token. Redirect to the URL associated with the service name, with the auth token.
+        - `verification`: After verification, do not create an account, but indicate that the email was verified in the "query result" response. Do not allow registration after verification.
+        - `registration`: After verification, indicate that the email was verified in the "query result" response. An account may be created by setting a password.
+        - `reset`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
+
+        One of the following service names must be provided with the request: `inbox-aliases`, `accounts`, `premium`.
       parameters:
       - description: Verification request params
         in: body
