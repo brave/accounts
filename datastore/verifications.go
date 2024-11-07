@@ -77,7 +77,7 @@ func (d *Datastore) CreateVerification(email string, service string, intent stri
 // UpdateVerificationStatus updates the verification status for a given email
 func (d *Datastore) UpdateVerificationStatus(id uuid.UUID, code string) error {
 	result := d.db.Model(&Verification{}).
-		Where("id = ? AND code = ?", id, code).
+		Where("id = ? AND code = ? AND verified = false", id, code).
 		Update("verified", true)
 
 	if result.Error != nil {

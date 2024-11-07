@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/brave-experiments/accounts/datastore"
 	"github.com/brave-experiments/accounts/util"
@@ -38,15 +37,7 @@ func AuthMiddleware(jwtUtil *util.JWTUtil, ds *datastore.Datastore, minSessionVe
 				return
 			}
 
-			if session.ExpiresAt != nil {
-				if time.Now().After(*session.ExpiresAt) {
-					util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
-					return
-				}
-			} else if session.Version < minSessionVersion {
-				// Using `else if` to exclude checking versions for ephemeral sessions
-				// i.e. non-Brave Premium sessions using email auth
-				// Ephemeral sessions are exceptions to the session version check
+			if session.Version < minSessionVersion {
 				util.RenderErrorResponse(w, r, http.StatusForbidden, errors.New("outdated session"))
 				return
 			}
