@@ -133,6 +133,19 @@ definitions:
         description: UUID of the session associated with the account
         type: string
     type: object
+  controllers.VerifyCompleteRequest:
+    description: Request parameters for verification completion
+    properties:
+      code:
+        description: Verification code sent to user
+        type: string
+      id:
+        description: Unique verification identifier
+        type: string
+    required:
+    - code
+    - id
+    type: object
   controllers.VerifyInitRequest:
     description: Request to initialize email verification
     properties:
@@ -141,11 +154,10 @@ definitions:
         example: test@example.com
         type: string
       intent:
-        description: Purpose of verification (e.g., get auth token, get auth token
-          & redirect, simple verification, registration)
+        description: Purpose of verification (e.g., get auth token, simple verification,
+          registration)
         enum:
         - auth_token
-        - auth_token_redirect
         - verification
         - registration
         - reset
@@ -201,9 +213,6 @@ definitions:
     properties:
       createdAt:
         description: Session creation timestamp
-        type: string
-      expiresAt:
-        description: Expiration timestamp
         type: string
       id:
         description: Session UUID
@@ -589,26 +598,22 @@ paths:
       tags:
       - Sessions
   /v2/verify/complete:
-    get:
+    post:
+      consumes:
+      - application/json
       description: Completes the email verification process
       parameters:
-      - description: Verification ID
-        in: query
-        name: verify_id
+      - description: Verify completion params
+        in: body
+        name: request
         required: true
-        type: string
-      - description: Verification code
-        in: query
-        name: verify_code
-        required: true
-        type: string
+        schema:
+          $ref: '#/definitions/controllers.VerifyCompleteRequest'
       produces:
-      - text/plain
+      - application/json
       responses:
-        "200":
+        "204":
           description: Email verification successful
-          schema:
-            type: string
         "400":
           description: Missing/invalid verification parameters
           schema:
@@ -632,7 +637,6 @@ paths:
         Starts email verification process by sending a verification email
         One of the following intents must be provided with the request:
         - `auth_token`: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the "query result" endpoint.
-        - `auth_token_redirect`: After verification, create an account if one does not exist, and generate an auth token. Redirect to the URL associated with the service name, with the auth token.
         - `verification`: After verification, do not create an account, but indicate that the email was verified in the "query result" response. Do not allow registration after verification.
         - `registration`: After verification, indicate that the email was verified in the "query result" response. An account may be created by setting a password.
         - `reset`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.

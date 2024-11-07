@@ -532,10 +532,13 @@ const docTemplate = `{
             }
         },
         "/v2/verify/complete": {
-            "get": {
+            "post": {
                 "description": "Completes the email verification process",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
-                    "text/plain"
+                    "application/json"
                 ],
                 "tags": [
                     "Email verification"
@@ -543,26 +546,18 @@ const docTemplate = `{
                 "summary": "Complete email verification",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Verification ID",
-                        "name": "verify_id",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Verification code",
-                        "name": "verify_code",
-                        "in": "query",
-                        "required": true
+                        "description": "Verify completion params",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.VerifyCompleteRequest"
+                        }
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "Email verification successful",
-                        "schema": {
-                            "type": "string"
-                        }
+                    "204": {
+                        "description": "Email verification successful"
                     },
                     "400": {
                         "description": "Missing/invalid verification parameters",
@@ -587,7 +582,7 @@ const docTemplate = `{
         },
         "/v2/verify/init": {
             "post": {
-                "description": "Starts email verification process by sending a verification email\nOne of the following intents must be provided with the request:\n- ` + "`" + `auth_token` + "`" + `: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the \"query result\" endpoint.\n- ` + "`" + `auth_token_redirect` + "`" + `: After verification, create an account if one does not exist, and generate an auth token. Redirect to the URL associated with the service name, with the auth token.\n- ` + "`" + `verification` + "`" + `: After verification, do not create an account, but indicate that the email was verified in the \"query result\" response. Do not allow registration after verification.\n- ` + "`" + `registration` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. An account may be created by setting a password.\n- ` + "`" + `reset` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. A password may be set for the existing account.\n\nOne of the following service names must be provided with the request: ` + "`" + `inbox-aliases` + "`" + `, ` + "`" + `accounts` + "`" + `, ` + "`" + `premium` + "`" + `.",
+                "description": "Starts email verification process by sending a verification email\nOne of the following intents must be provided with the request:\n- ` + "`" + `auth_token` + "`" + `: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the \"query result\" endpoint.\n- ` + "`" + `verification` + "`" + `: After verification, do not create an account, but indicate that the email was verified in the \"query result\" response. Do not allow registration after verification.\n- ` + "`" + `registration` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. An account may be created by setting a password.\n- ` + "`" + `reset` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. A password may be set for the existing account.\n\nOne of the following service names must be provided with the request: ` + "`" + `inbox-aliases` + "`" + `, ` + "`" + `accounts` + "`" + `, ` + "`" + `premium` + "`" + `.",
                 "consumes": [
                     "application/json"
                 ],
@@ -877,6 +872,24 @@ const docTemplate = `{
                 }
             }
         },
+        "controllers.VerifyCompleteRequest": {
+            "description": "Request parameters for verification completion",
+            "type": "object",
+            "required": [
+                "code",
+                "id"
+            ],
+            "properties": {
+                "code": {
+                    "description": "Verification code sent to user",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "Unique verification identifier",
+                    "type": "string"
+                }
+            }
+        },
         "controllers.VerifyInitRequest": {
             "description": "Request to initialize email verification",
             "type": "object",
@@ -892,11 +905,10 @@ const docTemplate = `{
                     "example": "test@example.com"
                 },
                 "intent": {
-                    "description": "Purpose of verification (e.g., get auth token, get auth token \u0026 redirect, simple verification, registration)",
+                    "description": "Purpose of verification (e.g., get auth token, simple verification, registration)",
                     "type": "string",
                     "enum": [
                         "auth_token",
-                        "auth_token_redirect",
                         "verification",
                         "registration",
                         "reset"
@@ -964,10 +976,6 @@ const docTemplate = `{
             "properties": {
                 "createdAt": {
                     "description": "Session creation timestamp",
-                    "type": "string"
-                },
-                "expiresAt": {
-                    "description": "Expiration timestamp",
                     "type": "string"
                 },
                 "id": {

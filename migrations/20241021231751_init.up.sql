@@ -10,6 +10,7 @@ CREATE TABLE accounts (
     oprf_seed_id INT REFERENCES oprf_seeds(id),
     opaque_registration BYTEA,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- add last_verified_at or last_active_at
     UNIQUE(email)
 );
 
@@ -32,7 +33,6 @@ CREATE TABLE sessions (
     account_id UUID NOT NULL REFERENCES accounts(id),
     session_name TEXT,
     version SMALLINT NOT NULL,
-    expires_at TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

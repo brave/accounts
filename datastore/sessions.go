@@ -9,6 +9,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	EmailAuthSessionVersion    = 1
+	PasswordAuthSessionVersion = 2
+)
+
 type Session struct {
 	// Session UUID
 	ID uuid.UUID `json:"id"`
@@ -18,8 +23,6 @@ type Session struct {
 	SessionName *string `json:"sessionName"`
 	// The accounts "phase" the session was created in
 	Version int `json:"-"`
-	// Expiration timestamp
-	ExpiresAt *time.Time `json:"expiresAt"`
 	// Session creation timestamp
 	CreatedAt time.Time `json:"createdAt" gorm:"<-:false"`
 	// Account is excluded from JSON
@@ -28,7 +31,7 @@ type Session struct {
 
 var ErrSessionNotFound = errors.New("session not found")
 
-func (d *Datastore) CreateSession(accountID uuid.UUID, sessionVersion int, sessionName *string, expiration *time.Duration) (*Session, error) {
+func (d *Datastore) CreateSession(accountID uuid.UUID, sessionVersion int, sessionName *string) (*Session, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
@@ -39,11 +42,6 @@ func (d *Datastore) CreateSession(accountID uuid.UUID, sessionVersion int, sessi
 		AccountID:   accountID,
 		SessionName: sessionName,
 		Version:     sessionVersion,
-	}
-
-	if expiration != nil {
-		expiresAt := time.Now().Add(*expiration).UTC()
-		session.ExpiresAt = &expiresAt
 	}
 
 	if err := d.db.Create(&session).Error; err != nil {

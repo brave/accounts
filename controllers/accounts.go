@@ -230,13 +230,13 @@ func (ac *AccountsController) setupPasswordFinalizeHelper(email string, w http.R
 		return nil
 	}
 
-	session, err := ac.ds.CreateSession(account.ID, PasswordAuthSessionVersion, requestData.SessionName, nil)
+	session, err := ac.ds.CreateSession(account.ID, datastore.PasswordAuthSessionVersion, requestData.SessionName)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return nil
 	}
 
-	authToken, err := ac.jwtUtil.CreateAuthToken(session.ID, nil)
+	authToken, err := ac.jwtUtil.CreateAuthToken(session.ID)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return nil
