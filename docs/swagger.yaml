@@ -205,6 +205,9 @@ definitions:
       email:
         description: Email associated wiith the verification
         type: string
+      serviceName:
+        description: Name of service requesting verification
+        type: string
       verified:
         description: Email verification status
         type: boolean
@@ -217,8 +220,8 @@ definitions:
       id:
         description: Session UUID
         type: string
-      sessionName:
-        description: Optional session name
+      userAgent:
+        description: User agent of client
         type: string
     type: object
   util.ErrorResponse:
@@ -627,6 +630,19 @@ paths:
           schema:
             type: string
       summary: Complete email verification
+      tags:
+      - Email verification
+  /v2/verify/complete_fe:
+    get:
+      description: Returns the HTML page for completing email verification
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML content
+          schema:
+            type: string
+      summary: Display default verification completion frontend
       tags:
       - Email verification
   /v2/verify/init:

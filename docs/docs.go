@@ -580,6 +580,26 @@ const docTemplate = `{
                 }
             }
         },
+        "/v2/verify/complete_fe": {
+            "get": {
+                "description": "Returns the HTML page for completing email verification",
+                "produces": [
+                    "text/html"
+                ],
+                "tags": [
+                    "Email verification"
+                ],
+                "summary": "Display default verification completion frontend",
+                "responses": {
+                    "200": {
+                        "description": "HTML content",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/v2/verify/init": {
             "post": {
                 "description": "Starts email verification process by sending a verification email\nOne of the following intents must be provided with the request:\n- ` + "`" + `auth_token` + "`" + `: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the \"query result\" endpoint.\n- ` + "`" + `verification` + "`" + `: After verification, do not create an account, but indicate that the email was verified in the \"query result\" response. Do not allow registration after verification.\n- ` + "`" + `registration` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. An account may be created by setting a password.\n- ` + "`" + `reset` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. A password may be set for the existing account.\n\nOne of the following service names must be provided with the request: ` + "`" + `inbox-aliases` + "`" + `, ` + "`" + `accounts` + "`" + `, ` + "`" + `premium` + "`" + `.",
@@ -965,6 +985,10 @@ const docTemplate = `{
                     "description": "Email associated wiith the verification",
                     "type": "string"
                 },
+                "serviceName": {
+                    "description": "Name of service requesting verification",
+                    "type": "string"
+                },
                 "verified": {
                     "description": "Email verification status",
                     "type": "boolean"
@@ -982,8 +1006,8 @@ const docTemplate = `{
                     "description": "Session UUID",
                     "type": "string"
                 },
-                "sessionName": {
-                    "description": "Optional session name",
+                "userAgent": {
+                    "description": "User agent of client",
                     "type": "string"
                 }
             }

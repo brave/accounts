@@ -4,6 +4,12 @@ CREATE TABLE oprf_seeds (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE jwt_keys (
+    id SERIAL PRIMARY KEY,
+    key BYTEA NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE accounts (
     id UUID PRIMARY KEY,
     email TEXT NOT NULL,
@@ -31,7 +37,7 @@ CREATE TABLE registration_states (
 CREATE TABLE sessions (
     id UUID PRIMARY KEY,
     account_id UUID NOT NULL REFERENCES accounts(id),
-    session_name TEXT,
+    user_agent TEXT NOT NULL,
     version SMALLINT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

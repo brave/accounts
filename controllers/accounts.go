@@ -22,7 +22,7 @@ var ErrIncorrectVerificationIntent = errors.New("incorrect verification intent")
 type AccountsController struct {
 	opaqueService *services.OpaqueService
 	validate      *validator.Validate
-	jwtUtil       *util.JWTUtil
+	jwtService       *services.JWTService
 	ds            *datastore.Datastore
 }
 
@@ -145,11 +145,11 @@ func FromOpaqueRegistrationResponse(opaqueResp *opaqueMsg.RegistrationResponse, 
 	}, nil
 }
 
-func NewAccountsController(opaqueService *services.OpaqueService, jwtUtil *util.JWTUtil, ds *datastore.Datastore) *AccountsController {
+func NewAccountsController(opaqueService *services.OpaqueService, jwtService *services.JWTService, ds *datastore.Datastore) *AccountsController {
 	return &AccountsController{
 		opaqueService: opaqueService,
 		validate:      validator.New(validator.WithRequiredStructEnabled()),
-		jwtUtil:       jwtUtil,
+		jwtService:       jwtService,
 		ds:            ds,
 	}
 }
@@ -230,13 +230,13 @@ func (ac *AccountsController) setupPasswordFinalizeHelper(email string, w http.R
 		return nil
 	}
 
-	session, err := ac.ds.CreateSession(account.ID, datastore.PasswordAuthSessionVersion, requestData.SessionName)
+	session, err := ac.ds.CreateSession(account.ID, datastore.PasswordAuthSessionVersion, r.UserAgent())
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return nil
 	}
 
-	authToken, err := ac.jwtUtil.CreateAuthToken(session.ID)
+	authToken, err := ac.jwtService.CreateAuthToken(session.ID)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return nil

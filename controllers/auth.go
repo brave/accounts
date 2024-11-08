@@ -19,7 +19,7 @@ import (
 type AuthController struct {
 	opaqueService *services.OpaqueService
 	validate      *validator.Validate
-	jwtUtil       *util.JWTUtil
+	jwtService       *services.JWTService
 	ds            *datastore.Datastore
 }
 
@@ -69,6 +69,16 @@ type LoginFinalizeRequest struct {
 type LoginFinalizeResponse struct {
 	// Authentication token for future requests
 	AuthToken string `json:"authToken"`
+}
+
+// @Description	Response containing validated token details
+type ValidateTokenResponse struct {
+	// Email address associated with the account
+	Email string `json:"email"`
+	// UUID of the account
+	AccountID string `json:"accountId"`
+	// UUID of the session associated with the account
+	SessionID string `json:"sessionId"`
 }
 
 func (req *LoginInitRequest) ToOpaqueKE1(opaqueService *services.OpaqueService) (*opaqueMsg.KE1, error) {
@@ -161,11 +171,11 @@ func (req *LoginFinalizeRequest) ToOpaqueKE3(opaqueService *services.OpaqueServi
 	}, nil
 }
 
-func NewAuthController(opaqueService *services.OpaqueService, jwtUtil *util.JWTUtil, ds *datastore.Datastore) *AuthController {
+func NewAuthController(opaqueService *services.OpaqueService, jwtService *services.JWTService, ds *datastore.Datastore) *AuthController {
 	return &AuthController{
 		opaqueService: opaqueService,
 		validate:      validator.New(validator.WithRequiredStructEnabled()),
-		jwtUtil:       jwtUtil,
+		jwtService:       jwtService,
 		ds:            ds,
 	}
 }
@@ -246,7 +256,7 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	akeToken, err := ac.jwtUtil.CreateEphemeralAKEToken(akeState.ID, datastore.AkeStateExpiration)
+	akeToken, err := ac.jwtService.CreateEphemeralAKEToken(akeState.ID, datastore.AkeStateExpiration)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
@@ -281,7 +291,7 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	akeStateID, err := ac.jwtUtil.ValidateEphemeralAKEToken(token)
+	akeStateID, err := ac.jwtService.ValidateEphemeralAKEToken(token)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 		return
@@ -316,13 +326,13 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	session, err := ac.ds.CreateSession(*accountID, datastore.PasswordAuthSessionVersion, requestData.SessionName)
+	session, err := ac.ds.CreateSession(*accountID, datastore.PasswordAuthSessionVersion, r.UserAgent())
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
 
-	authToken, err := ac.jwtUtil.CreateAuthToken(session.ID)
+	authToken, err := ac.jwtService.CreateAuthToken(session.ID)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
