@@ -2,6 +2,7 @@ package util
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"strings"
@@ -47,15 +48,11 @@ func RenderErrorResponse(w http.ResponseWriter, r *http.Request, status int, err
 }
 
 func GenerateRandomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, length)
 	if _, err := rand.Read(b); err != nil {
 		panic(fmt.Errorf("failed to generate random string: %w", err))
 	}
-	for i := range b {
-		b[i] = charset[int(b[i])%len(charset)]
-	}
-	return string(b)
+	return base64.URLEncoding.EncodeToString(b)
 }
 
 func ExtractAuthToken(r *http.Request) (string, error) {

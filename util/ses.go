@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	fromAddressEnv = "EMAIL_FROM_ADDRESS"
-	baseURLEnv     = "BASE_URL"
-	awsEndpointEnv = "AWS_ENDPOINT"
+	fromAddressEnv       = "EMAIL_FROM_ADDRESS"
+	baseURLEnv           = "BASE_URL"
+	verifyFrontendURLEnv = "VERIFY_FRONTEND_URL"
+	awsEndpointEnv       = "AWS_ENDPOINT"
 
 	defaultFromAddress = "noreply@brave.com"
 	defaultBaseURL     = "http://localhost:8080"
@@ -32,6 +33,7 @@ type SESUtil struct {
 	verifyTemplate *template.Template
 	fromAddress    string
 	baseURL        string
+	frontendURL    string
 	i18nBundle     *i18n.Bundle
 }
 
@@ -65,11 +67,14 @@ func NewSESUtil(i18nBundle *i18n.Bundle) (*SESUtil, error) {
 		baseURL = defaultBaseURL
 	}
 
+	frontendURL := os.Getenv(baseURLEnv)
+
 	return &SESUtil{
 		client,
 		tmpl,
 		fromAddress,
 		baseURL,
+		frontendURL,
 		i18nBundle,
 	}, nil
 }
@@ -87,7 +92,11 @@ type verifyEmailData struct {
 }
 
 func (s *SESUtil) SendVerificationEmail(ctx context.Context, email string, verificationID string, verificationCode string, locale string) error {
-	verifyURL := fmt.Sprintf("%s/v2/verify/complete?verify_id=%s&verify_code=%s", s.baseURL, verificationID, verificationCode)
+	frontendURL := s.frontendURL
+	if frontendURL == "" {
+		frontendURL = s.baseURL + "/v2/verify/complete_fe"
+	}
+	verifyURL := fmt.Sprintf("%s?id=%s&code=%s", frontendURL, verificationID, verificationCode)
 	localizer := i18n.NewLocalizer(s.i18nBundle, locale)
 	data := verifyEmailData{
 		VerifyURL:            verifyURL,

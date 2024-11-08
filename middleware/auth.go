@@ -6,13 +6,14 @@ import (
 	"net/http"
 
 	"github.com/brave-experiments/accounts/datastore"
+	"github.com/brave-experiments/accounts/services"
 	"github.com/brave-experiments/accounts/util"
 )
 
 const ContextSession = "session"
 const ContextVerification = "verification"
 
-func AuthMiddleware(jwtUtil *util.JWTUtil, ds *datastore.Datastore, minSessionVersion int) func(http.Handler) http.Handler {
+func AuthMiddleware(jwtService *services.JWTService, ds *datastore.Datastore, minSessionVersion int) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token, err := util.ExtractAuthToken(r)
@@ -21,7 +22,7 @@ func AuthMiddleware(jwtUtil *util.JWTUtil, ds *datastore.Datastore, minSessionVe
 				return
 			}
 
-			sessionID, err := jwtUtil.ValidateAuthToken(token)
+			sessionID, err := jwtService.ValidateAuthToken(token)
 			if err != nil {
 				util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 				return
@@ -49,7 +50,7 @@ func AuthMiddleware(jwtUtil *util.JWTUtil, ds *datastore.Datastore, minSessionVe
 	}
 }
 
-func VerificationAuthMiddleware(jwtUtil *util.JWTUtil, ds *datastore.Datastore) func(http.Handler) http.Handler {
+func VerificationAuthMiddleware(jwtService *services.JWTService, ds *datastore.Datastore) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token, err := util.ExtractAuthToken(r)
@@ -58,7 +59,7 @@ func VerificationAuthMiddleware(jwtUtil *util.JWTUtil, ds *datastore.Datastore) 
 				return
 			}
 
-			verificationID, err := jwtUtil.ValidateVerificationToken(token)
+			verificationID, err := jwtService.ValidateVerificationToken(token)
 			if err != nil {
 				util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 				return

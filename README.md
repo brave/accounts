@@ -17,7 +17,6 @@ View API documentation at http://localhost:8080/swagger/index.html.
 | DATABASE_URL | Yes | PostgreSQL database connection URL |
 | EMAIL_FROM_ADDRESS | Yes | Email address used as sender for verification emails |
 | BASE_URL | Yes | Base URL of the service |
-| JWT_KEY | Yes | Secret key for JWT signing |
 | OPAQUE_SECRET_KEY | Yes | OPAQUE server secret key |
 | OPAQUE_PUBLIC_KEY | Yes | OPAQUE server public key |
 | PREMIUM_AUTH_REDIRECT_URL | Yes | Redirect URL for premium service authentication |
@@ -28,3 +27,4 @@ View API documentation at http://localhost:8080/swagger/index.html.
 | PASSWORD_AUTH_ENABLED | No | Enable password authentication if set to 'true' |
 | EMAIL_AUTH_DISABLED | No | Disable email `auth_token` authentication if set to 'true' |
 | OPAQUE_FAKE_RECORD | No | Use OPAQUE fake record to prevent client enumeration attacks |
+| VERIFY_FRONTEND_URL | No | Frontend URL to use in verification emails |

@@ -9,6 +9,8 @@ import (
 
 	"github.com/brave-experiments/accounts/datastore"
 	"github.com/brave-experiments/accounts/middleware"
+	"github.com/brave-experiments/accounts/services"
+	"github.com/brave-experiments/accounts/templates"
 	"github.com/brave-experiments/accounts/util"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
@@ -39,7 +41,7 @@ var ErrAccountDoesNotExist = errors.New("account does not exist")
 type VerificationController struct {
 	datastore              *datastore.Datastore
 	validate               *validator.Validate
-	jwtUtil                *util.JWTUtil
+	jwtService             *services.JWTService
 	sesUtil                *util.SESUtil
 	passwordAuthEnabled    bool
 	emailAuthDisabled      bool
@@ -78,6 +80,8 @@ type VerifyResultResponse struct {
 	Verified bool `json:"verified"`
 	// Email associated wiith the verification
 	Email string `json:"email"`
+	// Name of service requesting verification
+	ServiceName string `json:"serviceName"`
 }
 
 // @Description Request parameters for verification completion
@@ -88,17 +92,7 @@ type VerifyCompleteRequest struct {
 	Code string `json:"code" validate:"required"`
 }
 
-// @Description	Response containing validated token details
-type ValidateTokenResponse struct {
-	// Email address associated with the account
-	Email string `json:"email"`
-	// UUID of the account
-	AccountID string `json:"accountId"`
-	// UUID of the session associated with the account
-	SessionID string `json:"sessionId"`
-}
-
-func NewVerificationController(datastore *datastore.Datastore, jwtUtil *util.JWTUtil, sesUtil *util.SESUtil, passwordAuthEnabled bool, emailAuthDisabled bool) *VerificationController {
+func NewVerificationController(datastore *datastore.Datastore, jwtService *services.JWTService, sesUtil *util.SESUtil, passwordAuthEnabled bool, emailAuthDisabled bool) *VerificationController {
 	premiumAuthRedirectURL := os.Getenv(premiumAuthRedirectURLEnv)
 	if premiumAuthRedirectURL == "" {
 		log.Fatal().Msg("PREMIUM_AUTH_REDIRECT_URL environment variable is required")
@@ -107,7 +101,7 @@ func NewVerificationController(datastore *datastore.Datastore, jwtUtil *util.JWT
 	return &VerificationController{
 		datastore:              datastore,
 		validate:               validator.New(validator.WithRequiredStructEnabled()),
-		jwtUtil:                jwtUtil,
+		jwtService:             jwtService,
 		sesUtil:                sesUtil,
 		passwordAuthEnabled:    passwordAuthEnabled,
 		emailAuthDisabled:      emailAuthDisabled,
@@ -120,6 +114,7 @@ func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Ha
 
 	r.Post("/init", vc.VerifyInit)
 	r.Post("/complete", vc.VerifyComplete)
+	r.Get("/complete_fe", vc.VerifyCompleteFrontend)
 	r.With(verificationAuthMiddleware).Post("/result", vc.VerifyQueryResult)
 
 	return r
@@ -204,7 +199,7 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 
 	var verificationToken *string
 	if requestData.Intent == authTokenIntent || requestData.Intent == verificationIntent || requestData.Intent == registrationIntent || requestData.Intent == resetIntent {
-		token, err := vc.jwtUtil.CreateVerificationToken(verification.ID, datastore.VerificationExpiration)
+		token, err := vc.jwtService.CreateVerificationToken(verification.ID, datastore.VerificationExpiration, requestData.Service)
 		if err != nil {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 			return
@@ -292,7 +287,8 @@ func (vc *VerificationController) VerifyQueryResult(w http.ResponseWriter, r *ht
 	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
 
 	responseData := VerifyResultResponse{
-		Email: verification.Email,
+		Email:       verification.Email,
+		ServiceName: verification.Service,
 	}
 
 	if !verification.Verified && requestData.Wait {
@@ -323,13 +319,13 @@ func (vc *VerificationController) VerifyQueryResult(w http.ResponseWriter, r *ht
 			return
 		}
 
-		session, err := vc.datastore.CreateSession(account.ID, datastore.EmailAuthSessionVersion, nil)
+		session, err := vc.datastore.CreateSession(account.ID, datastore.EmailAuthSessionVersion, r.UserAgent())
 		if err != nil {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
-		authTokenResult, err := vc.jwtUtil.CreateAuthToken(session.ID)
+		authTokenResult, err := vc.jwtService.CreateAuthToken(session.ID)
 		if err != nil {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 			return
@@ -342,4 +338,14 @@ func (vc *VerificationController) VerifyQueryResult(w http.ResponseWriter, r *ht
 
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, responseData)
+}
+
+// @Summary Display default verification completion frontend
+// @Description Returns the HTML page for completing email verification
+// @Tags Email verification
+// @Produce html
+// @Success 200 {string} string "HTML content"
+// @Router /v2/verify/complete_fe [get]
+func (vc *VerificationController) VerifyCompleteFrontend(w http.ResponseWriter, r *http.Request) {
+	render.HTML(w, r, templates.DefaultVerifyFrontendContent)
 }

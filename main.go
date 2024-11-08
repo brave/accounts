@@ -62,7 +62,7 @@ func main() {
 		log.Panic().Err(err).Msg("Failed to init datastore")
 	}
 
-	jwtUtil, err := util.NewJWTUtil()
+	jwtService, err := services.NewJWTService(datastore)
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to init JWT util")
 	}
@@ -82,15 +82,15 @@ func main() {
 		log.Panic().Err(err).Msg("Failed to init OPAQUE service")
 	}
 
-	restrictiveAuthMiddleware := middleware.AuthMiddleware(jwtUtil, datastore, minSessionVersion)
-	permissiveAuthMiddleware := middleware.AuthMiddleware(jwtUtil, datastore, 0)
-	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(jwtUtil, datastore)
+	restrictiveAuthMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion)
+	permissiveAuthMiddleware := middleware.AuthMiddleware(jwtService, datastore, 0)
+	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore)
 
 	r := chi.NewRouter()
 
-	authController := controllers.NewAuthController(opaqueService, jwtUtil, datastore)
-	accountsController := controllers.NewAccountsController(opaqueService, jwtUtil, datastore)
-	verificationController := controllers.NewVerificationController(datastore, jwtUtil, sesUtil, passwordAuthEnabled, emailAuthDisabled)
+	authController := controllers.NewAuthController(opaqueService, jwtService, datastore)
+	accountsController := controllers.NewAccountsController(opaqueService, jwtService, datastore)
+	verificationController := controllers.NewVerificationController(datastore, jwtService, sesUtil, passwordAuthEnabled, emailAuthDisabled)
 	sessionsController := controllers.NewSessionsController(datastore)
 
 	r.Use(middleware.LoggerMiddleware)

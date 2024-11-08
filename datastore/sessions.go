@@ -19,8 +19,8 @@ type Session struct {
 	ID uuid.UUID `json:"id"`
 	// AccountID is excluded from JSON
 	AccountID uuid.UUID `json:"-"`
-	// Optional session name
-	SessionName *string `json:"sessionName"`
+	// User agent of client
+	UserAgent string `json:"userAgent"`
 	// The accounts "phase" the session was created in
 	Version int `json:"-"`
 	// Session creation timestamp
@@ -31,17 +31,17 @@ type Session struct {
 
 var ErrSessionNotFound = errors.New("session not found")
 
-func (d *Datastore) CreateSession(accountID uuid.UUID, sessionVersion int, sessionName *string) (*Session, error) {
+func (d *Datastore) CreateSession(accountID uuid.UUID, sessionVersion int, userAgent string) (*Session, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
 	}
 
 	session := Session{
-		ID:          id,
-		AccountID:   accountID,
-		SessionName: sessionName,
-		Version:     sessionVersion,
+		ID:        id,
+		AccountID: accountID,
+		UserAgent: userAgent,
+		Version:   sessionVersion,
 	}
 
 	if err := d.db.Create(&session).Error; err != nil {
