@@ -52,9 +52,9 @@ func main() {
 	passwordAuthEnabled := os.Getenv(passwordAuthEnabledEnv) == "true"
 	emailAuthDisabled := os.Getenv(emailAuthDisabledEnv) == "true"
 
-	minSessionVersion := 1
+	minSessionVersion := datastore.EmailAuthSessionVersion
 	if passwordAuthEnabled && emailAuthDisabled {
-		minSessionVersion = 2
+		minSessionVersion = datastore.PasswordAuthSessionVersion
 	}
 
 	datastore, err := datastore.NewDatastore(minSessionVersion)
@@ -82,9 +82,8 @@ func main() {
 		log.Panic().Err(err).Msg("Failed to init OPAQUE service")
 	}
 
-	restrictiveAuthMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion)
-	permissiveAuthMiddleware := middleware.AuthMiddleware(jwtService, datastore, 0)
-	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore)
+	authMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion)
+	verificationMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore)
 
 	r := chi.NewRouter()
 
@@ -96,12 +95,12 @@ func main() {
 	r.Use(middleware.LoggerMiddleware)
 
 	r.Route("/v2", func(r chi.Router) {
-		r.Mount("/auth", authController.Router(restrictiveAuthMiddleware))
+		r.Mount("/auth", authController.Router(authMiddleware))
 		if passwordAuthEnabled {
-			r.Mount("/accounts", accountsController.Router(permissiveAuthMiddleware, verificationAuthMiddleware))
+			r.Mount("/accounts", accountsController.Router(verificationMiddleware))
 		}
-		r.Mount("/verify", verificationController.Router(verificationAuthMiddleware))
-		r.Mount("/sessions", sessionsController.Router(restrictiveAuthMiddleware))
+		r.Mount("/verify", verificationController.Router(verificationMiddleware))
+		r.Mount("/sessions", sessionsController.Router(authMiddleware))
 	})
 
 	if os.Getenv(serveSwaggerEnv) == "true" {

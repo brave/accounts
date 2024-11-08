@@ -100,7 +100,7 @@ func register() {
 		"blindedMessage": hex.EncodeToString(blindedMessage),
 	}
 
-	resp := postReq(initFields, "http://localhost:8080/v2/accounts/setup/init", &verificationToken)
+	resp := postReq(initFields, "http://localhost:8080/v2/accounts/password/init", &verificationToken)
 
 	evalMsgBytes, err := hex.DecodeString(resp["evaluatedMessage"].(string))
 	if err != nil {
@@ -138,7 +138,7 @@ func register() {
 		"envelope":   hex.EncodeToString(record.Envelope),
 	}
 
-	resp = postReq(recordFields, "http://localhost:8080/v2/accounts/setup/finalize", &verificationToken)
+	resp = postReq(recordFields, "http://localhost:8080/v2/accounts/password/finalize", &verificationToken)
 
 	log.Printf("auth token: %v", resp["authToken"])
 }
@@ -231,7 +231,7 @@ func main() {
 	conf.KSF.Salt = make([]byte, 16)
 
 	fmt.Println("1. Login")
-	fmt.Println("2. Register")
+	fmt.Println("2. Register/set password")
 	fmt.Print("Choose an option (1-2): ")
 
 	reader := bufio.NewReader(os.Stdin)

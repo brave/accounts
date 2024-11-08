@@ -161,6 +161,7 @@ definitions:
         - verification
         - registration
         - reset
+        - change_password
         example: registration
         type: string
       language:
@@ -241,96 +242,7 @@ info:
   contact: {}
   title: Brave Accounts Service
 paths:
-  /v2/accounts/change_pwd/finalize:
-    post:
-      consumes:
-      - application/json
-      description: |-
-        Complete the password change process and return auth token
-        Either `publicKey`, `maskingKey` and `envelope` must be provided together,
-        or `serializedRecord` must be provided.
-      parameters:
-      - description: Bearer + auth token
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: Registration record
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/controllers.RegistrationRecord'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/controllers.PasswordFinalizeResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/util.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/util.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/util.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/util.ErrorResponse'
-      summary: Finalize password setup
-      tags:
-      - Accounts
-  /v2/accounts/change_pwd/init:
-    post:
-      consumes:
-      - application/json
-      description: |-
-        Start the password change process using OPAQUE protocol.
-        This endpoint should also be used to upgrade a Phase 1 account to a Phase 2 account.
-        If `serializeResponse` is set to true, the `serializedResponse` field will be populated
-        in the response, with other fields omitted.
-      parameters:
-      - description: Bearer + auth token
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: Registration request
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/controllers.RegistrationRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/controllers.RegistrationResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/util.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/util.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/util.ErrorResponse'
-      summary: Initialize password change
-      tags:
-      - Accounts
-  /v2/accounts/setup/finalize:
+  /v2/accounts/password/finalize:
     post:
       consumes:
       - application/json
@@ -380,7 +292,7 @@ paths:
       summary: Finalize password setup
       tags:
       - Accounts
-  /v2/accounts/setup/init:
+  /v2/accounts/password/init:
     post:
       consumes:
       - application/json
@@ -656,6 +568,7 @@ paths:
         - `verification`: After verification, do not create an account, but indicate that the email was verified in the "query result" response. Do not allow registration after verification.
         - `registration`: After verification, indicate that the email was verified in the "query result" response. An account may be created by setting a password.
         - `reset`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
+        - `change_password`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
 
         One of the following service names must be provided with the request: `inbox-aliases`, `accounts`, `premium`.
       parameters:

@@ -19,7 +19,7 @@ import (
 type AuthController struct {
 	opaqueService *services.OpaqueService
 	validate      *validator.Validate
-	jwtService       *services.JWTService
+	jwtService    *services.JWTService
 	ds            *datastore.Datastore
 }
 
@@ -175,7 +175,7 @@ func NewAuthController(opaqueService *services.OpaqueService, jwtService *servic
 	return &AuthController{
 		opaqueService: opaqueService,
 		validate:      validator.New(validator.WithRequiredStructEnabled()),
-		jwtService:       jwtService,
+		jwtService:    jwtService,
 		ds:            ds,
 	}
 }
