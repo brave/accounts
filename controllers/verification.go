@@ -26,6 +26,7 @@ const (
 	verificationIntent        = "verification"
 	registrationIntent        = "registration"
 	resetIntent               = "reset"
+	changePasswordIntent      = "change_password"
 	premiumAuthRedirectURLEnv = "PREMIUM_AUTH_REDIRECT_URL"
 
 	accountsServiceName              = "accounts"
@@ -53,7 +54,7 @@ type VerifyInitRequest struct {
 	// Email address to verify
 	Email string `json:"email" validate:"required,email,ascii" example:"test@example.com"`
 	// Purpose of verification (e.g., get auth token, simple verification, registration)
-	Intent string `json:"intent" validate:"required,oneof=auth_token verification registration reset" example:"registration"`
+	Intent string `json:"intent" validate:"required,oneof=auth_token verification registration reset change_password" example:"registration"`
 	// Service requesting the verification
 	Service string `json:"service" validate:"required,oneof=accounts premium inbox-aliases" example:"accounts"`
 	// Locale for verification email
@@ -127,6 +128,7 @@ func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Ha
 // @Description - `verification`: After verification, do not create an account, but indicate that the email was verified in the "query result" response. Do not allow registration after verification.
 // @Description - `registration`: After verification, indicate that the email was verified in the "query result" response. An account may be created by setting a password.
 // @Description - `reset`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
+// @Description - `change_password`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
 // @Description
 // @Description One of the following service names must be provided with the request: `inbox-aliases`, `accounts`, `premium`.
 // @Tags Email verification
@@ -159,7 +161,7 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		if requestData.Service != inboxAliasesServiceName && requestData.Service != premiumServiceName {
 			intentAllowed = false
 		}
-	case registrationIntent, resetIntent:
+	case registrationIntent, resetIntent, changePasswordIntent:
 		if !vc.passwordAuthEnabled || requestData.Service != accountsServiceName {
 			intentAllowed = false
 		}
@@ -198,7 +200,9 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 	}
 
 	var verificationToken *string
-	if requestData.Intent == authTokenIntent || requestData.Intent == verificationIntent || requestData.Intent == registrationIntent || requestData.Intent == resetIntent {
+
+	switch requestData.Intent {
+	case authTokenIntent, verificationIntent, registrationIntent, resetIntent, changePasswordIntent:
 		token, err := vc.jwtService.CreateVerificationToken(verification.ID, datastore.VerificationExpiration, requestData.Service)
 		if err != nil {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)

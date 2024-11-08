@@ -15,131 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/v2/accounts/change_pwd/finalize": {
-            "post": {
-                "description": "Complete the password change process and return auth token\nEither ` + "`" + `publicKey` + "`" + `, ` + "`" + `maskingKey` + "`" + ` and ` + "`" + `envelope` + "`" + ` must be provided together,\nor ` + "`" + `serializedRecord` + "`" + ` must be provided.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Accounts"
-                ],
-                "summary": "Finalize password setup",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer + auth token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "description": "Registration record",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/controllers.RegistrationRecord"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/controllers.PasswordFinalizeResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/util.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/util.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/util.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/util.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/accounts/change_pwd/init": {
-            "post": {
-                "description": "Start the password change process using OPAQUE protocol.\nThis endpoint should also be used to upgrade a Phase 1 account to a Phase 2 account.\nIf ` + "`" + `serializeResponse` + "`" + ` is set to true, the ` + "`" + `serializedResponse` + "`" + ` field will be populated\nin the response, with other fields omitted.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Accounts"
-                ],
-                "summary": "Initialize password change",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer + auth token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "description": "Registration request",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/controllers.RegistrationRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/controllers.RegistrationResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/util.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/util.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/util.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/accounts/setup/finalize": {
+        "/v2/accounts/password/finalize": {
             "post": {
                 "description": "Complete the password setup process and return auth token.\nEither ` + "`" + `publicKey` + "`" + `, ` + "`" + `maskingKey` + "`" + ` and ` + "`" + `envelope` + "`" + ` must be provided together,\nor ` + "`" + `serializedRecord` + "`" + ` must be provided.",
                 "consumes": [
@@ -210,7 +86,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v2/accounts/setup/init": {
+        "/v2/accounts/password/init": {
             "post": {
                 "description": "Start the password setup process using OPAQUE protocol.\nIf ` + "`" + `serializeResponse` + "`" + ` is set to true, the ` + "`" + `serializedResponse` + "`" + ` field will be populated\nin the response, with other fields omitted.",
                 "consumes": [
@@ -602,7 +478,7 @@ const docTemplate = `{
         },
         "/v2/verify/init": {
             "post": {
-                "description": "Starts email verification process by sending a verification email\nOne of the following intents must be provided with the request:\n- ` + "`" + `auth_token` + "`" + `: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the \"query result\" endpoint.\n- ` + "`" + `verification` + "`" + `: After verification, do not create an account, but indicate that the email was verified in the \"query result\" response. Do not allow registration after verification.\n- ` + "`" + `registration` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. An account may be created by setting a password.\n- ` + "`" + `reset` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. A password may be set for the existing account.\n\nOne of the following service names must be provided with the request: ` + "`" + `inbox-aliases` + "`" + `, ` + "`" + `accounts` + "`" + `, ` + "`" + `premium` + "`" + `.",
+                "description": "Starts email verification process by sending a verification email\nOne of the following intents must be provided with the request:\n- ` + "`" + `auth_token` + "`" + `: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the \"query result\" endpoint.\n- ` + "`" + `verification` + "`" + `: After verification, do not create an account, but indicate that the email was verified in the \"query result\" response. Do not allow registration after verification.\n- ` + "`" + `registration` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. An account may be created by setting a password.\n- ` + "`" + `reset` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. A password may be set for the existing account.\n- ` + "`" + `change_password` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. A password may be set for the existing account.\n\nOne of the following service names must be provided with the request: ` + "`" + `inbox-aliases` + "`" + `, ` + "`" + `accounts` + "`" + `, ` + "`" + `premium` + "`" + `.",
                 "consumes": [
                     "application/json"
                 ],
@@ -931,7 +807,8 @@ const docTemplate = `{
                         "auth_token",
                         "verification",
                         "registration",
-                        "reset"
+                        "reset",
+                        "change_password"
                     ],
                     "example": "registration"
                 },

@@ -68,8 +68,8 @@ pub fn prompt_credentials() -> (String, String) {
     (email, password)
 }
 
-fn set_password(change_password: bool) {
-    print!("Enter verification/auth token: ");
+fn set_password() {
+    print!("Enter verification token: ");
     stdout().flush().unwrap();
     let mut token = String::new();
     stdin().read_line(&mut token).unwrap();
@@ -88,12 +88,11 @@ fn set_password(change_password: bool) {
     body.insert("blindedMessage", registration_request_hex.into());
     body.insert("serializeResponse", true.into());
 
-    let init_url = if change_password {
-        "http://localhost:8080/v2/accounts/change_pwd/init"
-    } else {
-        "http://localhost:8080/v2/accounts/setup/init"
-    };
-    let resp = post_request(init_url, Some(&token), body);
+    let resp = post_request(
+        "http://localhost:8080/v2/accounts/password/init",
+        Some(&token),
+        body,
+    );
 
     let resp_bin = hex::decode(resp.get("serializedResponse").unwrap()).unwrap();
 
@@ -117,12 +116,11 @@ fn set_password(change_password: bool) {
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("serializedRecord", record_hex.into());
 
-    let finalize_url = if change_password {
-        "http://localhost:8080/v2/accounts/change_pwd/finalize"
-    } else {
-        "http://localhost:8080/v2/accounts/setup/finalize"
-    };
-    let resp = post_request(finalize_url, Some(&token), body);
+    let resp = post_request(
+        "http://localhost:8080/v2/accounts/password/finalize",
+        Some(&token),
+        body,
+    );
 
     println!("auth token: {}", resp.get("authToken").unwrap())
 }
@@ -174,7 +172,7 @@ fn login() {
 }
 
 fn main() {
-    print!("1. Login\n2. Register\n3. Change password\nEnter choice (1, 2 or 3): ");
+    print!("1. Login\n2. Register/set password\nEnter choice (1 or 2): ");
     stdout().flush().unwrap();
 
     let mut choice = String::new();
@@ -182,8 +180,7 @@ fn main() {
 
     match choice.trim() {
         "1" => login(),
-        "2" => set_password(false),
-        "3" => set_password(true),
+        "2" => set_password(),
         _ => println!("Invalid choice"),
     }
 }
