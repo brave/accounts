@@ -25,11 +25,12 @@ import (
 var routes = flag.Bool("routes", false, "Generate router documentation")
 
 const (
-	logPrettyEnv           = "LOG_PRETTY"
-	logLevelEnv            = "LOG_LEVEL"
-	serveSwaggerEnv        = "SERVE_SWAGGER"
-	passwordAuthEnabledEnv = "PASSWORD_AUTH_ENABLED"
-	emailAuthDisabledEnv   = "EMAIL_AUTH_DISABLED"
+	logPrettyEnv             = "LOG_PRETTY"
+	logLevelEnv              = "LOG_LEVEL"
+	serveSwaggerEnv          = "SERVE_SWAGGER"
+	passwordAuthEnabledEnv   = "PASSWORD_AUTH_ENABLED"
+	emailAuthDisabledEnv     = "EMAIL_AUTH_DISABLED"
+	debugEndpointsEnabledEnv = "DEBUG_ENDPOINTS_ENABLED"
 )
 
 // @title Brave Accounts Service
@@ -51,6 +52,7 @@ func main() {
 
 	passwordAuthEnabled := os.Getenv(passwordAuthEnabledEnv) == "true"
 	emailAuthDisabled := os.Getenv(emailAuthDisabledEnv) == "true"
+	debugEndpointsEnabled := os.Getenv(debugEndpointsEnabledEnv) == "true"
 
 	minSessionVersion := datastore.EmailAuthSessionVersion
 	if passwordAuthEnabled && emailAuthDisabled {
@@ -72,7 +74,7 @@ func main() {
 		log.Panic().Err(err).Msg("Failed to init i18n bundle")
 	}
 
-	sesUtil, err := util.NewSESUtil(i18nBundle)
+	sesService, err := services.NewSESService(i18nBundle)
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to init SES util")
 	}
@@ -89,7 +91,7 @@ func main() {
 
 	authController := controllers.NewAuthController(opaqueService, jwtService, datastore)
 	accountsController := controllers.NewAccountsController(opaqueService, jwtService, datastore)
-	verificationController := controllers.NewVerificationController(datastore, jwtService, sesUtil, passwordAuthEnabled, emailAuthDisabled)
+	verificationController := controllers.NewVerificationController(datastore, jwtService, sesService, passwordAuthEnabled, emailAuthDisabled)
 	sessionsController := controllers.NewSessionsController(datastore)
 
 	r.Use(middleware.LoggerMiddleware)
@@ -99,7 +101,7 @@ func main() {
 		if passwordAuthEnabled {
 			r.Mount("/accounts", accountsController.Router(verificationMiddleware))
 		}
-		r.Mount("/verify", verificationController.Router(verificationMiddleware))
+		r.Mount("/verify", verificationController.Router(verificationMiddleware, debugEndpointsEnabled))
 		r.Mount("/sessions", sessionsController.Router(authMiddleware))
 	})
 

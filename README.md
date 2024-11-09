@@ -6,7 +6,8 @@
 2. Run `docker compose up -d`
 3. Run `go run .`
 
-Use `make get-emails` to get the contents of sent verification emails.
+Visit http://localhost:8080/v2/verify/email_viewer to view sent verification emails.
+Use `make clean-emails` to delete all sent emails.
 
 View API documentation at http://localhost:8080/swagger/index.html.
 
@@ -19,7 +20,6 @@ View API documentation at http://localhost:8080/swagger/index.html.
 | BASE_URL | Yes | Base URL of the service |
 | OPAQUE_SECRET_KEY | Yes | OPAQUE server secret key |
 | OPAQUE_PUBLIC_KEY | Yes | OPAQUE server public key |
-| PREMIUM_AUTH_REDIRECT_URL | Yes | Redirect URL for premium service authentication |
 | AWS_ENDPOINT | No | Custom AWS endpoint for testing |
 | LOG_PRETTY | No | Enable pretty logging format if set to 'true' |
 | LOG_LEVEL | No | Logging level (default: info) |

@@ -1,31 +1,79 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Verify Your Email"
+other = "Verify your email"
 
-[VerifyEmailTitle]
-description = "Title of the email verification message"
-other = "Verify Your Email Address"
+[SetPasswordEmailSubject]
+description = "Email subject for setting a new password"
+other = "Set a new password for your Brave account"
+
+[RegistrationEmailSubject]
+description = "Email subject for creating a new account"
+other = "Create your Brave account"
+
+[LoginEmailSubject]
+description = "Email subject for logging into an account"
+other = "Access your Brave account"
 
 [VerifyEmailGreeting]
 description = "Greeting in the email verification message"
 other = "Hello,"
 
+[SetPasswordEmailInstructions]
+description = "Instructions to verify email address and set a new password for an account"
+other = "Click the link below to verify your email and set a new password for your account. (You can also paste the link in your browser.) Note that this email contains a private access link that can only be used once."
+
+[RegistrationEmailInstructions]
+description = "Instructions to verify email address and create a new account"
+other = "Click the link below to verify your email and create your Brave account. (You can also paste the link in your browser.) Note that this email contains a private access link that can only be used once."
+
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Please verify your email address {{.Email}}."
+other = "Click the link below to verify your email. (You can also paste the link in your browser.) Note that this email contains a private access link that can only be used once."
 
-[VerifyEmailButton]
+[LoginEmailInstructions]
+description = "Instruction to verify an email address and login to an account"
+other = "Click the link below to access your Brave account. (You can also paste the link in your browser.) Note that this email contains a private access link that can only be used once."
+
+[VerifyEmailAction]
 description = "Text on the email verification button"
-other = "Verify Email"
-
-[VerifyEmailIgnore]
-description = "Message to ignore if verification wasn't requested"
-other = "If you didn't request this verification, please ignore this email."
+other = "Confirm your email"
 
 [VerifyEmailSignature]
 description = "Email signature"
-other = "Best regards, Brave Team"
+other = "The Brave Team"
 
-[VerifyEmailFallbackInstructions]
+[VerifyEmailActionBackup]
 description = "Instructions for manual link usage if button doesn't work"
-other = "If the button doesn't work, copy and paste this link into your browser:"
+other = "Don’t see a button? Click this link to confirm your email."
+
+[VerifyEmailExpiryDisclaimer]
+description = "Informs the user that the link expires after 30 minutes"
+other = "Note: This confirmation prompt will expire within 30 minutes."
+
+[VerifyEmailDisregard]
+description = "Instructs the user to ignore the email if the user did not initiate the verification request"
+other = "If you didn’t make this request, please disregard this email."
+
+[EmailCopyright]
+description = "Brave copyright notice"
+other = "Copyright © {{.Year}} Brave Software Inc."
+
+[EmailAllRightsReserved]
+description = "All rights reserved notice"
+other = "All rights reserved"
+
+[EmailPrivacyPolicy]
+description = "Privacy policy link text"
+other = "Privacy Policy"
+
+[EmailTermsOfUse]
+description = "Terms of use link text"
+other = "Terms of Use"
+
+[EmailDownloadBrave]
+description = "Brave download link text"
+other = "Download Brave"
+
+[EmailContactSupport]
+description = "Support contact link text"
+other = "Contact Support"
