@@ -819,6 +819,10 @@ const docTemplate = `{
             "description": "Response for verification completion",
             "type": "object",
             "properties": {
+                "serviceName": {
+                    "description": "Name of service requesting verification",
+                    "type": "string"
+                },
                 "verificationToken": {
                     "description": "JWT token for checking verification status",
                     "type": "string"

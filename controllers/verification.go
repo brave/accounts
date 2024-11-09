@@ -90,6 +90,8 @@ type VerifyCompleteRequest struct {
 type VerifyCompleteResponse struct {
 	// JWT token for checking verification status
 	VerificationToken *string `json:"verificationToken"`
+	// Name of service requesting verification
+	ServiceName string `json:"serviceName"`
 }
 
 type localStackEmails struct {
@@ -278,6 +280,7 @@ func (vc *VerificationController) VerifyComplete(w http.ResponseWriter, r *http.
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, &VerifyCompleteResponse{
 		VerificationToken: verificationToken,
+		ServiceName:       verification.Service,
 	})
 }
 
