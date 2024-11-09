@@ -146,6 +146,13 @@ definitions:
     - code
     - id
     type: object
+  controllers.VerifyCompleteResponse:
+    description: Response for verification completion
+    properties:
+      verificationToken:
+        description: JWT token for checking verification status
+        type: string
+    type: object
   controllers.VerifyInitRequest:
     description: Request to initialize email verification
     properties:
@@ -526,8 +533,10 @@ paths:
       produces:
       - application/json
       responses:
-        "204":
-          description: Email verification successful
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.VerifyCompleteResponse'
         "400":
           description: Missing/invalid verification parameters
           schema:

@@ -31,12 +31,13 @@
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }
+        return response.json();
       })
-      .then(() => {
-        document.body.innerHTML = '<h1>Email verification successful.</h1>';
+      .then((data) => {
+        document.body.innerHTML = `<h1>Email verification successful. Verification token = ${data.verificationToken}</h1>`;
       })
       .catch(error => {
-        document.body.innerHTML = '<h1>Error: ' + error.message + '</h1>';
+        document.body.innerHTML = `<h1>Error: ${error.message}</h1>`;
       });
     };
   </script>

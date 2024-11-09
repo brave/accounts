@@ -86,6 +86,12 @@ type VerifyCompleteRequest struct {
 	Code string `json:"code" validate:"required"`
 }
 
+// @Description Response for verification completion
+type VerifyCompleteResponse struct {
+	// JWT token for checking verification status
+	VerificationToken *string `json:"verificationToken"`
+}
+
 type localStackEmails struct {
 	Messages []interface{} `json:"messages"`
 }
@@ -113,6 +119,20 @@ func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Ha
 	r.With(verificationAuthMiddleware).Post("/result", vc.VerifyQueryResult)
 
 	return r
+}
+
+func (vc *VerificationController) maybeCreateVerificationToken(verification *datastore.Verification, isCompletion bool) (*string, error) {
+	// Do not generate verification token immediately for Premium verifications
+	// We'll create it later in the completion endpoint, so it can be passed to the Premium site upon redirect
+	shouldCreateOnCompletion := verification.Service == premiumServiceName && verification.Intent == datastore.VerificationIntent
+	if shouldCreateOnCompletion != isCompletion {
+		return nil, nil
+	}
+	token, err := vc.jwtService.CreateVerificationToken(verification.ID, datastore.VerificationExpiration, verification.Service)
+	if err != nil {
+		return nil, err
+	}
+	return &token, nil
 }
 
 // @Summary Initialize email verification
@@ -192,17 +212,10 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	var verificationToken *string
-
-	if requestData.Service != premiumServiceName || requestData.Intent != datastore.VerificationIntent {
-		// Do not generate verification token for Premium verifications
-		// We'll create it later in the completion endpoint
-		token, err := vc.jwtService.CreateVerificationToken(verification.ID, datastore.VerificationExpiration, requestData.Service)
-		if err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-		verificationToken = &token
+	verificationToken, err := vc.maybeCreateVerificationToken(verification, false)
+	if err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
 	}
 
 	if err := vc.sesService.SendVerificationEmail(
@@ -215,12 +228,10 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	response := VerifyInitResponse{
-		VerificationToken: verificationToken,
-	}
-
 	render.Status(r, http.StatusOK)
-	render.JSON(w, r, response)
+	render.JSON(w, r, &VerifyInitResponse{
+		VerificationToken: verificationToken,
+	})
 }
 
 // @Summary Complete email verification
@@ -229,7 +240,7 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 // @Accept json
 // @Produce json
 // @Param request body VerifyCompleteRequest true "Verify completion params"
-// @Success 204 "Email verification successful"
+// @Success 200 {object} VerifyCompleteResponse
 // @Failure 400 {string} string "Missing/invalid verification parameters"
 // @Failure 404 {string} string "Verification not found"
 // @Failure 500 {string} string "Internal server error"
@@ -247,7 +258,8 @@ func (vc *VerificationController) VerifyComplete(w http.ResponseWriter, r *http.
 	}
 
 	// Update verification status
-	if err := vc.datastore.UpdateVerificationStatus(requestData.ID, requestData.Code); err != nil {
+	verification, err := vc.datastore.UpdateAndGetVerificationStatus(requestData.ID, requestData.Code)
+	if err != nil {
 		if errors.Is(err, datastore.ErrVerificationNotFound) {
 			util.RenderErrorResponse(w, r, http.StatusNotFound, err)
 			return
@@ -257,7 +269,16 @@ func (vc *VerificationController) VerifyComplete(w http.ResponseWriter, r *http.
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	verificationToken, err := vc.maybeCreateVerificationToken(verification, true)
+	if err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	render.Status(r, http.StatusOK)
+	render.JSON(w, r, &VerifyCompleteResponse{
+		VerificationToken: verificationToken,
+	})
 }
 
 // @Summary Query result of verification
