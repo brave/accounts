@@ -432,8 +432,11 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "Email verification successful"
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.VerifyCompleteResponse"
+                        }
                     },
                     "400": {
                         "description": "Missing/invalid verification parameters",
@@ -808,6 +811,16 @@ const docTemplate = `{
                 },
                 "id": {
                     "description": "Unique verification identifier",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.VerifyCompleteResponse": {
+            "description": "Response for verification completion",
+            "type": "object",
+            "properties": {
+                "verificationToken": {
+                    "description": "JWT token for checking verification status",
                     "type": "string"
                 }
             }

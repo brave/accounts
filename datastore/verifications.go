@@ -80,17 +80,17 @@ func (d *Datastore) CreateVerification(email string, service string, intent stri
 }
 
 // UpdateVerificationStatus updates the verification status for a given email
-func (d *Datastore) UpdateVerificationStatus(id uuid.UUID, code string) error {
+func (d *Datastore) UpdateAndGetVerificationStatus(id uuid.UUID, code string) (*Verification, error) {
 	result := d.db.Model(&Verification{}).
 		Where("id = ? AND code = ? AND verified = false", id, code).
 		Update("verified", true)
 
 	if result.Error != nil {
-		return fmt.Errorf("error updating verification status: %w", result.Error)
+		return nil, fmt.Errorf("error updating verification status: %w", result.Error)
 	}
 
 	if result.RowsAffected == 0 {
-		return ErrVerificationNotFound
+		return nil, ErrVerificationNotFound
 	}
 
 	// Send notification
@@ -99,10 +99,10 @@ func (d *Datastore) UpdateVerificationStatus(id uuid.UUID, code string) error {
 		generateNotificationChannel(id),
 		"1",
 	).Error; err != nil {
-		return fmt.Errorf("failed to send notification: %w", err)
+		return nil, fmt.Errorf("failed to send notification: %w", err)
 	}
 
-	return nil
+	return d.GetVerificationStatus(id)
 }
 
 // GetVerificationStatus checks if email is verified with given token
