@@ -463,7 +463,7 @@ const docTemplate = `{
                     "text/html"
                 ],
                 "tags": [
-                    "Email verification"
+                    "Debugging"
                 ],
                 "summary": "Display default verification completion frontend",
                 "responses": {
@@ -476,9 +476,35 @@ const docTemplate = `{
                 }
             }
         },
+        "/v2/verify/email_viewer": {
+            "get": {
+                "description": "Retrieves and displays emails sent through LocalStack SES endpoint",
+                "produces": [
+                    "text/html"
+                ],
+                "tags": [
+                    "Debugging"
+                ],
+                "summary": "View sent emails in LocalStack SES",
+                "responses": {
+                    "200": {
+                        "description": "HTML page displaying emails",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/v2/verify/init": {
             "post": {
-                "description": "Starts email verification process by sending a verification email\nOne of the following intents must be provided with the request:\n- ` + "`" + `auth_token` + "`" + `: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the \"query result\" endpoint.\n- ` + "`" + `verification` + "`" + `: After verification, do not create an account, but indicate that the email was verified in the \"query result\" response. Do not allow registration after verification.\n- ` + "`" + `registration` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. An account may be created by setting a password.\n- ` + "`" + `reset` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. A password may be set for the existing account.\n- ` + "`" + `change_password` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. A password may be set for the existing account.\n\nOne of the following service names must be provided with the request: ` + "`" + `inbox-aliases` + "`" + `, ` + "`" + `accounts` + "`" + `, ` + "`" + `premium` + "`" + `.",
+                "description": "Starts email verification process by sending a verification email\nOne of the following intents must be provided with the request:\n- ` + "`" + `auth_token` + "`" + `: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the \"query result\" endpoint.\n- ` + "`" + `verification` + "`" + `: After verification, do not create an account, but indicate that the email was verified in the \"query result\" response. Do not allow registration after verification.\n- ` + "`" + `registration` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. An account may be created by setting a password.\n- ` + "`" + `set_password` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. A password may be set for the existing account.\n\nOne of the following service names must be provided with the request: ` + "`" + `inbox-aliases` + "`" + `, ` + "`" + `accounts` + "`" + `, ` + "`" + `premium` + "`" + `.",
                 "consumes": [
                     "application/json"
                 ],
@@ -807,8 +833,7 @@ const docTemplate = `{
                         "auth_token",
                         "verification",
                         "registration",
-                        "reset",
-                        "change_password"
+                        "set_password"
                     ],
                     "example": "registration"
                 },

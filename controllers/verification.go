@@ -1,11 +1,13 @@
 package controllers
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"net/http"
-	"os"
-	"time"
+	"slices"
 
 	"github.com/brave-experiments/accounts/datastore"
 	"github.com/brave-experiments/accounts/middleware"
@@ -20,19 +22,11 @@ import (
 )
 
 const (
-	qsVerifyID                = "verify_id"
-	qsVerifyCode              = "verify_code"
-	authTokenIntent           = "auth_token"
-	verificationIntent        = "verification"
-	registrationIntent        = "registration"
-	resetIntent               = "reset"
-	changePasswordIntent      = "change_password"
-	premiumAuthRedirectURLEnv = "PREMIUM_AUTH_REDIRECT_URL"
+	accountsServiceName     = "accounts"
+	premiumServiceName      = "premium"
+	inboxAliasesServiceName = "inbox-aliases"
 
-	accountsServiceName              = "accounts"
-	premiumServiceName               = "premium"
-	inboxAliasesServiceName          = "inbox-aliases"
-	premiumSessionExpirationDuration = 10 * time.Minute
+	localStackSESEndpoint = "http://localhost:4566/_aws/ses"
 )
 
 var ErrIntentNotAllowed = errors.New("intent not allowed")
@@ -40,13 +34,12 @@ var ErrAccountExists = errors.New("account already exists")
 var ErrAccountDoesNotExist = errors.New("account does not exist")
 
 type VerificationController struct {
-	datastore              *datastore.Datastore
-	validate               *validator.Validate
-	jwtService             *services.JWTService
-	sesUtil                *util.SESUtil
-	passwordAuthEnabled    bool
-	emailAuthDisabled      bool
-	premiumAuthRedirectURL string
+	datastore           *datastore.Datastore
+	validate            *validator.Validate
+	jwtService          *services.JWTService
+	sesService          *services.SESService
+	passwordAuthEnabled bool
+	emailAuthDisabled   bool
 }
 
 // @Description	Request to initialize email verification
@@ -54,7 +47,7 @@ type VerifyInitRequest struct {
 	// Email address to verify
 	Email string `json:"email" validate:"required,email,ascii" example:"test@example.com"`
 	// Purpose of verification (e.g., get auth token, simple verification, registration)
-	Intent string `json:"intent" validate:"required,oneof=auth_token verification registration reset change_password" example:"registration"`
+	Intent string `json:"intent" validate:"required,oneof=auth_token verification registration set_password" example:"registration"`
 	// Service requesting the verification
 	Service string `json:"service" validate:"required,oneof=accounts premium inbox-aliases" example:"accounts"`
 	// Locale for verification email
@@ -93,29 +86,30 @@ type VerifyCompleteRequest struct {
 	Code string `json:"code" validate:"required"`
 }
 
-func NewVerificationController(datastore *datastore.Datastore, jwtService *services.JWTService, sesUtil *util.SESUtil, passwordAuthEnabled bool, emailAuthDisabled bool) *VerificationController {
-	premiumAuthRedirectURL := os.Getenv(premiumAuthRedirectURLEnv)
-	if premiumAuthRedirectURL == "" {
-		log.Fatal().Msg("PREMIUM_AUTH_REDIRECT_URL environment variable is required")
-	}
+type localStackEmails struct {
+	Messages []interface{} `json:"messages"`
+}
 
+func NewVerificationController(datastore *datastore.Datastore, jwtService *services.JWTService, sesService *services.SESService, passwordAuthEnabled bool, emailAuthDisabled bool) *VerificationController {
 	return &VerificationController{
-		datastore:              datastore,
-		validate:               validator.New(validator.WithRequiredStructEnabled()),
-		jwtService:             jwtService,
-		sesUtil:                sesUtil,
-		passwordAuthEnabled:    passwordAuthEnabled,
-		emailAuthDisabled:      emailAuthDisabled,
-		premiumAuthRedirectURL: premiumAuthRedirectURL,
+		datastore:           datastore,
+		validate:            validator.New(validator.WithRequiredStructEnabled()),
+		jwtService:          jwtService,
+		sesService:          sesService,
+		passwordAuthEnabled: passwordAuthEnabled,
+		emailAuthDisabled:   emailAuthDisabled,
 	}
 }
 
-func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Handler) http.Handler) chi.Router {
+func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Handler) http.Handler, debugEndpointsEnabled bool) chi.Router {
 	r := chi.NewRouter()
 
 	r.Post("/init", vc.VerifyInit)
 	r.Post("/complete", vc.VerifyComplete)
-	r.Get("/complete_fe", vc.VerifyCompleteFrontend)
+	if debugEndpointsEnabled {
+		r.Get("/complete_fe", vc.VerifyCompleteFrontend)
+		r.Get("/email_viewer", vc.EmailViewer)
+	}
 	r.With(verificationAuthMiddleware).Post("/result", vc.VerifyQueryResult)
 
 	return r
@@ -127,8 +121,7 @@ func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Ha
 // @Description - `auth_token`: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the "query result" endpoint.
 // @Description - `verification`: After verification, do not create an account, but indicate that the email was verified in the "query result" response. Do not allow registration after verification.
 // @Description - `registration`: After verification, indicate that the email was verified in the "query result" response. An account may be created by setting a password.
-// @Description - `reset`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
-// @Description - `change_password`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
+// @Description - `set_password`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
 // @Description
 // @Description One of the following service names must be provided with the request: `inbox-aliases`, `accounts`, `premium`.
 // @Tags Email verification
@@ -153,15 +146,15 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 
 	intentAllowed := true
 	switch requestData.Intent {
-	case authTokenIntent:
+	case datastore.AuthTokenIntent:
 		if vc.emailAuthDisabled || requestData.Service != inboxAliasesServiceName {
 			intentAllowed = false
 		}
-	case verificationIntent:
+	case datastore.VerificationIntent:
 		if requestData.Service != inboxAliasesServiceName && requestData.Service != premiumServiceName {
 			intentAllowed = false
 		}
-	case registrationIntent, resetIntent, changePasswordIntent:
+	case datastore.RegistrationIntent, datastore.SetPasswordIntent:
 		if !vc.passwordAuthEnabled || requestData.Service != accountsServiceName {
 			intentAllowed = false
 		}
@@ -173,17 +166,17 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if requestData.Intent == registrationIntent || requestData.Intent == resetIntent {
+	if requestData.Intent == datastore.RegistrationIntent || requestData.Intent == datastore.SetPasswordIntent {
 		accountExists, err := vc.datastore.AccountExists(requestData.Email)
 		if err != nil {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 			return
 		}
-		if requestData.Intent == registrationIntent && accountExists {
+		if requestData.Intent == datastore.RegistrationIntent && accountExists {
 			util.RenderErrorResponse(w, r, http.StatusBadRequest, ErrAccountExists)
 			return
 		}
-		if requestData.Intent == resetIntent && !accountExists {
+		if requestData.Intent == datastore.SetPasswordIntent && !accountExists {
 			util.RenderErrorResponse(w, r, http.StatusBadRequest, ErrAccountDoesNotExist)
 			return
 		}
@@ -201,8 +194,9 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 
 	var verificationToken *string
 
-	switch requestData.Intent {
-	case authTokenIntent, verificationIntent, registrationIntent, resetIntent, changePasswordIntent:
+	if requestData.Service != premiumServiceName || requestData.Intent != datastore.VerificationIntent {
+		// Do not generate verification token for Premium verifications
+		// We'll create it later in the completion endpoint
 		token, err := vc.jwtService.CreateVerificationToken(verification.ID, datastore.VerificationExpiration, requestData.Service)
 		if err != nil {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
@@ -211,11 +205,10 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		verificationToken = &token
 	}
 
-	if err := vc.sesUtil.SendVerificationEmail(
+	if err := vc.sesService.SendVerificationEmail(
 		r.Context(),
 		requestData.Email,
-		verification.ID.String(),
-		verification.Code,
+		verification,
 		requestData.Locale,
 	); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, fmt.Errorf("failed to send verification email: %w", err))
@@ -311,7 +304,7 @@ func (vc *VerificationController) VerifyQueryResult(w http.ResponseWriter, r *ht
 	}
 
 	var authToken *string
-	if verification.Intent == authTokenIntent {
+	if verification.Intent == datastore.AuthTokenIntent {
 		if err := vc.datastore.DeleteVerification(verification.ID); err != nil {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 			return
@@ -346,10 +339,47 @@ func (vc *VerificationController) VerifyQueryResult(w http.ResponseWriter, r *ht
 
 // @Summary Display default verification completion frontend
 // @Description Returns the HTML page for completing email verification
-// @Tags Email verification
+// @Tags Debugging
 // @Produce html
 // @Success 200 {string} string "HTML content"
 // @Router /v2/verify/complete_fe [get]
 func (vc *VerificationController) VerifyCompleteFrontend(w http.ResponseWriter, r *http.Request) {
 	render.HTML(w, r, templates.DefaultVerifyFrontendContent)
+}
+
+// @Summary View sent emails in LocalStack SES
+// @Description Retrieves and displays emails sent through LocalStack SES endpoint
+// @Tags Debugging
+// @Produce html
+// @Success 200 {string} string "HTML page displaying emails"
+// @Failure 500 {string} string "Internal Server Error"
+// @Router /v2/verify/email_viewer [get]
+func (vc *VerificationController) EmailViewer(w http.ResponseWriter, r *http.Request) {
+	resp, err := http.Get(localStackSESEndpoint)
+	if err != nil {
+		http.Error(w, "Failed to fetch emails", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	var data localStackEmails
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		http.Error(w, "Failed to parse email data", http.StatusInternalServerError)
+		return
+	}
+
+	slices.Reverse(data.Messages)
+
+	tmpl, err := template.New("email_viewer").Parse(templates.EmailViewerTemplateContent)
+	if err != nil {
+		http.Error(w, "Failed to render template", http.StatusInternalServerError)
+		return
+	}
+
+	var bodyContent bytes.Buffer
+	if err := tmpl.Execute(&bodyContent, data); err != nil {
+		http.Error(w, "Failed to execute template", http.StatusInternalServerError)
+	}
+
+	render.HTML(w, r, bodyContent.String())
 }

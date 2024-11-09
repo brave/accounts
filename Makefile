@@ -2,8 +2,8 @@
 all:
 	go build
 
-get-emails:
-	curl "http://localhost:4566/_aws/ses?email=noreply@brave.com" | jq
+clear-emails:
+	curl "http://localhost:4566/_aws/ses" | jq -r ".messages[].Id" | xargs -I % curl -X DELETE "http://localhost:4566/_aws/ses?id=%"
 
 # Run `go install github.com/swaggo/swag/cmd/swag@latest` to use this
 update-swagger:

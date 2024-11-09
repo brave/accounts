@@ -169,7 +169,7 @@ func checkVerificationStatusAndIntent(w http.ResponseWriter, r *http.Request, ve
 		return false
 	}
 
-	if verification.Intent != registrationIntent && verification.Intent != resetIntent && verification.Intent != changePasswordIntent {
+	if verification.Intent != datastore.RegistrationIntent && verification.Intent != datastore.SetPasswordIntent {
 		util.RenderErrorResponse(w, r, http.StatusForbidden, ErrIncorrectVerificationIntent)
 		return false
 	}
