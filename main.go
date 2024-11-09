@@ -15,6 +15,8 @@ import (
 	"github.com/brave-experiments/accounts/util"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/docgen"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/swaggo/http-swagger/v2"
 
 	_ "github.com/joho/godotenv/autoload"
@@ -84,6 +86,8 @@ func main() {
 		log.Panic().Err(err).Msg("Failed to init OPAQUE service")
 	}
 
+	prometheusRegistry := prometheus.NewRegistry()
+
 	authMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion)
 	verificationMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore)
 
@@ -94,7 +98,7 @@ func main() {
 	verificationController := controllers.NewVerificationController(datastore, jwtService, sesService, passwordAuthEnabled, emailAuthDisabled)
 	sessionsController := controllers.NewSessionsController(datastore)
 
-	r.Use(middleware.LoggerMiddleware)
+	r.Use(middleware.LoggerMiddleware(prometheusRegistry))
 
 	r.Route("/v2", func(r chi.Router) {
 		r.Mount("/auth", authController.Router(authMiddleware))
@@ -115,6 +119,15 @@ func main() {
 		}))
 		return
 	}
+
+	go func() {
+		r := chi.NewRouter()
+		r.Handle("/metrics", promhttp.HandlerFor(prometheusRegistry, promhttp.HandlerOpts{}))
+		log.Info().Msg("Prometheus server listening on port 9090")
+		if err := http.ListenAndServe(":9090", r); err != nil {
+			log.Panic().Err(err).Msg("Failed to start Prometheus server")
+		}
+	}()
 
 	log.Info().Msg("Server listening on port 8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
