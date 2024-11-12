@@ -75,7 +75,7 @@ type VerifyResultResponse struct {
 	// Email associated wiith the verification
 	Email string `json:"email"`
 	// Name of service requesting verification
-	ServiceName string `json:"serviceName"`
+	Service string `json:"service"`
 }
 
 // @Description Request parameters for verification completion
@@ -91,7 +91,7 @@ type VerifyCompleteResponse struct {
 	// JWT token for checking verification status
 	VerificationToken *string `json:"verificationToken"`
 	// Name of service requesting verification
-	ServiceName string `json:"serviceName"`
+	Service string `json:"service"`
 }
 
 type localStackEmails struct {
@@ -109,16 +109,16 @@ func NewVerificationController(datastore *datastore.Datastore, jwtService *servi
 	}
 }
 
-func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Handler) http.Handler, debugEndpointsEnabled bool) chi.Router {
+func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Handler) http.Handler, servicesKeyMiddleware func(http.Handler) http.Handler, debugEndpointsEnabled bool) chi.Router {
 	r := chi.NewRouter()
 
-	r.Post("/init", vc.VerifyInit)
+	r.With(servicesKeyMiddleware).Post("/init", vc.VerifyInit)
 	r.Post("/complete", vc.VerifyComplete)
 	if debugEndpointsEnabled {
 		r.Get("/complete_fe", vc.VerifyCompleteFrontend)
 		r.Get("/email_viewer", vc.EmailViewer)
 	}
-	r.With(verificationAuthMiddleware).Post("/result", vc.VerifyQueryResult)
+	r.With(servicesKeyMiddleware).With(verificationAuthMiddleware).Post("/result", vc.VerifyQueryResult)
 
 	return r
 }
@@ -149,6 +149,7 @@ func (vc *VerificationController) maybeCreateVerificationToken(verification *dat
 // @Tags Email verification
 // @Accept json
 // @Produce json
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
 // @Param request body VerifyInitRequest true "Verification request params"
 // @Success 200 {object} VerifyInitResponse
 // @Failure 400 {object} util.ErrorResponse
@@ -241,6 +242,7 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 // @Tags Email verification
 // @Accept json
 // @Produce json
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
 // @Param request body VerifyCompleteRequest true "Verify completion params"
 // @Success 200 {object} VerifyCompleteResponse
 // @Failure 400 {string} string "Missing/invalid verification parameters"
@@ -280,7 +282,7 @@ func (vc *VerificationController) VerifyComplete(w http.ResponseWriter, r *http.
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, &VerifyCompleteResponse{
 		VerificationToken: verificationToken,
-		ServiceName:       verification.Service,
+		Service:           verification.Service,
 	})
 }
 
@@ -292,6 +294,7 @@ func (vc *VerificationController) VerifyComplete(w http.ResponseWriter, r *http.
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + verification token"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
 // @Param request body VerifyResultRequest true "Auth token request params"
 // @Success 200 {object} VerifyResultResponse
 // @Failure 400 {object} util.ErrorResponse
@@ -308,8 +311,8 @@ func (vc *VerificationController) VerifyQueryResult(w http.ResponseWriter, r *ht
 	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
 
 	responseData := VerifyResultResponse{
-		Email:       verification.Email,
-		ServiceName: verification.Service,
+		Email:   verification.Email,
+		Service: verification.Service,
 	}
 
 	if !verification.Verified && requestData.Wait {

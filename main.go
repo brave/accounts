@@ -88,6 +88,7 @@ func main() {
 
 	prometheusRegistry := prometheus.NewRegistry()
 
+	servicesKeyMiddleware := middleware.ServicesKeyMiddleware()
 	authMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion)
 	verificationMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore)
 
@@ -101,12 +102,12 @@ func main() {
 	r.Use(middleware.LoggerMiddleware(prometheusRegistry))
 
 	r.Route("/v2", func(r chi.Router) {
-		r.Mount("/auth", authController.Router(authMiddleware))
+		r.With(servicesKeyMiddleware).Mount("/auth", authController.Router(authMiddleware))
 		if passwordAuthEnabled {
-			r.Mount("/accounts", accountsController.Router(verificationMiddleware))
+			r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware))
 		}
-		r.Mount("/verify", verificationController.Router(verificationMiddleware, debugEndpointsEnabled))
-		r.Mount("/sessions", sessionsController.Router(authMiddleware))
+		r.Mount("/verify", verificationController.Router(verificationMiddleware, servicesKeyMiddleware, debugEndpointsEnabled))
+		r.With(servicesKeyMiddleware).Mount("/sessions", sessionsController.Router(authMiddleware))
 	})
 
 	if os.Getenv(serveSwaggerEnv) == "true" {

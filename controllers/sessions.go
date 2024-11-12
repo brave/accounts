@@ -27,6 +27,7 @@ func NewSessionsController(datastore *datastore.Datastore) *SessionsController {
 // @Tags Sessions
 // @Produce json
 // @Param Authorization header string true "Bearer + auth token"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
 // @Success 200 {array} datastore.Session
 // @Failure 401 {object} util.ErrorResponse
 // @Failure 500 {object} util.ErrorResponse
@@ -48,6 +49,7 @@ func (sc *SessionsController) ListSessions(w http.ResponseWriter, r *http.Reques
 // @Description Deletes a specific session by ID
 // @Tags Sessions
 // @Param Authorization header string true "Bearer + auth token"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
 // @Param id path string true "Session ID (UUID)"
 // @Success 204 "No Content"
 // @Failure 400 {object} util.ErrorResponse

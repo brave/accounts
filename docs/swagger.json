@@ -27,6 +27,12 @@
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
                         "description": "Registration record",
                         "name": "request",
                         "in": "body",
@@ -98,6 +104,12 @@
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
                         "description": "Registration request",
                         "name": "request",
                         "in": "body",
@@ -163,6 +175,12 @@
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
                         "description": "login finalize request",
                         "name": "request",
                         "in": "body",
@@ -222,6 +240,12 @@
                         "schema": {
                             "$ref": "#/definitions/controllers.LoginInitRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -269,6 +293,12 @@
                         "name": "Authorization",
                         "in": "header",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -316,6 +346,12 @@
                         "name": "Authorization",
                         "in": "header",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -357,6 +393,12 @@
                         "name": "Authorization",
                         "in": "header",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
                     },
                     {
                         "type": "string",
@@ -411,6 +453,12 @@
                 ],
                 "summary": "Complete email verification",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
                     {
                         "description": "Verify completion params",
                         "name": "request",
@@ -510,6 +558,12 @@
                 "summary": "Initialize email verification",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
                         "description": "Verification request params",
                         "name": "request",
                         "in": "body",
@@ -561,6 +615,12 @@
                         "name": "Authorization",
                         "in": "header",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
                     },
                     {
                         "description": "Auth token request params",
@@ -809,7 +869,7 @@
             "description": "Response for verification completion",
             "type": "object",
             "properties": {
-                "serviceName": {
+                "service": {
                     "description": "Name of service requesting verification",
                     "type": "string"
                 },
@@ -894,7 +954,7 @@
                     "description": "Email associated wiith the verification",
                     "type": "string"
                 },
-                "serviceName": {
+                "service": {
                     "description": "Name of service requesting verification",
                     "type": "string"
                 },

@@ -37,6 +37,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
                         "description": "Registration record",
                         "name": "request",
                         "in": "body",
@@ -108,6 +114,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
                         "description": "Registration request",
                         "name": "request",
                         "in": "body",
@@ -173,6 +185,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
                         "description": "login finalize request",
                         "name": "request",
                         "in": "body",
@@ -232,6 +250,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/controllers.LoginInitRequest"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -279,6 +303,12 @@ const docTemplate = `{
                         "name": "Authorization",
                         "in": "header",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -326,6 +356,12 @@ const docTemplate = `{
                         "name": "Authorization",
                         "in": "header",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -367,6 +403,12 @@ const docTemplate = `{
                         "name": "Authorization",
                         "in": "header",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
                     },
                     {
                         "type": "string",
@@ -421,6 +463,12 @@ const docTemplate = `{
                 ],
                 "summary": "Complete email verification",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
                     {
                         "description": "Verify completion params",
                         "name": "request",
@@ -520,6 +568,12 @@ const docTemplate = `{
                 "summary": "Initialize email verification",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
                         "description": "Verification request params",
                         "name": "request",
                         "in": "body",
@@ -571,6 +625,12 @@ const docTemplate = `{
                         "name": "Authorization",
                         "in": "header",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
                     },
                     {
                         "description": "Auth token request params",
@@ -819,7 +879,7 @@ const docTemplate = `{
             "description": "Response for verification completion",
             "type": "object",
             "properties": {
-                "serviceName": {
+                "service": {
                     "description": "Name of service requesting verification",
                     "type": "string"
                 },
@@ -904,7 +964,7 @@ const docTemplate = `{
                     "description": "Email associated wiith the verification",
                     "type": "string"
                 },
-                "serviceName": {
+                "service": {
                     "description": "Name of service requesting verification",
                     "type": "string"
                 },

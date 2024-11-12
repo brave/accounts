@@ -184,6 +184,7 @@ func checkVerificationStatusAndIntent(w http.ResponseWriter, r *http.Request, ve
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + verification token"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
 // @Param request body RegistrationRequest true "Registration request"
 // @Success 200 {object} RegistrationResponse
 // @Failure 400 {object} util.ErrorResponse
@@ -239,6 +240,7 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + verification token"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
 // @Param request body RegistrationRecord true "Registration record"
 // @Success 200 {object} PasswordFinalizeResponse
 // @Failure 400 {object} util.ErrorResponse

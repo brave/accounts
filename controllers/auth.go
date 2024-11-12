@@ -195,6 +195,7 @@ func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler)
 // @Tags Auth
 // @Produce json
 // @Param Authorization header string true "Bearer + auth token"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
 // @Success 200 {object} ValidateTokenResponse
 // @Failure 401 {object} util.ErrorResponse
 // @Failure 403 {object} util.ErrorResponse
@@ -223,6 +224,7 @@ func (ac *AuthController) Validate(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param request body LoginInitRequest true "login init request"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
 // @Success 200 {object} LoginInitResponse
 // @Failure 400 {object} util.ErrorResponse
 // @Failure 401 {object} util.ErrorResponse
@@ -278,6 +280,7 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + ake token"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
 // @Param request body LoginFinalizeRequest true "login finalize request"
 // @Success 200 {object} LoginFinalizeResponse
 // @Failure 400 {object} util.ErrorResponse
