@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
 
 	"github.com/brave-experiments/accounts/datastore"
 	"github.com/brave-experiments/accounts/services"
@@ -12,6 +13,9 @@ import (
 
 const ContextSession = "session"
 const ContextVerification = "verification"
+
+const braveServicesKeyEnv = "BRAVE_SERVICES_KEY"
+const braveServicesKeyHeader = "brave-key"
 
 func AuthMiddleware(jwtService *services.JWTService, ds *datastore.Datastore, minSessionVersion int) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -78,6 +82,24 @@ func VerificationAuthMiddleware(jwtService *services.JWTService, ds *datastore.D
 			// Store verification in context
 			ctx := context.WithValue(r.Context(), ContextVerification, verification)
 			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func ServicesKeyMiddleware() func(http.Handler) http.Handler {
+	servicesKey := os.Getenv(braveServicesKeyEnv)
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// If services key is configured, verify the request header
+			if servicesKey != "" {
+				headerKey := r.Header.Get(braveServicesKeyHeader)
+				if headerKey != servicesKey {
+					util.RenderErrorResponse(w, r, http.StatusUnauthorized, errors.New("services key does not match"))
+					return
+				}
+			}
+
+			next.ServeHTTP(w, r)
 		})
 	}
 }

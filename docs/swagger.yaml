@@ -149,7 +149,7 @@ definitions:
   controllers.VerifyCompleteResponse:
     description: Response for verification completion
     properties:
-      serviceName:
+      service:
         description: Name of service requesting verification
         type: string
       verificationToken:
@@ -215,7 +215,7 @@ definitions:
       email:
         description: Email associated wiith the verification
         type: string
-      serviceName:
+      service:
         description: Name of service requesting verification
         type: string
       verified:
@@ -264,6 +264,10 @@ paths:
         in: header
         name: Authorization
         required: true
+        type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
         type: string
       - description: Registration record
         in: body
@@ -315,6 +319,10 @@ paths:
         name: Authorization
         required: true
         type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
+        type: string
       - description: Registration request
         in: body
         name: request
@@ -357,6 +365,10 @@ paths:
         in: header
         name: Authorization
         required: true
+        type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
         type: string
       - description: login finalize request
         in: body
@@ -403,6 +415,10 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/controllers.LoginInitRequest'
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
+        type: string
       produces:
       - application/json
       responses:
@@ -433,6 +449,10 @@ paths:
         in: header
         name: Authorization
         required: true
+        type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
         type: string
       produces:
       - application/json
@@ -465,6 +485,10 @@ paths:
         name: Authorization
         required: true
         type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
+        type: string
       produces:
       - application/json
       responses:
@@ -493,6 +517,10 @@ paths:
         in: header
         name: Authorization
         required: true
+        type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
         type: string
       - description: Session ID (UUID)
         in: path
@@ -527,6 +555,10 @@ paths:
       - application/json
       description: Completes the email verification process
       parameters:
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
+        type: string
       - description: Verify completion params
         in: body
         name: request
@@ -599,6 +631,10 @@ paths:
 
         One of the following service names must be provided with the request: `inbox-aliases`, `accounts`, `premium`.
       parameters:
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
+        type: string
       - description: Verification request params
         in: body
         name: request
@@ -636,6 +672,10 @@ paths:
         in: header
         name: Authorization
         required: true
+        type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
         type: string
       - description: Auth token request params
         in: body

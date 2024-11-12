@@ -28,3 +28,4 @@ View API documentation at http://localhost:8080/swagger/index.html.
 | EMAIL_AUTH_DISABLED | No | Disable email `auth_token` authentication if set to 'true' |
 | OPAQUE_FAKE_RECORD | No | Use OPAQUE fake record to prevent client enumeration attacks |
 | VERIFY_FRONTEND_URL | No | Frontend URL to use in verification emails |
+| BRAVE_SERVICES_KEY | No | Services key to check against (via the `Brave-Key` header) for all requests |
