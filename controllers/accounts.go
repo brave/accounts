@@ -322,7 +322,7 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/accounts [delete]
 func (ac *AccountsController) DeleteAccount(w http.ResponseWriter, r *http.Request) {
-	session := r.Context().Value(middleware.ContextSession).(*datastore.Session)
+	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
 
 	// Delete the account with all associated data
 	if err := ac.ds.DeleteAccount(session.AccountID); err != nil {

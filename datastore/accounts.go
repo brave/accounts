@@ -6,19 +6,32 @@ import (
 	"strings"
 	"time"
 
+	"github.com/brave-experiments/accounts/util"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
-type Account struct {
-	ID                 uuid.UUID
-	Email              string
-	OprfSeedID         *int   `json:"-"`
-	OpaqueRegistration []byte `json:"-"`
-	CreatedAt          time.Time
-}
-
 var ErrAccountNotFound = errors.New("account not found")
+
+const lastUsedUpdateInterval = time.Minute * 30
+
+// Account defines a Brave Account
+type Account struct {
+	// Unique identifier for the account
+	ID uuid.UUID
+	// Email address associated with the account
+	Email string
+	// Normalized email address associated with the account
+	NormalizedEmail *string `json:"-"`
+	// Optional reference to the OPRF seed used for password hashing
+	OprfSeedID *int `json:"-"`
+	// Serialized OPAQUE protocol registration data
+	OpaqueRegistration []byte `json:"-"`
+	// Timestamp when the account was last used (with a MOE of 30 minutes)
+	LastUsedAt time.Time `gorm:"<-:update"`
+	// Timestamp when the account was created
+	CreatedAt time.Time `gorm:"<-:false"`
+}
 
 func (d *Datastore) GetAccount(tx *gorm.DB, email string) (*Account, error) {
 	var account Account
@@ -72,8 +85,9 @@ func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
 		}
 
 		account = &Account{
-			ID:    id,
-			Email: email,
+			ID:              id,
+			Email:           email,
+			NormalizedEmail: util.NormalizeEmail(email),
 		}
 
 		if err := tx.Create(account).Error; err != nil {
@@ -115,6 +129,22 @@ func (d *Datastore) DeleteAccount(accountID uuid.UUID) error {
 	result := d.db.Delete(&Account{}, "id = ?", accountID)
 	if result.Error != nil {
 		return fmt.Errorf("error deleting account: %w", result.Error)
+	}
+
+	return nil
+}
+
+func (d *Datastore) MaybeUpdateAccountLastUsed(accountID uuid.UUID, lastUsedTime time.Time) error {
+	if time.Since(lastUsedTime) < lastUsedUpdateInterval {
+		return nil
+	}
+
+	result := d.db.Model(&Account{}).
+		Where("id = ?", accountID).
+		Update("last_used_at", time.Now().UTC())
+
+	if result.Error != nil {
+		return fmt.Errorf("error updating account last used: %w", result.Error)
 	}
 
 	return nil

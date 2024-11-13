@@ -202,10 +202,15 @@ func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler)
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/auth/validate [get]
 func (ac *AuthController) Validate(w http.ResponseWriter, r *http.Request) {
-	session := r.Context().Value(middleware.ContextSession).(*datastore.Session)
+	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
+
+	if err := ac.ds.MaybeUpdateAccountLastUsed(session.AccountID, session.LastUsedAt); err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
 
 	response := ValidateTokenResponse{
-		Email:     session.Account.Email,
+		Email:     session.Email,
 		AccountID: session.AccountID.String(),
 		SessionID: session.ID.String(),
 	}
