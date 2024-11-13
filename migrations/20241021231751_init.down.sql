@@ -1,3 +1,4 @@
+DROP TABLE user_keys;
 DROP TABLE verifications;
 DROP TABLE sessions;
 DROP TABLE registration_states;
