@@ -51,5 +51,12 @@ CREATE TABLE verifications (
     verified BOOL NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE INDEX ON verifications (email);
+
+CREATE TABLE user_keys (
+    account_id UUID NOT NULL REFERENCES accounts(id),
+    name TEXT NOT NULL,
+    encrypted_key BYTEA NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (account_id, name)
+);

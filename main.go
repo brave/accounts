@@ -98,6 +98,7 @@ func main() {
 	accountsController := controllers.NewAccountsController(opaqueService, jwtService, datastore)
 	verificationController := controllers.NewVerificationController(datastore, jwtService, sesService, passwordAuthEnabled, emailAuthDisabled)
 	sessionsController := controllers.NewSessionsController(datastore)
+	userKeysController := controllers.NewUserKeysController(datastore)
 
 	r.Use(middleware.LoggerMiddleware(prometheusRegistry))
 
@@ -108,6 +109,7 @@ func main() {
 		}
 		r.Mount("/verify", verificationController.Router(verificationMiddleware, servicesKeyMiddleware, debugEndpointsEnabled))
 		r.With(servicesKeyMiddleware).Mount("/sessions", sessionsController.Router(authMiddleware))
+		r.With(servicesKeyMiddleware).Mount("/keys", userKeysController.Router(authMiddleware))
 	})
 
 	if os.Getenv(serveSwaggerEnv) == "true" {

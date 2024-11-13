@@ -75,7 +75,7 @@ func (sc *SessionsController) DeleteSession(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	render.NoContent(w, r)
 }
 
 func (sc *SessionsController) Router(authMiddleware func(http.Handler) http.Handler) chi.Router {

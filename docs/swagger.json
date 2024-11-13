@@ -329,6 +329,200 @@
                 }
             }
         },
+        "/v2/keys": {
+            "get": {
+                "description": "Get all keys for the authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User keys"
+                ],
+                "summary": "List user keys",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/controllers.UserKey"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Save a new key or update existing key for the authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User keys"
+                ],
+                "summary": "Save user key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Key to save",
+                        "name": "key",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.UserKeyStoreRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Key saved"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/keys/{name}": {
+            "get": {
+                "description": "Get a specific key by name for the authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User keys"
+                ],
+                "summary": "Get user key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Key name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.UserKey"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v2/sessions": {
             "get": {
                 "description": "Lists all active sessions for the authenticated account",
@@ -826,6 +1020,46 @@
                 "serializedResponse": {
                     "description": "Serialized OPAQUE registration response",
                     "type": "string"
+                }
+            }
+        },
+        "controllers.UserKey": {
+            "type": "object",
+            "properties": {
+                "encryptedKey": {
+                    "description": "EncryptedKey contains the encrypted key data as hex bytes",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name identifies the type of key (wrapping_key or sync_enc_seed)",
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "description": "UpdatedAt is the timestamp when the key was last updated",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.UserKeyStoreRequest": {
+            "type": "object",
+            "required": [
+                "encryptedKey",
+                "name"
+            ],
+            "properties": {
+                "encryptedKey": {
+                    "description": "EncryptedKey contains the encrypted key data as hex bytes",
+                    "type": "string",
+                    "maxLength": 128,
+                    "minLength": 16
+                },
+                "name": {
+                    "description": "Name identifies the type of key (wrapping_key or sync_enc_seed)",
+                    "type": "string",
+                    "enum": [
+                        "wrapping_key",
+                        "sync_enc_seed"
+                    ]
                 }
             }
         },

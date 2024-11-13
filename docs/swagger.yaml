@@ -120,6 +120,35 @@ definitions:
         description: Serialized OPAQUE registration response
         type: string
     type: object
+  controllers.UserKey:
+    properties:
+      encryptedKey:
+        description: EncryptedKey contains the encrypted key data as hex bytes
+        type: string
+      name:
+        description: Name identifies the type of key (wrapping_key or sync_enc_seed)
+        type: string
+      updatedAt:
+        description: UpdatedAt is the timestamp when the key was last updated
+        type: string
+    type: object
+  controllers.UserKeyStoreRequest:
+    properties:
+      encryptedKey:
+        description: EncryptedKey contains the encrypted key data as hex bytes
+        maxLength: 128
+        minLength: 16
+        type: string
+      name:
+        description: Name identifies the type of key (wrapping_key or sync_enc_seed)
+        enum:
+        - wrapping_key
+        - sync_enc_seed
+        type: string
+    required:
+    - encryptedKey
+    - name
+    type: object
   controllers.ValidateTokenResponse:
     description: Response containing validated token details
     properties:
@@ -476,6 +505,135 @@ paths:
       summary: Validate auth token
       tags:
       - Auth
+  /v2/keys:
+    get:
+      consumes:
+      - application/json
+      description: Get all keys for the authenticated user
+      parameters:
+      - description: Bearer + auth token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/controllers.UserKey'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: List user keys
+      tags:
+      - User keys
+    post:
+      consumes:
+      - application/json
+      description: Save a new key or update existing key for the authenticated user
+      parameters:
+      - description: Bearer + auth token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
+        type: string
+      - description: Key to save
+        in: body
+        name: key
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.UserKeyStoreRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Key saved
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Save user key
+      tags:
+      - User keys
+  /v2/keys/{name}:
+    get:
+      consumes:
+      - application/json
+      description: Get a specific key by name for the authenticated user
+      parameters:
+      - description: Bearer + auth token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
+        type: string
+      - description: Key name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.UserKey'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Get user key
+      tags:
+      - User keys
   /v2/sessions:
     get:
       description: Lists all active sessions for the authenticated account
