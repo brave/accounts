@@ -154,11 +154,12 @@ func NewAccountsController(opaqueService *services.OpaqueService, jwtService *se
 	}
 }
 
-func (ac *AccountsController) Router(verificationMiddleware func(http.Handler) http.Handler) chi.Router {
+func (ac *AccountsController) Router(verificationMiddleware func(http.Handler) http.Handler, authMiddleware func(http.Handler) http.Handler) chi.Router {
 	r := chi.NewRouter()
 
 	r.With(verificationMiddleware).Post("/password/init", ac.SetupPasswordInit)
 	r.With(verificationMiddleware).Post("/password/finalize", ac.SetupPasswordFinalize)
+	r.With(authMiddleware).Delete("/", ac.DeleteAccount)
 
 	return r
 }
@@ -307,4 +308,28 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 	render.JSON(w, r, &PasswordFinalizeResponse{
 		AuthToken: authToken,
 	})
+}
+
+// @Summary Delete account
+// @Description Deletes the authenticated account and all associated data
+// @Tags Accounts
+// @Produce json
+// @Param Authorization header string true "Bearer + auth token"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Success 204 "No Content"
+// @Failure 401 {object} util.ErrorResponse
+// @Failure 403 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/accounts [delete]
+func (ac *AccountsController) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	session := r.Context().Value(middleware.ContextSession).(*datastore.Session)
+
+	// Delete the account with all associated data
+	if err := ac.ds.DeleteAccount(session.AccountID); err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	render.Status(r, http.StatusNoContent)
+	render.NoContent(w, r)
 }

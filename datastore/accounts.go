@@ -110,3 +110,12 @@ func (d *Datastore) UpdateOpaqueRegistration(accountID uuid.UUID, oprfSeedID int
 
 	return nil
 }
+
+func (d *Datastore) DeleteAccount(accountID uuid.UUID) error {
+	result := d.db.Delete(&Account{}, "id = ?", accountID)
+	if result.Error != nil {
+		return fmt.Errorf("error deleting account: %w", result.Error)
+	}
+
+	return nil
+}

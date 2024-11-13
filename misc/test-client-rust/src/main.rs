@@ -27,7 +27,11 @@ fn post_request(
     bearer_token: Option<&str>,
     body: HashMap<&str, Value>,
 ) -> HashMap<String, String> {
-    let client = reqwest::blocking::Client::new();
+    // add user agent of some sort.
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+        .build()
+        .expect("Failed to create HTTP client");
     let mut request_builder = client.post(url).json(&body);
 
     // Add authorization header if bearer token is provided

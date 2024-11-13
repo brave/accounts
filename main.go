@@ -105,7 +105,7 @@ func main() {
 	r.Route("/v2", func(r chi.Router) {
 		r.With(servicesKeyMiddleware).Mount("/auth", authController.Router(authMiddleware))
 		if passwordAuthEnabled {
-			r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware))
+			r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware, authMiddleware))
 		}
 		r.Mount("/verify", verificationController.Router(verificationMiddleware, servicesKeyMiddleware, debugEndpointsEnabled))
 		r.With(servicesKeyMiddleware).Mount("/sessions", sessionsController.Router(authMiddleware))
