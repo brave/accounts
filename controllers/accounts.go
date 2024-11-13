@@ -16,9 +16,6 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-var ErrEmailNotVerified = errors.New("email not verified")
-var ErrIncorrectVerificationIntent = errors.New("incorrect verification intent")
-
 type AccountsController struct {
 	opaqueService *services.OpaqueService
 	validate      *validator.Validate
@@ -166,12 +163,12 @@ func (ac *AccountsController) Router(verificationMiddleware func(http.Handler) h
 
 func checkVerificationStatusAndIntent(w http.ResponseWriter, r *http.Request, verification *datastore.Verification) bool {
 	if !verification.Verified {
-		util.RenderErrorResponse(w, r, http.StatusForbidden, ErrEmailNotVerified)
+		util.RenderErrorResponse(w, r, http.StatusForbidden, util.ErrEmailNotVerified)
 		return false
 	}
 
 	if verification.Intent != datastore.RegistrationIntent && verification.Intent != datastore.SetPasswordIntent {
-		util.RenderErrorResponse(w, r, http.StatusForbidden, ErrIncorrectVerificationIntent)
+		util.RenderErrorResponse(w, r, http.StatusForbidden, util.ErrIncorrectVerificationIntent)
 		return false
 	}
 	return true
@@ -277,9 +274,9 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 	account, err := ac.opaqueService.SetupPasswordFinalize(verification.Email, opaqueRecord)
 	if err != nil {
 		switch {
-		case errors.Is(err, datastore.ErrRegistrationStateNotFound):
+		case errors.Is(err, util.ErrRegistrationStateNotFound):
 			util.RenderErrorResponse(w, r, http.StatusNotFound, err)
-		case errors.Is(err, datastore.ErrRegistrationStateExpired):
+		case errors.Is(err, util.ErrRegistrationStateExpired):
 			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
 		default:
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)

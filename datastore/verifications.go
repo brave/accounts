@@ -35,9 +35,6 @@ const (
 	maxPendingVerifications = 3
 )
 
-var ErrVerificationNotFound = errors.New("verification not found or invalid token")
-var ErrTooManyVerifications = errors.New("too many pending verification requests for email")
-
 func generateNotificationChannel(id uuid.UUID) string {
 	return fmt.Sprintf("verification_%s", id.String())
 }
@@ -70,7 +67,7 @@ func (d *Datastore) CreateVerification(email string, service string, intent stri
 	}
 
 	if existingCount >= maxPendingVerifications {
-		return nil, ErrTooManyVerifications
+		return nil, util.ErrTooManyVerifications
 	}
 	if err := d.db.Create(&verification).Error; err != nil {
 		return nil, fmt.Errorf("error creating verification: %w", err)
@@ -90,7 +87,7 @@ func (d *Datastore) UpdateAndGetVerificationStatus(id uuid.UUID, code string) (*
 	}
 
 	if result.RowsAffected == 0 {
-		return nil, ErrVerificationNotFound
+		return nil, util.ErrVerificationNotFound
 	}
 
 	// Send notification
@@ -110,7 +107,7 @@ func (d *Datastore) GetVerificationStatus(id uuid.UUID) (*Verification, error) {
 	var verification Verification
 	if err := d.db.First(&verification, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrVerificationNotFound
+			return nil, util.ErrVerificationNotFound
 		}
 		return nil, fmt.Errorf("error fetching verification: %w", err)
 	}
@@ -119,7 +116,7 @@ func (d *Datastore) GetVerificationStatus(id uuid.UUID) (*Verification, error) {
 		if err := d.db.Delete(&verification).Error; err != nil {
 			return nil, fmt.Errorf("error deleting expired verification: %w", err)
 		}
-		return nil, ErrVerificationNotFound
+		return nil, util.ErrVerificationNotFound
 	}
 
 	return &verification, nil
@@ -173,7 +170,7 @@ func (d *Datastore) DeleteVerification(id uuid.UUID) error {
 	}
 
 	if result.RowsAffected == 0 {
-		return ErrVerificationNotFound
+		return util.ErrVerificationNotFound
 	}
 
 	return nil

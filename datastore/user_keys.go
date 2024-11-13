@@ -1,15 +1,13 @@
 package datastore
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
+	"github.com/brave-experiments/accounts/util"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
-
-var ErrKeyNotFound = errors.New("key not found")
 
 // DBUserKey represents a key in the database
 type DBUserKey struct {
@@ -43,7 +41,7 @@ func (d *Datastore) GetUserKey(accountID uuid.UUID, name string) (*DBUserKey, er
 	result := d.db.Where("account_id = ? AND name = ?", accountID, name).First(&key)
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
-			return nil, ErrKeyNotFound
+			return nil, util.ErrKeyNotFound
 		}
 		return nil, fmt.Errorf("failed to retrieve user key: %w", result.Error)
 	}

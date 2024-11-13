@@ -29,10 +29,6 @@ const (
 	localStackSESEndpoint = "http://localhost:4566/_aws/ses"
 )
 
-var ErrIntentNotAllowed = errors.New("intent not allowed")
-var ErrAccountExists = errors.New("account already exists")
-var ErrAccountDoesNotExist = errors.New("account does not exist")
-
 type VerificationController struct {
 	datastore           *datastore.Datastore
 	validate            *validator.Validate
@@ -185,7 +181,7 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		intentAllowed = false
 	}
 	if !intentAllowed {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, ErrIntentNotAllowed)
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrIntentNotAllowed)
 		return
 	}
 
@@ -196,18 +192,18 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		if requestData.Intent == datastore.RegistrationIntent && accountExists {
-			util.RenderErrorResponse(w, r, http.StatusBadRequest, ErrAccountExists)
+			util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrAccountExists)
 			return
 		}
 		if requestData.Intent == datastore.SetPasswordIntent && !accountExists {
-			util.RenderErrorResponse(w, r, http.StatusBadRequest, ErrAccountDoesNotExist)
+			util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrAccountDoesNotExist)
 			return
 		}
 	}
 
 	verification, err := vc.datastore.CreateVerification(requestData.Email, requestData.Service, requestData.Intent)
 	if err != nil {
-		if errors.Is(err, datastore.ErrTooManyVerifications) {
+		if errors.Is(err, util.ErrTooManyVerifications) {
 			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
 			return
 		}
@@ -264,7 +260,7 @@ func (vc *VerificationController) VerifyComplete(w http.ResponseWriter, r *http.
 	// Update verification status
 	verification, err := vc.datastore.UpdateAndGetVerificationStatus(requestData.ID, requestData.Code)
 	if err != nil {
-		if errors.Is(err, datastore.ErrVerificationNotFound) {
+		if errors.Is(err, util.ErrVerificationNotFound) {
 			util.RenderErrorResponse(w, r, http.StatusNotFound, err)
 			return
 		}

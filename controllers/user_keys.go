@@ -132,7 +132,7 @@ func (uc *UserKeysController) GetKey(w http.ResponseWriter, r *http.Request) {
 
 	key, err := uc.ds.GetUserKey(session.AccountID, name)
 	if err != nil {
-		if errors.Is(err, datastore.ErrKeyNotFound) {
+		if errors.Is(err, util.ErrKeyNotFound) {
 			util.RenderErrorResponse(w, r, http.StatusNotFound, err)
 			return
 		}

@@ -1279,6 +1279,10 @@ const docTemplate = `{
             "description": "Standard error response",
             "type": "object",
             "properties": {
+                "code": {
+                    "description": "Error code",
+                    "type": "integer"
+                },
                 "error": {
                     "description": "Error message",
                     "type": "string"
