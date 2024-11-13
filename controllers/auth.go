@@ -255,7 +255,7 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 
 	ke2, akeState, err := ac.opaqueService.LoginInit(requestData.Email, opaqueReq)
 	if err != nil {
-		if errors.Is(err, services.ErrIncorrectCredentials) {
+		if errors.Is(err, util.ErrIncorrectCredentials) {
 			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 			return
 		}
@@ -324,9 +324,9 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 
 	accountID, err := ac.opaqueService.LoginFinalize(akeStateID, opaqueReq)
 	if err != nil {
-		if errors.Is(err, services.ErrIncorrectCredentials) ||
-			errors.Is(err, datastore.ErrAKEStateNotFound) ||
-			errors.Is(err, datastore.ErrAKEStateExpired) {
+		if errors.Is(err, util.ErrIncorrectCredentials) ||
+			errors.Is(err, util.ErrAKEStateNotFound) ||
+			errors.Is(err, util.ErrAKEStateExpired) {
 			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 			return
 		}

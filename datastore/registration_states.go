@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/brave-experiments/accounts/util"
 	"gorm.io/gorm"
 )
 
 const registrationStateExpiration = 30 * time.Second
-
-var ErrRegistrationStateNotFound = errors.New("Registration state not found")
-var ErrRegistrationStateExpired = errors.New("Registration state has expired")
 
 type RegistrationState struct {
 	Email      string `gorm:"primaryKey"`
@@ -23,14 +21,14 @@ func (d *Datastore) GetRegistrationStateSeedID(email string) (int, error) {
 	var state RegistrationState
 	if err := d.db.First(&state, "email = ?", email).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, ErrRegistrationStateNotFound
+			return 0, util.ErrRegistrationStateNotFound
 		}
 		return 0, fmt.Errorf("failed to get registration state: %w", err)
 	}
 
 	var err error
 	if time.Since(state.CreatedAt) > registrationStateExpiration {
-		err = ErrRegistrationStateExpired
+		err = util.ErrRegistrationStateExpired
 	}
 
 	if dbErr := d.db.Delete(&state).Error; dbErr != nil {

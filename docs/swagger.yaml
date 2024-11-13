@@ -266,6 +266,9 @@ definitions:
   util.ErrorResponse:
     description: Standard error response
     properties:
+      code:
+        description: Error code
+        type: integer
       error:
         description: Error message
         type: string

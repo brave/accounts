@@ -5,14 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/brave-experiments/accounts/util"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 const AkeStateExpiration = 30 * time.Second
-
-var ErrAKEStateNotFound = errors.New("AKE state not found")
-var ErrAKEStateExpired = errors.New("AKE state has expired")
 
 type AKEState struct {
 	ID         uuid.UUID  `json:"id"`
@@ -46,7 +44,7 @@ func (d *Datastore) GetAKEState(akeStateID uuid.UUID) (*AKEState, error) {
 	var akeState AKEState
 	if err := d.db.First(&akeState, "id = ?", akeStateID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrAKEStateNotFound
+			return nil, util.ErrAKEStateNotFound
 		}
 		return nil, fmt.Errorf("failed to get AKE state: %w", err)
 	}
@@ -54,7 +52,7 @@ func (d *Datastore) GetAKEState(akeStateID uuid.UUID) (*AKEState, error) {
 	var err error
 	// Check if AKE state has expired
 	if time.Since(akeState.CreatedAt) > AkeStateExpiration {
-		err = ErrAKEStateExpired
+		err = util.ErrAKEStateExpired
 	}
 
 	if dbErr := d.db.Delete(&AKEState{}, "id = ?", akeStateID).Error; dbErr != nil {

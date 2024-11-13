@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/brave-experiments/accounts/datastore"
+	"github.com/brave-experiments/accounts/util"
 	"github.com/bytemare/crypto"
 	"github.com/bytemare/opaque"
 	opaqueMsg "github.com/bytemare/opaque/message"
@@ -24,8 +25,6 @@ const (
 )
 
 var opaqueArgon2Salt = make([]byte, 16)
-
-var ErrIncorrectCredentials = errors.New("incorrect credentials")
 
 type OpaqueService struct {
 	ds                *datastore.Datastore
@@ -157,7 +156,7 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 	}
 
 	if account == nil && !o.fakeRecordEnabled {
-		return nil, nil, ErrIncorrectCredentials
+		return nil, nil, util.ErrIncorrectCredentials
 	}
 
 	useFakeRecord := account == nil || account.OpaqueRegistration == nil || account.OprfSeedID == nil
@@ -229,11 +228,11 @@ func (o *OpaqueService) LoginFinalize(akeStateID uuid.UUID, ke3 *opaqueMsg.KE3) 
 	}
 
 	if err = server.LoginFinish(ke3); err != nil {
-		return nil, ErrIncorrectCredentials
+		return nil, util.ErrIncorrectCredentials
 	}
 
 	if akeState.AccountID == nil {
-		return nil, ErrIncorrectCredentials
+		return nil, util.ErrIncorrectCredentials
 	}
 
 	return akeState.AccountID, nil

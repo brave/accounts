@@ -45,7 +45,7 @@ func AuthMiddleware(jwtService *services.JWTService, ds *datastore.Datastore, mi
 			}
 
 			if session.Version < minSessionVersion {
-				util.RenderErrorResponse(w, r, http.StatusForbidden, errors.New("outdated session"))
+				util.RenderErrorResponse(w, r, http.StatusForbidden, util.ErrOutdatedSession)
 				return
 			}
 
@@ -73,7 +73,7 @@ func VerificationAuthMiddleware(jwtService *services.JWTService, ds *datastore.D
 
 			verification, err := ds.GetVerificationStatus(verificationID)
 			if err != nil {
-				if errors.Is(err, datastore.ErrVerificationNotFound) {
+				if errors.Is(err, util.ErrVerificationNotFound) {
 					util.RenderErrorResponse(w, r, http.StatusNotFound, err)
 					return
 				}
@@ -96,7 +96,7 @@ func ServicesKeyMiddleware() func(http.Handler) http.Handler {
 			if servicesKey != "" {
 				headerKey := r.Header.Get(braveServicesKeyHeader)
 				if headerKey != servicesKey {
-					util.RenderErrorResponse(w, r, http.StatusUnauthorized, errors.New("services key does not match"))
+					util.RenderErrorResponse(w, r, http.StatusUnauthorized, util.ErrInvalidServicesKey)
 					return
 				}
 			}
