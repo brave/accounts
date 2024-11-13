@@ -12,7 +12,6 @@ import (
 	"github.com/brave-experiments/accounts/util"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 )
 
@@ -61,14 +60,12 @@ func FromDBUserKey(dbKey *datastore.DBUserKey) UserKey {
 }
 
 type UserKeysController struct {
-	ds       *datastore.Datastore
-	validate *validator.Validate
+	ds *datastore.Datastore
 }
 
 func NewUserKeysController(ds *datastore.Datastore) *UserKeysController {
 	return &UserKeysController{
-		ds:       ds,
-		validate: validator.New(validator.WithRequiredStructEnabled()),
+		ds: ds,
 	}
 }
 
@@ -161,13 +158,7 @@ func (uc *UserKeysController) SaveKey(w http.ResponseWriter, r *http.Request) {
 	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
 
 	var requestData UserKeyStoreRequest
-	if err := render.DecodeJSON(r.Body, &requestData); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
-		return
-	}
-
-	if err := uc.validate.Struct(requestData); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+	if !util.DecodeJSONAndValidate(w, r, &requestData) {
 		return
 	}
 

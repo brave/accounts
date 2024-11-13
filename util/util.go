@@ -6,7 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/go-chi/render"
+	"github.com/go-playground/validator/v10"
 )
+
+var validate = validator.New(validator.WithRequiredStructEnabled())
 
 func GenerateRandomString(length int) string {
 	b := make([]byte, length)
@@ -47,4 +52,17 @@ func NormalizeEmail(email string) *string {
 	// Construct normalized email
 	normalized := strings.ToLower(localPart + "@gmail.com")
 	return &normalized
+}
+
+func DecodeJSONAndValidate(w http.ResponseWriter, r *http.Request, data interface{}) bool {
+	if err := render.DecodeJSON(r.Body, &data); err != nil {
+		RenderErrorResponse(w, r, http.StatusBadRequest, err)
+		return false
+	}
+
+	if err := validate.Struct(data); err != nil {
+		RenderErrorResponse(w, r, http.StatusBadRequest, err)
+		return false
+	}
+	return true
 }
