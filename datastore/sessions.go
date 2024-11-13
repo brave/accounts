@@ -25,8 +25,19 @@ type Session struct {
 	Version int `json:"-"`
 	// Session creation timestamp
 	CreatedAt time.Time `json:"createdAt" gorm:"<-:false"`
-	// Account is excluded from JSON
-	Account Account `json:"-"`
+}
+
+type SessionWithAccountInfo struct {
+	// Session UUID
+	ID uuid.UUID `json:"id"`
+	// AccountID is excluded from JSON
+	AccountID uuid.UUID `json:"-"`
+	// The accounts "phase" the session was created in
+	Version int `json:"-"`
+	// Account email
+	Email string
+	// Account last usage time
+	LastUsedAt time.Time
 }
 
 var ErrSessionNotFound = errors.New("session not found")
@@ -63,9 +74,20 @@ func (d *Datastore) ListSessions(accountID uuid.UUID, minSessionVersion *int) ([
 	return sessions, nil
 }
 
-func (d *Datastore) GetSession(sessionID uuid.UUID) (*Session, error) {
-	var session Session
-	if err := d.db.Preload("Account").First(&session, "id = ?", sessionID).Error; err != nil {
+func (d *Datastore) GetSession(sessionID uuid.UUID) (*SessionWithAccountInfo, error) {
+	var session SessionWithAccountInfo
+	// fix. i'm not getting email
+	if err := d.db.Table("sessions").
+		Select(`
+			sessions.id,
+			sessions.account_id,
+			sessions.version,
+			accounts.email,
+			accounts.last_used_at
+		`).
+		Joins("JOIN accounts ON sessions.account_id = accounts.id").
+		Where("sessions.id = ?", sessionID).
+		First(&session).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrSessionNotFound
 		}

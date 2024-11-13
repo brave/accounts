@@ -33,7 +33,7 @@ func NewSessionsController(datastore *datastore.Datastore) *SessionsController {
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/sessions [get]
 func (sc *SessionsController) ListSessions(w http.ResponseWriter, r *http.Request) {
-	session := r.Context().Value(middleware.ContextSession).(*datastore.Session)
+	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
 
 	sessions, err := sc.datastore.ListSessions(session.AccountID, nil)
 	if err != nil {

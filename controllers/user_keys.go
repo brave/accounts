@@ -96,7 +96,7 @@ func (uc *UserKeysController) Router(authMiddleware func(http.Handler) http.Hand
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/keys [get]
 func (uc *UserKeysController) ListKeys(w http.ResponseWriter, r *http.Request) {
-	session := r.Context().Value(middleware.ContextSession).(*datastore.Session)
+	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
 
 	keys, err := uc.ds.GetUserKeys(session.AccountID)
 	if err != nil {
@@ -127,7 +127,7 @@ func (uc *UserKeysController) ListKeys(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/keys/{name} [get]
 func (uc *UserKeysController) GetKey(w http.ResponseWriter, r *http.Request) {
-	session := r.Context().Value(middleware.ContextSession).(*datastore.Session)
+	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
 	name := chi.URLParam(r, keyNameURLParam)
 
 	key, err := uc.ds.GetUserKey(session.AccountID, name)
@@ -158,7 +158,7 @@ func (uc *UserKeysController) GetKey(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/keys [post]
 func (uc *UserKeysController) SaveKey(w http.ResponseWriter, r *http.Request) {
-	session := r.Context().Value(middleware.ContextSession).(*datastore.Session)
+	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
 
 	var requestData UserKeyStoreRequest
 	if err := render.DecodeJSON(r.Body, &requestData); err != nil {

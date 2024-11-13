@@ -11,11 +11,13 @@ import (
 	"github.com/brave-experiments/accounts/util"
 )
 
-const ContextSession = "session"
-const ContextVerification = "verification"
+const (
+	ContextSession      = "session"
+	ContextVerification = "verification"
 
-const braveServicesKeyEnv = "BRAVE_SERVICES_KEY"
-const braveServicesKeyHeader = "brave-key"
+	braveServicesKeyEnv    = "BRAVE_SERVICES_KEY"
+	braveServicesKeyHeader = "brave-key"
+)
 
 func AuthMiddleware(jwtService *services.JWTService, ds *datastore.Datastore, minSessionVersion int) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
