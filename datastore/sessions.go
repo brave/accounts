@@ -56,7 +56,7 @@ func (d *Datastore) ListSessions(accountID uuid.UUID, minSessionVersion *int) ([
 	if minSessionVersion == nil {
 		minSessionVersion = &d.minSessionVersion
 	}
-	if err := d.db.Where("account_id = ? AND version >= ? AND expires_at IS NULL", accountID, *minSessionVersion).Find(&sessions).Error; err != nil {
+	if err := d.db.Where("account_id = ? AND version >= ?", accountID, *minSessionVersion).Find(&sessions).Error; err != nil {
 		return nil, fmt.Errorf("failed to list sessions: %w", err)
 	}
 

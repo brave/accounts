@@ -22,7 +22,7 @@ CREATE TABLE accounts (
 
 CREATE TABLE ake_states (
     id UUID PRIMARY KEY,
-    account_id UUID REFERENCES accounts(id),
+    account_id UUID REFERENCES accounts(id) ON DELETE CASCADE,
     oprf_seed_id INT REFERENCES oprf_seeds(id),
     state BYTEA NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -36,7 +36,7 @@ CREATE TABLE registration_states (
 
 CREATE TABLE sessions (
     id UUID PRIMARY KEY,
-    account_id UUID NOT NULL REFERENCES accounts(id),
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     user_agent TEXT NOT NULL,
     version SMALLINT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -54,7 +54,7 @@ CREATE TABLE verifications (
 CREATE INDEX ON verifications (email);
 
 CREATE TABLE user_keys (
-    account_id UUID NOT NULL REFERENCES accounts(id),
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     encrypted_key BYTEA NOT NULL,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

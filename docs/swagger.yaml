@@ -280,6 +280,39 @@ info:
   contact: {}
   title: Brave Accounts Service
 paths:
+  /v2/accounts:
+    delete:
+      description: Deletes the authenticated account and all associated data
+      parameters:
+      - description: Bearer + auth token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Delete account
+      tags:
+      - Accounts
   /v2/accounts/password/finalize:
     post:
       consumes:
