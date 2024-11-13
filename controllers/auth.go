@@ -13,12 +13,10 @@ import (
 	opaqueMsg "github.com/bytemare/opaque/message"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	"github.com/go-playground/validator/v10"
 )
 
 type AuthController struct {
 	opaqueService *services.OpaqueService
-	validate      *validator.Validate
 	jwtService    *services.JWTService
 	ds            *datastore.Datastore
 }
@@ -174,7 +172,6 @@ func (req *LoginFinalizeRequest) ToOpaqueKE3(opaqueService *services.OpaqueServi
 func NewAuthController(opaqueService *services.OpaqueService, jwtService *services.JWTService, ds *datastore.Datastore) *AuthController {
 	return &AuthController{
 		opaqueService: opaqueService,
-		validate:      validator.New(validator.WithRequiredStructEnabled()),
 		jwtService:    jwtService,
 		ds:            ds,
 	}
@@ -237,13 +234,7 @@ func (ac *AuthController) Validate(w http.ResponseWriter, r *http.Request) {
 // @Router /v2/auth/login/init [post]
 func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 	var requestData LoginInitRequest
-	if err := render.DecodeJSON(r.Body, &requestData); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
-		return
-	}
-
-	if err := ac.validate.Struct(requestData); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+	if !util.DecodeJSONAndValidate(w, r, &requestData) {
 		return
 	}
 
@@ -255,7 +246,9 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 
 	ke2, akeState, err := ac.opaqueService.LoginInit(requestData.Email, opaqueReq)
 	if err != nil {
-		if errors.Is(err, util.ErrIncorrectCredentials) {
+		if errors.Is(err, util.ErrIncorrectCredentials) ||
+			errors.Is(err, util.ErrIncorrectEmail) ||
+			errors.Is(err, util.ErrIncorrectPassword) {
 			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 			return
 		}
@@ -306,13 +299,7 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var requestData LoginFinalizeRequest
-	if err := render.DecodeJSON(r.Body, &requestData); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
-		return
-	}
-
-	if err := ac.validate.Struct(requestData); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+	if !util.DecodeJSONAndValidate(w, r, &requestData) {
 		return
 	}
 
@@ -325,6 +312,8 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 	accountID, err := ac.opaqueService.LoginFinalize(akeStateID, opaqueReq)
 	if err != nil {
 		if errors.Is(err, util.ErrIncorrectCredentials) ||
+			errors.Is(err, util.ErrIncorrectEmail) ||
+			errors.Is(err, util.ErrIncorrectPassword) ||
 			errors.Is(err, util.ErrAKEStateNotFound) ||
 			errors.Is(err, util.ErrAKEStateExpired) {
 			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)

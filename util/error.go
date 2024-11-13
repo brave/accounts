@@ -33,6 +33,8 @@ var (
 	ErrAKEStateExpired      = NewExposedError(14002, "AKE state has expired")
 	ErrOutdatedSession      = NewExposedError(14003, "outdated session")
 	ErrIncorrectCredentials = NewExposedError(14004, "incorrect credentials")
+	ErrIncorrectEmail       = NewExposedError(14005, "incorrect email")
+	ErrIncorrectPassword    = NewExposedError(14006, "incorrect password")
 
 	// Misc errors, prefixed with '15'
 	ErrInvalidServicesKey = NewExposedError(15005, "invalid services key")

@@ -16,7 +16,6 @@ import (
 	"github.com/brave-experiments/accounts/util"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
@@ -31,7 +30,6 @@ const (
 
 type VerificationController struct {
 	datastore           *datastore.Datastore
-	validate            *validator.Validate
 	jwtService          *services.JWTService
 	sesService          *services.SESService
 	passwordAuthEnabled bool
@@ -97,7 +95,6 @@ type localStackEmails struct {
 func NewVerificationController(datastore *datastore.Datastore, jwtService *services.JWTService, sesService *services.SESService, passwordAuthEnabled bool, emailAuthDisabled bool) *VerificationController {
 	return &VerificationController{
 		datastore:           datastore,
-		validate:            validator.New(validator.WithRequiredStructEnabled()),
 		jwtService:          jwtService,
 		sesService:          sesService,
 		passwordAuthEnabled: passwordAuthEnabled,
@@ -153,13 +150,7 @@ func (vc *VerificationController) maybeCreateVerificationToken(verification *dat
 // @Router /v2/verify/init [post]
 func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Request) {
 	var requestData VerifyInitRequest
-	if err := render.DecodeJSON(r.Body, &requestData); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
-		return
-	}
-
-	if err := vc.validate.Struct(requestData); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+	if !util.DecodeJSONAndValidate(w, r, &requestData) {
 		return
 	}
 
@@ -247,13 +238,7 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 // @Router /v2/verify/complete [post]
 func (vc *VerificationController) VerifyComplete(w http.ResponseWriter, r *http.Request) {
 	var requestData VerifyCompleteRequest
-	if err := render.DecodeJSON(r.Body, &requestData); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
-		return
-	}
-
-	if err := vc.validate.Struct(requestData); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+	if !util.DecodeJSONAndValidate(w, r, &requestData) {
 		return
 	}
 

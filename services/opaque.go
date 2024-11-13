@@ -156,7 +156,7 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 	}
 
 	if account == nil && !o.fakeRecordEnabled {
-		return nil, nil, util.ErrIncorrectCredentials
+		return nil, nil, util.ErrIncorrectEmail
 	}
 
 	useFakeRecord := account == nil || account.OpaqueRegistration == nil || account.OprfSeedID == nil
@@ -228,7 +228,11 @@ func (o *OpaqueService) LoginFinalize(akeStateID uuid.UUID, ke3 *opaqueMsg.KE3) 
 	}
 
 	if err = server.LoginFinish(ke3); err != nil {
-		return nil, util.ErrIncorrectCredentials
+		if o.fakeRecordEnabled {
+			return nil, util.ErrIncorrectCredentials
+		} else {
+			return nil, util.ErrIncorrectPassword
+		}
 	}
 
 	if akeState.AccountID == nil {

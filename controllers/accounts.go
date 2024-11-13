@@ -13,12 +13,10 @@ import (
 	opaqueMsg "github.com/bytemare/opaque/message"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	"github.com/go-playground/validator/v10"
 )
 
 type AccountsController struct {
 	opaqueService *services.OpaqueService
-	validate      *validator.Validate
 	jwtService    *services.JWTService
 	ds            *datastore.Datastore
 }
@@ -145,7 +143,6 @@ func FromOpaqueRegistrationResponse(opaqueResp *opaqueMsg.RegistrationResponse, 
 func NewAccountsController(opaqueService *services.OpaqueService, jwtService *services.JWTService, ds *datastore.Datastore) *AccountsController {
 	return &AccountsController{
 		opaqueService: opaqueService,
-		validate:      validator.New(validator.WithRequiredStructEnabled()),
 		jwtService:    jwtService,
 		ds:            ds,
 	}
@@ -198,13 +195,7 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 	}
 
 	var requestData RegistrationRequest
-	if err := render.DecodeJSON(r.Body, &requestData); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
-		return
-	}
-
-	if err := ac.validate.Struct(requestData); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+	if !util.DecodeJSONAndValidate(w, r, &requestData) {
 		return
 	}
 
@@ -255,13 +246,7 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 	}
 
 	var requestData RegistrationRecord
-	if err := render.DecodeJSON(r.Body, &requestData); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
-		return
-	}
-
-	if err := ac.validate.Struct(requestData); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+	if !util.DecodeJSONAndValidate(w, r, &requestData) {
 		return
 	}
 
