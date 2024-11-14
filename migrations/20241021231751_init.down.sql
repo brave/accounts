@@ -1,3 +1,4 @@
+DROP TABLE pending_webhook_events;
 DROP TABLE user_keys;
 DROP TABLE verifications;
 DROP TABLE sessions;

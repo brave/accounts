@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/brave-experiments/accounts/migrations"
 	"github.com/golang-migrate/migrate/v4"
@@ -21,6 +22,7 @@ type Datastore struct {
 	dbConfig          *pgx.ConnConfig
 	db                *gorm.DB
 	minSessionVersion int
+	webhookUrls       map[string]interface{}
 }
 
 func NewDatastore(minSessionVersion int) (*Datastore, error) {
@@ -60,5 +62,17 @@ func NewDatastore(minSessionVersion int) (*Datastore, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	return &Datastore{dbConfig: dbConfig, db: db, minSessionVersion: minSessionVersion}, nil
+	webhookUrls := make(map[string]interface{})
+
+	// Parse webhook URLs from environment variable
+	if urls := os.Getenv(WebhookKeysEnv); urls != "" {
+		pairs := strings.Split(urls, ",")
+		for _, pair := range pairs {
+			if parts := strings.Split(pair, "="); len(parts) == 2 {
+				webhookUrls[parts[0]] = true
+			}
+		}
+	}
+
+	return &Datastore{dbConfig, db, minSessionVersion, webhookUrls}, nil
 }

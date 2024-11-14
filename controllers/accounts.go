@@ -312,6 +312,11 @@ func (ac *AccountsController) DeleteAccount(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if err := ac.ds.NotifyAccountDeletionEvent(session.Email, session.AccountID); err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
 	render.Status(r, http.StatusNoContent)
 	render.NoContent(w, r)
 }
