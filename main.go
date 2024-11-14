@@ -24,7 +24,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var routes = flag.Bool("routes", false, "Generate router documentation")
+var (
+	routesFlag             = flag.Bool("routes", false, "Generate router documentation")
+	startWebhookSenderFlag = flag.Bool("start-webhook-sender", false, "Start the webhook event sender")
+)
 
 const (
 	logPrettyEnv             = "LOG_PRETTY"
@@ -64,6 +67,11 @@ func main() {
 	datastore, err := datastore.NewDatastore(minSessionVersion)
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to init datastore")
+	}
+
+	if *startWebhookSenderFlag {
+		services.NewWebhookService(datastore).StartProcessingEvents()
+		return
 	}
 
 	jwtService, err := services.NewJWTService(datastore)
@@ -116,7 +124,7 @@ func main() {
 		r.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL("http://localhost:8080/swagger/doc.json")))
 	}
 
-	if *routes {
+	if *routesFlag {
 		fmt.Println(docgen.MarkdownRoutesDoc(r, docgen.MarkdownOpts{
 			ProjectPath: "github.com/brave-experiments/accounts",
 		}))
