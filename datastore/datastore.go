@@ -17,6 +17,8 @@ import (
 )
 
 const databaseURLEnv = "DATABASE_URL"
+const testDatabaseURLEnv = "TEST_DATABASE_URL"
+const defaultTestDatabaseURLEnv = "postgres://accounts:password@localhost:5435/test?sslmode=disable"
 
 type Datastore struct {
 	dbConfig          *pgx.ConnConfig
@@ -25,10 +27,18 @@ type Datastore struct {
 	webhookUrls       map[string]interface{}
 }
 
-func NewDatastore(minSessionVersion int) (*Datastore, error) {
-	dbURL := os.Getenv(databaseURLEnv)
+func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
+	envVar := databaseURLEnv
+	if isTesting {
+		envVar = testDatabaseURLEnv
+	}
+	dbURL := os.Getenv(envVar)
 	if dbURL == "" {
-		return nil, fmt.Errorf("DATABASE_URL environment variable not set")
+		if isTesting {
+			dbURL = defaultTestDatabaseURLEnv
+		} else {
+			return nil, fmt.Errorf("%v environment variable not set", envVar)
+		}
 	}
 
 	dbConfig, err := pgx.ParseConfig(dbURL)
@@ -47,6 +57,14 @@ func NewDatastore(minSessionVersion int) (*Datastore, error) {
 	)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to init migrations: %w", err)
+	}
+	if isTesting {
+		if err = migration.Down(); err != nil {
+			if !errors.Is(err, migrate.ErrNoChange) {
+				return nil, fmt.Errorf("failed to down migrations for testing: %w", err)
+			}
+			err = nil
+		}
 	}
 	if err = migration.Up(); err != nil {
 		if !errors.Is(err, migrate.ErrNoChange) {

@@ -64,7 +64,7 @@ func main() {
 		minSessionVersion = datastore.PasswordAuthSessionVersion
 	}
 
-	datastore, err := datastore.NewDatastore(minSessionVersion)
+	datastore, err := datastore.NewDatastore(minSessionVersion, false)
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to init datastore")
 	}

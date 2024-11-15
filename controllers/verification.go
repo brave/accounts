@@ -31,7 +31,7 @@ const (
 type VerificationController struct {
 	datastore           *datastore.Datastore
 	jwtService          *services.JWTService
-	sesService          *services.SESService
+	sesService          services.SES
 	passwordAuthEnabled bool
 	emailAuthDisabled   bool
 }
@@ -92,7 +92,7 @@ type localStackEmails struct {
 	Messages []interface{} `json:"messages"`
 }
 
-func NewVerificationController(datastore *datastore.Datastore, jwtService *services.JWTService, sesService *services.SESService, passwordAuthEnabled bool, emailAuthDisabled bool) *VerificationController {
+func NewVerificationController(datastore *datastore.Datastore, jwtService *services.JWTService, sesService services.SES, passwordAuthEnabled bool, emailAuthDisabled bool) *VerificationController {
 	return &VerificationController{
 		datastore:           datastore,
 		jwtService:          jwtService,
