@@ -11,6 +11,8 @@ services:
       - POSTGRES_PASSWORD=password
     networks:
       - accounts
+    volumes:
+      - ./misc/create_test_db.sql:/docker-entrypoint-initdb.d/create_test_db.sql
   localstack:
     image: localstack/localstack
     ports:

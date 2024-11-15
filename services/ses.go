@@ -40,6 +40,10 @@ type SESService struct {
 	i18nBundle         *i18n.Bundle
 }
 
+type SES interface {
+	SendVerificationEmail(ctx context.Context, email string, verification *datastore.Verification, locale string) error
+}
+
 type verifyEmailFields struct {
 	VerifyURL          string
 	Subject            string
