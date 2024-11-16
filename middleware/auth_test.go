@@ -79,10 +79,7 @@ func (suite *MiddlewareTestSuite) TestAuthMiddleware() {
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp = util.ExecuteTestRequest(req, mw(handler))
 	assert.Equal(suite.T(), http.StatusForbidden, resp.Code)
-	var errResp util.ErrorResponse
-	util.DecodeJSONTestResponse(suite.T(), resp.Body, &errResp)
-	require.NotNil(suite.T(), errResp.Code)
-	assert.Equal(suite.T(), util.ErrOutdatedSession.Code, *errResp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrOutdatedSession.Code)
 }
 
 func (suite *MiddlewareTestSuite) TestServicesKeyMiddleware() {
@@ -138,16 +135,14 @@ func (suite *MiddlewareTestSuite) TestVerificationAuthMiddleware() {
 	assert.Equal(suite.T(), http.StatusOK, resp.Code)
 
 	// Test expired verification
-	suite.ds.DB.Model(&datastore.Verification{}).Where("id = ?", verification.ID).Update("created_at", time.Now().Add(-45*time.Minute))
+	err = suite.ds.DB.Model(&datastore.Verification{}).Where("id = ?", verification.ID).Update("created_at", time.Now().Add(-45*time.Minute)).Error
+	require.NoError(suite.T(), err)
 
 	req = httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp = util.ExecuteTestRequest(req, mw(handler))
 	assert.Equal(suite.T(), http.StatusNotFound, resp.Code)
-	var errResp util.ErrorResponse
-	util.DecodeJSONTestResponse(suite.T(), resp.Body, &errResp)
-	require.NotNil(suite.T(), errResp.Code)
-	assert.Equal(suite.T(), util.ErrVerificationNotFound.Code, *errResp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrVerificationNotFound.Code)
 
 	// Test invalid token
 	req = httptest.NewRequest("GET", "/", nil)

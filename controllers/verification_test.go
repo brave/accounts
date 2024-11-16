@@ -104,10 +104,7 @@ func (suite *VerificationTestSuite) TestVerifyInitTooMany() {
 		resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
 		assert.Equal(suite.T(), http.StatusBadRequest, resp.Code)
 
-		var parsedResp util.ErrorResponse
-		util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
-		require.NotNil(suite.T(), parsedResp.Code)
-		assert.Equal(suite.T(), util.ErrTooManyVerifications.Code, *parsedResp.Code)
+		util.AssertErrorResponseCode(suite.T(), resp, util.ErrTooManyVerifications.Code)
 	}
 
 	suite.sesMock.AssertExpectations(suite.T())
@@ -173,10 +170,7 @@ func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
 
 		resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
 		assert.Equal(suite.T(), http.StatusBadRequest, resp.Code)
-		var parsedResp util.ErrorResponse
-		util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
-		require.NotNil(suite.T(), parsedResp.Code)
-		assert.Equal(suite.T(), util.ErrIntentNotAllowed.Code, *parsedResp.Code)
+		util.AssertErrorResponseCode(suite.T(), resp, util.ErrIntentNotAllowed.Code)
 	}
 }
 
@@ -222,10 +216,7 @@ func (suite *VerificationTestSuite) TestVerifyComplete() {
 	// Second attempt - should fail
 	completeResp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/complete", completeBody), suite.router)
 	assert.Equal(suite.T(), http.StatusNotFound, completeResp.Code)
-	var errResp util.ErrorResponse
-	util.DecodeJSONTestResponse(suite.T(), completeResp.Body, &errResp)
-	require.NotNil(suite.T(), errResp.Code)
-	assert.Equal(suite.T(), util.ErrVerificationNotFound.Code, *errResp.Code)
+	util.AssertErrorResponseCode(suite.T(), completeResp, util.ErrVerificationNotFound.Code)
 }
 
 func (suite *VerificationTestSuite) TestVerifyQueryResult() {
