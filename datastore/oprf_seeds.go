@@ -17,7 +17,7 @@ type OPRFSeed struct {
 func (d *Datastore) GetOrCreateOPRFSeeds(seedGenerator func() []byte) (map[int][]byte, error) {
 	var seeds []OPRFSeed
 
-	err := d.db.Transaction(func(tx *gorm.DB) error {
+	err := d.DB.Transaction(func(tx *gorm.DB) error {
 		// Acquire table lock at start of transaction
 		// so we don't create more than one seed if multiple
 		// replicas are operating.

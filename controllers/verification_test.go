@@ -28,9 +28,9 @@ type VerificationTestSuite struct {
 func (suite *VerificationTestSuite) SetupController(passwordAuthEnabled bool, emailAuthDisabled bool) {
 	var err error
 	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, true)
-	assert.NoError(suite.T(), err)
+	require.NoError(suite.T(), err)
 	suite.jwtService, err = services.NewJWTService(suite.ds)
-	assert.NoError(suite.T(), err)
+	require.NoError(suite.T(), err)
 	suite.sesMock = &MockSESService{}
 	controller := controllers.NewVerificationController(suite.ds, suite.jwtService, suite.sesMock, passwordAuthEnabled, emailAuthDisabled)
 
@@ -309,8 +309,12 @@ func (suite *VerificationTestSuite) TestVerifyQueryResult() {
 		if tc.shouldHaveAuthToken {
 			assert.NotNil(suite.T(), result.AuthToken)
 
-			_, err = suite.jwtService.ValidateAuthToken(*result.AuthToken)
+			sessionID, err := suite.jwtService.ValidateAuthToken(*result.AuthToken)
 			assert.NoError(suite.T(), err)
+			session, err := suite.ds.GetSession(sessionID)
+			assert.NoError(suite.T(), err)
+			require.NotNil(suite.T(), session)
+			assert.Equal(suite.T(), session.Version, 1)
 		} else {
 			assert.Nil(suite.T(), result.AuthToken)
 		}

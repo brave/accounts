@@ -59,8 +59,6 @@ type LoginInitResponse struct {
 type LoginFinalizeRequest struct {
 	// Client MAC of KE3
 	Mac *string `json:"clientMac" validate:"required"`
-	// Optional name for the new session
-	SessionName *string `json:"sessionName"`
 }
 
 // @Description Response containing auth token after successful login
@@ -177,12 +175,14 @@ func NewAuthController(opaqueService *services.OpaqueService, jwtService *servic
 	}
 }
 
-func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler) chi.Router {
+func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler, passwordAuthEnabled bool) chi.Router {
 	r := chi.NewRouter()
 
 	r.With(authMiddleware).Get("/validate", ac.Validate)
-	r.Post("/login/init", ac.LoginInit)
-	r.Post("/login/finalize", ac.LoginFinalize)
+	if passwordAuthEnabled {
+		r.Post("/login/init", ac.LoginInit)
+		r.Post("/login/finalize", ac.LoginFinalize)
+	}
 
 	return r
 }
@@ -288,7 +288,7 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) {
 	token, err := util.ExtractAuthToken(r)
 	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+		util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 		return
 	}
 

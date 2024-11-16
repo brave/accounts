@@ -32,7 +32,7 @@ type OpaqueService struct {
 	currentSeedId     int
 	secretKey         []byte
 	publicKey         []byte
-	config            *opaque.Configuration
+	Config            *opaque.Configuration
 	fakeRecordEnabled bool
 }
 
@@ -84,15 +84,15 @@ func NewOpaqueService(ds *datastore.Datastore) (*OpaqueService, error) {
 }
 
 func (o *OpaqueService) NewElement() *crypto.Element {
-	return o.config.OPRF.Group().NewElement()
+	return o.Config.OPRF.Group().NewElement()
 }
 
 func (o *OpaqueService) BinaryDeserializer() (*opaque.Deserializer, error) {
-	return o.config.Deserializer()
+	return o.Config.Deserializer()
 }
 
 func (o *OpaqueService) newOpaqueServer(seedID int) (*opaque.Server, error) {
-	server, err := opaque.NewServer(o.config)
+	server, err := opaque.NewServer(o.Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init opaque server: %w", err)
 	}
@@ -175,12 +175,12 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 	if useFakeRecord {
 		// Get fake record and continue with process to prevent
 		// client enumeration attacks
-		opaqueRecord, err = o.config.GetFakeRecord([]byte(email))
+		opaqueRecord, err = o.Config.GetFakeRecord([]byte(email))
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get fake opaque registration: %w", err)
 		}
 	} else {
-		deserializer, err := o.config.Deserializer()
+		deserializer, err := o.Config.Deserializer()
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get opaque deserializer: %w", err)
 		}

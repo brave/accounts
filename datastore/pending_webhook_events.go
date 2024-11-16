@@ -58,10 +58,10 @@ func (d *Datastore) notifyEvent(eventType string, details interface{}) error {
 			URL:       webhookURL,
 			UpdatedAt: time.Now().UTC(),
 		}
-		if err := d.db.Create(&webhookEvent).Error; err != nil {
+		if err := d.DB.Create(&webhookEvent).Error; err != nil {
 			return fmt.Errorf("failed to create webhook event: %w", err)
 		}
-		if err := d.db.Exec(
+		if err := d.DB.Exec(
 			"SELECT pg_notify(?, ?)",
 			webhookEventsChannel,
 			fmt.Sprintf("%d", webhookEvent.ID),
@@ -110,14 +110,14 @@ func (l *WebhookEventListener) WaitForEvent() (int64, error) {
 
 func (d *Datastore) GetPendingEvent(eventID int64) (*PendingWebhookEvent, error) {
 	var event PendingWebhookEvent
-	if err := d.db.First(&event, eventID).Error; err != nil {
+	if err := d.DB.First(&event, eventID).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch pending event: %w", err)
 	}
 	return &event, nil
 }
 
 func (d *Datastore) IncrementAttemptsCount(eventID int64) error {
-	result := d.db.Model(&PendingWebhookEvent{}).
+	result := d.DB.Model(&PendingWebhookEvent{}).
 		Where("id = ?", eventID).
 		Updates(map[string]interface{}{
 			"attempts":   gorm.Expr("attempts + 1"),
@@ -139,9 +139,9 @@ func (d *Datastore) GetPendingEvents(failedOnly bool) ([]PendingWebhookEvent, er
 	var events []PendingWebhookEvent
 	var err error
 	if failedOnly {
-		err = d.db.Where("attempts > 0").Find(&events).Error
+		err = d.DB.Where("attempts > 0").Find(&events).Error
 	} else {
-		err = d.db.Find(&events).Error
+		err = d.DB.Find(&events).Error
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch events: %w", err)
@@ -150,7 +150,7 @@ func (d *Datastore) GetPendingEvents(failedOnly bool) ([]PendingWebhookEvent, er
 }
 
 func (d *Datastore) DeletePendingEvent(eventID int64) error {
-	result := d.db.Delete(&PendingWebhookEvent{}, eventID)
+	result := d.DB.Delete(&PendingWebhookEvent{}, eventID)
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete pending event: %w", result.Error)
 	}

@@ -28,7 +28,7 @@ func (DBUserKey) TableName() string {
 
 // StoreUserKey saves a user key to the database
 func (d *Datastore) StoreUserKey(key *DBUserKey) error {
-	result := d.db.Save(key)
+	result := d.DB.Save(key)
 	if result.Error != nil {
 		return fmt.Errorf("failed to store user key: %w", result.Error)
 	}
@@ -38,7 +38,7 @@ func (d *Datastore) StoreUserKey(key *DBUserKey) error {
 // GetUserKey retrieves a user key from the database
 func (d *Datastore) GetUserKey(accountID uuid.UUID, name string) (*DBUserKey, error) {
 	var key DBUserKey
-	result := d.db.Where("account_id = ? AND name = ?", accountID, name).First(&key)
+	result := d.DB.Where("account_id = ? AND name = ?", accountID, name).First(&key)
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
 			return nil, util.ErrKeyNotFound
@@ -51,7 +51,7 @@ func (d *Datastore) GetUserKey(accountID uuid.UUID, name string) (*DBUserKey, er
 // GetUserKeys retrieves all keys for an account
 func (d *Datastore) GetUserKeys(accountID uuid.UUID) ([]DBUserKey, error) {
 	var keys []DBUserKey
-	result := d.db.Where("account_id = ?", accountID).Find(&keys)
+	result := d.DB.Where("account_id = ?", accountID).Find(&keys)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to retrieve user keys: %w", result.Error)
 	}
