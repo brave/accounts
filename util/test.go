@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func ExecuteTestRequest(req *http.Request, handler http.Handler) *httptest.ResponseRecorder {
@@ -27,4 +28,11 @@ func CreateJSONTestRequest(path string, body interface{}) *http.Request {
 func DecodeJSONTestResponse(t *testing.T, body *bytes.Buffer, parsed interface{}) {
 	err := json.NewDecoder(body).Decode(parsed)
 	assert.NoError(t, err)
+}
+
+func AssertErrorResponseCode(t *testing.T, resp *httptest.ResponseRecorder, expectedCode int) {
+	var errResp ErrorResponse
+	DecodeJSONTestResponse(t, resp.Body, &errResp)
+	require.NotNil(t, errResp.Code)
+	assert.Equal(t, expectedCode, *errResp.Code)
 }

@@ -68,9 +68,7 @@ func (suite *AuthTestSuite) SetupTest() {
 func (suite *AuthTestSuite) createLoginFinalizeRequest(opaqueClient *opaque.Client, serializedKE2Hex string) controllers.LoginFinalizeRequest {
 	serializedKE2, err := hex.DecodeString(serializedKE2Hex)
 	require.NoError(suite.T(), err)
-	deserializer, err := suite.opaqueConfig.Deserializer()
-	require.NoError(suite.T(), err)
-	ke2, err := deserializer.KE2(serializedKE2)
+	ke2, err := opaqueClient.Deserialize.KE2(serializedKE2)
 	require.NoError(suite.T(), err)
 	ke3, _, err := opaqueClient.GenerateKE3(ke2, opaque.GenerateKE3Options{
 		ClientIdentity: []byte(suite.account.Email),
@@ -206,10 +204,7 @@ func (suite *AuthTestSuite) TestAuthLoginInvalidEmail() {
 
 	resp := util.ExecuteTestRequest(req, suite.router)
 	assert.Equal(suite.T(), http.StatusUnauthorized, resp.Code)
-	var errResp util.ErrorResponse
-	util.DecodeJSONTestResponse(suite.T(), resp.Body, &errResp)
-	require.NotNil(suite.T(), errResp.Code)
-	assert.Equal(suite.T(), util.ErrIncorrectEmail.Code, *errResp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrIncorrectEmail.Code)
 }
 
 func (suite *AuthTestSuite) TestAuthLoginExpiredAKEToken() {
@@ -236,7 +231,8 @@ func (suite *AuthTestSuite) TestAuthLoginExpiredAKEToken() {
 	akeStateID, err := suite.jwtService.ValidateEphemeralAKEToken(parsedResp.AkeToken)
 	require.NoError(suite.T(), err)
 
-	suite.ds.DB.Model(&datastore.AKEState{}).Where("id = ?", akeStateID).Update("created_at", time.Now().Add(-30*time.Minute))
+	err = suite.ds.DB.Model(&datastore.AKEState{}).Where("id = ?", akeStateID).Update("created_at", time.Now().Add(-30*time.Minute)).Error
+	require.NoError(suite.T(), err)
 
 	loginFinalReq := suite.createLoginFinalizeRequest(opaqueClient, *parsedResp.SerializedKE2)
 
@@ -245,10 +241,7 @@ func (suite *AuthTestSuite) TestAuthLoginExpiredAKEToken() {
 
 	resp = util.ExecuteTestRequest(req, suite.router)
 	assert.Equal(suite.T(), http.StatusUnauthorized, resp.Code)
-	var errResp util.ErrorResponse
-	util.DecodeJSONTestResponse(suite.T(), resp.Body, &errResp)
-	require.NotNil(suite.T(), errResp.Code)
-	assert.Equal(suite.T(), util.ErrAKEStateExpired.Code, *errResp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrAKEStateExpired.Code)
 }
 
 func TestAuthTestSuite(t *testing.T) {
