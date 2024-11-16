@@ -20,7 +20,7 @@ type JWTKey struct {
 func (d *Datastore) GetOrCreateJWTKeys() (map[int][]byte, error) {
 	var keys []JWTKey
 
-	err := d.db.Transaction(func(tx *gorm.DB) error {
+	err := d.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Exec("LOCK TABLE jwt_keys IN ACCESS EXCLUSIVE MODE").Error; err != nil {
 			return fmt.Errorf("error acquiring table lock: %w", err)
 		}

@@ -7,13 +7,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 )
 
-func ExecuteTestRequest(req *http.Request, router *chi.Mux) *httptest.ResponseRecorder {
+func ExecuteTestRequest(req *http.Request, handler http.Handler) *httptest.ResponseRecorder {
 	rr := httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
+	handler.ServeHTTP(rr, req)
 
 	return rr
 }

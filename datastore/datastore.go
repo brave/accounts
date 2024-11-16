@@ -22,7 +22,7 @@ const defaultTestDatabaseURLEnv = "postgres://accounts:password@localhost:5435/t
 
 type Datastore struct {
 	dbConfig          *pgx.ConnConfig
-	db                *gorm.DB
+	DB                *gorm.DB
 	minSessionVersion int
 	webhookUrls       map[string]interface{}
 }
@@ -59,11 +59,16 @@ func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
 		return nil, fmt.Errorf("Failed to init migrations: %w", err)
 	}
 	if isTesting {
-		if err = migration.Down(); err != nil {
-			if !errors.Is(err, migrate.ErrNoChange) {
-				return nil, fmt.Errorf("failed to down migrations for testing: %w", err)
-			}
-			err = nil
+		if err = migration.Drop(); err != nil {
+			return nil, fmt.Errorf("failed to down migrations for testing: %w", err)
+		}
+		migration, err = migrate.NewWithSourceInstance(
+			"iofs",
+			iofsDriver,
+			dbURL,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to re-init migrations: %w", err)
 		}
 	}
 	if err = migration.Up(); err != nil {

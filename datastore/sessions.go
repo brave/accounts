@@ -55,19 +55,16 @@ func (d *Datastore) CreateSession(accountID uuid.UUID, sessionVersion int, userA
 		Version:   sessionVersion,
 	}
 
-	if err := d.db.Create(&session).Error; err != nil {
+	if err := d.DB.Create(&session).Error; err != nil {
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
 	return &session, nil
 }
 
-func (d *Datastore) ListSessions(accountID uuid.UUID, minSessionVersion *int) ([]Session, error) {
+func (d *Datastore) ListSessions(accountID uuid.UUID) ([]Session, error) {
 	var sessions []Session
-	if minSessionVersion == nil {
-		minSessionVersion = &d.minSessionVersion
-	}
-	if err := d.db.Where("account_id = ? AND version >= ?", accountID, *minSessionVersion).Find(&sessions).Error; err != nil {
+	if err := d.DB.Where("account_id = ? AND version >= ?", accountID, &d.minSessionVersion).Find(&sessions).Error; err != nil {
 		return nil, fmt.Errorf("failed to list sessions: %w", err)
 	}
 
@@ -77,7 +74,7 @@ func (d *Datastore) ListSessions(accountID uuid.UUID, minSessionVersion *int) ([
 func (d *Datastore) GetSession(sessionID uuid.UUID) (*SessionWithAccountInfo, error) {
 	var session SessionWithAccountInfo
 	// fix. i'm not getting email
-	if err := d.db.Table("sessions").
+	if err := d.DB.Table("sessions").
 		Select(`
 			sessions.id,
 			sessions.account_id,
@@ -98,7 +95,7 @@ func (d *Datastore) GetSession(sessionID uuid.UUID) (*SessionWithAccountInfo, er
 }
 
 func (d *Datastore) DeleteSession(sessionID uuid.UUID, accountID uuid.UUID) error {
-	result := d.db.Delete(&Session{}, "id = ? AND account_id = ?", sessionID, accountID)
+	result := d.DB.Delete(&Session{}, "id = ? AND account_id = ?", sessionID, accountID)
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete session: %w", result.Error)
 	}
@@ -111,7 +108,7 @@ func (d *Datastore) DeleteSession(sessionID uuid.UUID, accountID uuid.UUID) erro
 }
 
 func (d *Datastore) DeleteAllSessions(accountID uuid.UUID) error {
-	result := d.db.Delete(&Session{}, "account_id = ?", accountID)
+	result := d.DB.Delete(&Session{}, "account_id = ?", accountID)
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete all sessions: %w", result.Error)
 	}

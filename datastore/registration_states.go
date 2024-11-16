@@ -19,7 +19,7 @@ type RegistrationState struct {
 
 func (d *Datastore) GetRegistrationStateSeedID(email string) (int, error) {
 	var state RegistrationState
-	if err := d.db.First(&state, "email = ?", email).Error; err != nil {
+	if err := d.DB.First(&state, "email = ?", email).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, util.ErrRegistrationStateNotFound
 		}
@@ -31,7 +31,7 @@ func (d *Datastore) GetRegistrationStateSeedID(email string) (int, error) {
 		err = util.ErrRegistrationStateExpired
 	}
 
-	if dbErr := d.db.Delete(&state).Error; dbErr != nil {
+	if dbErr := d.DB.Delete(&state).Error; dbErr != nil {
 		return 0, fmt.Errorf("failed to delete registration state: %w", dbErr)
 	}
 
@@ -47,7 +47,7 @@ func (d *Datastore) UpsertRegistrationState(email string, oprfSeedID int) error 
 		Email:      email,
 		OprfSeedID: oprfSeedID,
 	}
-	result := d.db.Save(&state)
+	result := d.DB.Save(&state)
 
 	if result.Error != nil {
 		return fmt.Errorf("failed to upsert registration state: %w", result.Error)

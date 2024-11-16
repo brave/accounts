@@ -111,7 +111,7 @@ func main() {
 	r.Use(middleware.LoggerMiddleware(prometheusRegistry))
 
 	r.Route("/v2", func(r chi.Router) {
-		r.With(servicesKeyMiddleware).Mount("/auth", authController.Router(authMiddleware))
+		r.With(servicesKeyMiddleware).Mount("/auth", authController.Router(authMiddleware, passwordAuthEnabled))
 		if passwordAuthEnabled {
 			r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware, authMiddleware))
 		}

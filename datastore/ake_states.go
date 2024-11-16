@@ -17,7 +17,7 @@ type AKEState struct {
 	AccountID  *uuid.UUID `json:"-"`
 	OprfSeedID int        `json:"-"`
 	State      []byte     `json:"-"`
-	CreatedAt  time.Time  `json:"createdAt" gorm:"<-:false"`
+	CreatedAt  time.Time  `json:"createdAt" gorm:"<-:update"`
 }
 
 func (d *Datastore) CreateAKEState(accountID *uuid.UUID, state []byte, oprfSeedID int) (*AKEState, error) {
@@ -33,7 +33,7 @@ func (d *Datastore) CreateAKEState(accountID *uuid.UUID, state []byte, oprfSeedI
 		State:      state,
 	}
 
-	if err := d.db.Create(&akeState).Error; err != nil {
+	if err := d.DB.Create(&akeState).Error; err != nil {
 		return nil, fmt.Errorf("failed to create AKE state: %w", err)
 	}
 
@@ -42,7 +42,7 @@ func (d *Datastore) CreateAKEState(accountID *uuid.UUID, state []byte, oprfSeedI
 
 func (d *Datastore) GetAKEState(akeStateID uuid.UUID) (*AKEState, error) {
 	var akeState AKEState
-	if err := d.db.First(&akeState, "id = ?", akeStateID).Error; err != nil {
+	if err := d.DB.First(&akeState, "id = ?", akeStateID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, util.ErrAKEStateNotFound
 		}
@@ -55,7 +55,7 @@ func (d *Datastore) GetAKEState(akeStateID uuid.UUID) (*AKEState, error) {
 		err = util.ErrAKEStateExpired
 	}
 
-	if dbErr := d.db.Delete(&AKEState{}, "id = ?", akeStateID).Error; dbErr != nil {
+	if dbErr := d.DB.Delete(&AKEState{}, "id = ?", akeStateID).Error; dbErr != nil {
 		return nil, fmt.Errorf("failed to delete AKE state: %w", dbErr)
 	}
 

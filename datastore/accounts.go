@@ -36,7 +36,7 @@ type Account struct {
 func (d *Datastore) GetAccount(tx *gorm.DB, email string) (*Account, error) {
 	var account Account
 	if tx == nil {
-		tx = d.db
+		tx = d.DB
 	}
 	result := tx.Where("email = ?", email).First(&account)
 	if result.Error != nil {
@@ -50,7 +50,7 @@ func (d *Datastore) GetAccount(tx *gorm.DB, email string) (*Account, error) {
 
 func (d *Datastore) AccountExists(email string) (bool, error) {
 	var exists bool
-	result := d.db.Model(&Account{}).
+	result := d.DB.Model(&Account{}).
 		Select("1").
 		Where("email = ?", strings.TrimSpace(email)).
 		Limit(1).
@@ -65,7 +65,7 @@ func (d *Datastore) AccountExists(email string) (bool, error) {
 func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
 	var account *Account
 
-	err := d.db.Transaction(func(tx *gorm.DB) error {
+	err := d.DB.Transaction(func(tx *gorm.DB) error {
 		var err error
 		account, err = d.GetAccount(tx, email)
 
@@ -106,7 +106,7 @@ func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
 
 // split into two methods for seed id and registration. use the struct for updates!
 func (d *Datastore) UpdateOpaqueRegistration(accountID uuid.UUID, oprfSeedID int, opaqueRegistration []byte) error {
-	result := d.db.Model(&Account{}).
+	result := d.DB.Model(&Account{}).
 		Where("id = ?", accountID).
 		Updates(Account{
 			OprfSeedID:         &oprfSeedID,
@@ -126,7 +126,7 @@ func (d *Datastore) UpdateOpaqueRegistration(accountID uuid.UUID, oprfSeedID int
 }
 
 func (d *Datastore) DeleteAccount(accountID uuid.UUID) error {
-	result := d.db.Delete(&Account{}, "id = ?", accountID)
+	result := d.DB.Delete(&Account{}, "id = ?", accountID)
 	if result.Error != nil {
 		return fmt.Errorf("error deleting account: %w", result.Error)
 	}
@@ -139,7 +139,7 @@ func (d *Datastore) MaybeUpdateAccountLastUsed(accountID uuid.UUID, lastUsedTime
 		return nil
 	}
 
-	result := d.db.Model(&Account{}).
+	result := d.DB.Model(&Account{}).
 		Where("id = ?", accountID).
 		Update("last_used_at", time.Now().UTC())
 

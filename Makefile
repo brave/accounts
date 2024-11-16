@@ -13,6 +13,9 @@ run:
 	docker compose up -d
 	go run .
 
+test:
+	go test -v ./...
+
 # Run `go install github.com/air-verse/air@latest` to use this
 dev:
 	air
