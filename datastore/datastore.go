@@ -1,6 +1,7 @@
 package datastore
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -28,6 +30,8 @@ type Datastore struct {
 }
 
 func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
+	var err error
+	var rdsConnector *rdsConnector
 	envVar := databaseURLEnv
 	if isTesting {
 		envVar = testDatabaseURLEnv
@@ -36,6 +40,12 @@ func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
 	if dbURL == "" {
 		if isTesting {
 			dbURL = defaultTestDatabaseURLEnv
+		} else if os.Getenv(rdsHostKey) != "" {
+			rdsConnector = newRDSConnector()
+			dbURL, err = rdsConnector.getConnectionString(context.Background())
+			if err != nil {
+				return nil, err
+			}
 		} else {
 			return nil, fmt.Errorf("%v environment variable not set", envVar)
 		}
@@ -78,7 +88,18 @@ func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
 		err = nil
 	}
 
-	db, err := gorm.Open(postgres.Open(dbURL), &gorm.Config{
+	pgConfig := postgres.Config{
+		DSN: dbURL,
+	}
+	if rdsConnector != nil {
+		pgxConfig, err := pgx.ParseConfig(dbURL)
+		if err != nil {
+			return nil, err
+		}
+		baseDB := stdlib.OpenDB(*pgxConfig, stdlib.OptionBeforeConnect(rdsConnector.updateConnConfig))
+		pgConfig.Conn = baseDB
+	}
+	db, err := gorm.Open(postgres.New(pgConfig), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
