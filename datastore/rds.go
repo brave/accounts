@@ -9,13 +9,16 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/jackc/pgx/v5"
 )
 
 const defaultRegion = "us-west-2"
 
 const (
+	rdsRoleKey   = "RDS_ROLE"
 	rdsPortKey   = "RDS_DATABASE_PORT"
 	rdsHostKey   = "RDS_WRITER_ENDPOINT"
 	rdsUserKey   = "RDS_USER"
@@ -29,6 +32,7 @@ type rdsConnector struct {
 	user           string
 	token          string
 	region         string
+	role           string
 	tokenCacheTime time.Time
 	mu             sync.Mutex
 }
@@ -39,6 +43,7 @@ func newRDSConnector() *rdsConnector {
 	user := os.Getenv(rdsUserKey)
 	dbName := os.Getenv(rdsDbNameKey)
 	region := os.Getenv(regionKey)
+	role := os.Getenv(rdsRoleKey)
 
 	if region == "" {
 		region = defaultRegion
@@ -49,6 +54,7 @@ func newRDSConnector() *rdsConnector {
 		dbName:      dbName,
 		user:        user,
 		region:      region,
+		role:        role,
 	}
 }
 
@@ -61,9 +67,17 @@ func (c *rdsConnector) getAuthToken(ctx context.Context) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to load AWS config")
 		}
+		// Create STS client and assume role
+		stsClient := sts.NewFromConfig(cfg)
+		roleProvider := stscreds.NewAssumeRoleProvider(stsClient, c.role)
+		cfgWithRole, err := config.LoadDefaultConfig(ctx,
+			config.WithCredentialsProvider(roleProvider))
+		if err != nil {
+			return "", fmt.Errorf("failed to assume role: %w", err)
+		}
 
 		token, err := auth.BuildAuthToken(
-			ctx, c.hostAndPort, c.region, c.user, cfg.Credentials)
+			ctx, c.hostAndPort, c.region, c.user, cfgWithRole.Credentials)
 		if err != nil {
 			return "", fmt.Errorf("failed to create authentication token: %w", err)
 		}
