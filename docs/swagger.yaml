@@ -5,9 +5,6 @@ definitions:
       clientMac:
         description: Client MAC of KE3
         type: string
-      sessionName:
-        description: Optional name for the new session
-        type: string
     required:
     - clientMac
     type: object
@@ -749,10 +746,6 @@ paths:
       - application/json
       description: Completes the email verification process
       parameters:
-      - description: Brave services key (if one is configured)
-        in: header
-        name: Brave-Key
-        type: string
       - description: Verify completion params
         in: body
         name: request
@@ -793,7 +786,7 @@ paths:
             type: string
       summary: Display default verification completion frontend
       tags:
-      - Debugging
+      - Development
   /v2/verify/email_viewer:
     get:
       description: Retrieves and displays emails sent through LocalStack SES endpoint
@@ -810,7 +803,7 @@ paths:
             type: string
       summary: View sent emails in LocalStack SES
       tags:
-      - Debugging
+      - Development
   /v2/verify/init:
     post:
       consumes:

@@ -708,12 +708,6 @@ const docTemplate = `{
                 "summary": "Complete email verification",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Brave services key (if one is configured)",
-                        "name": "Brave-Key",
-                        "in": "header"
-                    },
-                    {
                         "description": "Verify completion params",
                         "name": "request",
                         "in": "body",
@@ -758,7 +752,7 @@ const docTemplate = `{
                     "text/html"
                 ],
                 "tags": [
-                    "Debugging"
+                    "Development"
                 ],
                 "summary": "Display default verification completion frontend",
                 "responses": {
@@ -778,7 +772,7 @@ const docTemplate = `{
                     "text/html"
                 ],
                 "tags": [
-                    "Debugging"
+                    "Development"
                 ],
                 "summary": "View sent emails in LocalStack SES",
                 "responses": {
@@ -925,10 +919,6 @@ const docTemplate = `{
             "properties": {
                 "clientMac": {
                     "description": "Client MAC of KE3",
-                    "type": "string"
-                },
-                "sessionName": {
-                    "description": "Optional name for the new session",
                     "type": "string"
                 }
             }
