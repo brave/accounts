@@ -9,6 +9,8 @@ FROM public.ecr.aws/docker/library/debian:bookworm-slim
 
 COPY --from=builder /src/accounts /usr/local/bin/accounts
 
+RUN apt update && apt install -y ca-certificates
+
 EXPOSE 8080
 
 CMD ["/usr/local/bin/accounts"]
