@@ -30,12 +30,12 @@ var (
 )
 
 const (
-	logPrettyEnv             = "LOG_PRETTY"
-	logLevelEnv              = "LOG_LEVEL"
-	serveSwaggerEnv          = "SERVE_SWAGGER"
-	passwordAuthEnabledEnv   = "PASSWORD_AUTH_ENABLED"
-	emailAuthDisabledEnv     = "EMAIL_AUTH_DISABLED"
-	debugEndpointsEnabledEnv = "DEBUG_ENDPOINTS_ENABLED"
+	logPrettyEnv           = "LOG_PRETTY"
+	logLevelEnv            = "LOG_LEVEL"
+	serveSwaggerEnv        = "SERVE_SWAGGER"
+	passwordAuthEnabledEnv = "PASSWORD_AUTH_ENABLED"
+	emailAuthDisabledEnv   = "EMAIL_AUTH_DISABLED"
+	devEndpointsEnabledEnv = "DEV_ENDPOINTS_ENABLED"
 )
 
 // @title Brave Accounts Service
@@ -57,7 +57,7 @@ func main() {
 
 	passwordAuthEnabled := os.Getenv(passwordAuthEnabledEnv) == "true"
 	emailAuthDisabled := os.Getenv(emailAuthDisabledEnv) == "true"
-	debugEndpointsEnabled := os.Getenv(debugEndpointsEnabledEnv) == "true"
+	devEndpointsEnabled := os.Getenv(devEndpointsEnabledEnv) == "true"
 
 	minSessionVersion := datastore.EmailAuthSessionVersion
 	if passwordAuthEnabled && emailAuthDisabled {
@@ -115,7 +115,7 @@ func main() {
 		if passwordAuthEnabled {
 			r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware, authMiddleware))
 		}
-		r.Mount("/verify", verificationController.Router(verificationMiddleware, servicesKeyMiddleware, debugEndpointsEnabled))
+		r.Mount("/verify", verificationController.Router(verificationMiddleware, servicesKeyMiddleware, devEndpointsEnabled))
 		r.With(servicesKeyMiddleware).Mount("/sessions", sessionsController.Router(authMiddleware))
 		r.With(servicesKeyMiddleware).Mount("/keys", userKeysController.Router(authMiddleware))
 	})

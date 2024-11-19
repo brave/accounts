@@ -102,12 +102,12 @@ func NewVerificationController(datastore *datastore.Datastore, jwtService *servi
 	}
 }
 
-func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Handler) http.Handler, servicesKeyMiddleware func(http.Handler) http.Handler, debugEndpointsEnabled bool) chi.Router {
+func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Handler) http.Handler, servicesKeyMiddleware func(http.Handler) http.Handler, devEndpointsEnabled bool) chi.Router {
 	r := chi.NewRouter()
 
 	r.With(servicesKeyMiddleware).Post("/init", vc.VerifyInit)
 	r.Post("/complete", vc.VerifyComplete)
-	if debugEndpointsEnabled {
+	if devEndpointsEnabled {
 		r.Get("/complete_fe", vc.VerifyCompleteFrontend)
 		r.Get("/email_viewer", vc.EmailViewer)
 	}
@@ -229,7 +229,6 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 // @Tags Email verification
 // @Accept json
 // @Produce json
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
 // @Param request body VerifyCompleteRequest true "Verify completion params"
 // @Success 200 {object} VerifyCompleteResponse
 // @Failure 400 {string} string "Missing/invalid verification parameters"
@@ -347,7 +346,7 @@ func (vc *VerificationController) VerifyQueryResult(w http.ResponseWriter, r *ht
 
 // @Summary Display default verification completion frontend
 // @Description Returns the HTML page for completing email verification
-// @Tags Debugging
+// @Tags Development
 // @Produce html
 // @Success 200 {string} string "HTML content"
 // @Router /v2/verify/complete_fe [get]
@@ -357,7 +356,7 @@ func (vc *VerificationController) VerifyCompleteFrontend(w http.ResponseWriter, 
 
 // @Summary View sent emails in LocalStack SES
 // @Description Retrieves and displays emails sent through LocalStack SES endpoint
-// @Tags Debugging
+// @Tags Development
 // @Produce html
 // @Success 200 {string} string "HTML page displaying emails"
 // @Failure 500 {string} string "Internal Server Error"
