@@ -34,7 +34,7 @@ const (
 	logLevelEnv            = "LOG_LEVEL"
 	serveSwaggerEnv        = "SERVE_SWAGGER"
 	passwordAuthEnabledEnv = "PASSWORD_AUTH_ENABLED"
-	emailAuthDisabledEnv   = "EMAIL_AUTH_DISABLED"
+	emailAuthEnabledEnv    = "EMAIL_AUTH_ENABLED"
 	devEndpointsEnabledEnv = "DEV_ENDPOINTS_ENABLED"
 )
 
@@ -56,11 +56,15 @@ func main() {
 	}
 
 	passwordAuthEnabled := os.Getenv(passwordAuthEnabledEnv) == "true"
-	emailAuthDisabled := os.Getenv(emailAuthDisabledEnv) == "true"
+	emailAuthEnabled := os.Getenv(emailAuthEnabledEnv) == "true"
 	devEndpointsEnabled := os.Getenv(devEndpointsEnabledEnv) == "true"
 
+	if !passwordAuthEnabled && !emailAuthEnabled {
+		log.Panic().Msg("At least one authentication method must be enabled via PASSWORD_AUTH_ENABLED or EMAIL_AUTH_ENABLED env vars")
+	}
+
 	minSessionVersion := datastore.EmailAuthSessionVersion
-	if passwordAuthEnabled && emailAuthDisabled {
+	if passwordAuthEnabled && !emailAuthEnabled {
 		minSessionVersion = datastore.PasswordAuthSessionVersion
 	}
 
@@ -104,7 +108,7 @@ func main() {
 
 	authController := controllers.NewAuthController(opaqueService, jwtService, datastore)
 	accountsController := controllers.NewAccountsController(opaqueService, jwtService, datastore)
-	verificationController := controllers.NewVerificationController(datastore, jwtService, sesService, passwordAuthEnabled, emailAuthDisabled)
+	verificationController := controllers.NewVerificationController(datastore, jwtService, sesService, passwordAuthEnabled, emailAuthEnabled)
 	sessionsController := controllers.NewSessionsController(datastore)
 	userKeysController := controllers.NewUserKeysController(datastore)
 

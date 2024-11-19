@@ -33,7 +33,7 @@ type VerificationController struct {
 	jwtService          *services.JWTService
 	sesService          services.SES
 	passwordAuthEnabled bool
-	emailAuthDisabled   bool
+	emailAuthEnabled    bool
 }
 
 // @Description	Request to initialize email verification
@@ -92,13 +92,13 @@ type localStackEmails struct {
 	Messages []interface{} `json:"messages"`
 }
 
-func NewVerificationController(datastore *datastore.Datastore, jwtService *services.JWTService, sesService services.SES, passwordAuthEnabled bool, emailAuthDisabled bool) *VerificationController {
+func NewVerificationController(datastore *datastore.Datastore, jwtService *services.JWTService, sesService services.SES, passwordAuthEnabled bool, emailAuthEnabled bool) *VerificationController {
 	return &VerificationController{
 		datastore:           datastore,
 		jwtService:          jwtService,
 		sesService:          sesService,
 		passwordAuthEnabled: passwordAuthEnabled,
-		emailAuthDisabled:   emailAuthDisabled,
+		emailAuthEnabled:    emailAuthEnabled,
 	}
 }
 
@@ -157,7 +157,7 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 	intentAllowed := true
 	switch requestData.Intent {
 	case datastore.AuthTokenIntent:
-		if vc.emailAuthDisabled || requestData.Service != inboxAliasesServiceName {
+		if !vc.emailAuthEnabled || requestData.Service != inboxAliasesServiceName {
 			intentAllowed = false
 		}
 	case datastore.VerificationIntent:

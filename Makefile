@@ -10,7 +10,7 @@ update-swagger:
 	swag init
 
 run:
-	docker compose up -d
+	docker compose up -d postgres localstack
 	go run .
 
 test:

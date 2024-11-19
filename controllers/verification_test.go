@@ -25,14 +25,14 @@ type VerificationTestSuite struct {
 	router     *chi.Mux
 }
 
-func (suite *VerificationTestSuite) SetupController(passwordAuthEnabled bool, emailAuthDisabled bool) {
+func (suite *VerificationTestSuite) SetupController(passwordAuthEnabled bool, emailAuthEnabled bool) {
 	var err error
 	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, true)
 	require.NoError(suite.T(), err)
 	suite.jwtService, err = services.NewJWTService(suite.ds)
 	require.NoError(suite.T(), err)
 	suite.sesMock = &MockSESService{}
-	controller := controllers.NewVerificationController(suite.ds, suite.jwtService, suite.sesMock, passwordAuthEnabled, emailAuthDisabled)
+	controller := controllers.NewVerificationController(suite.ds, suite.jwtService, suite.sesMock, passwordAuthEnabled, emailAuthEnabled)
 
 	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds)
 	servicesKeyMiddleware := middleware.ServicesKeyMiddleware()
@@ -51,7 +51,7 @@ func (m *MockSESService) SendVerificationEmail(ctx context.Context, email string
 }
 
 func (suite *VerificationTestSuite) TestVerifyInit() {
-	suite.SetupController(false, false)
+	suite.SetupController(false, true)
 
 	body := controllers.VerifyInitRequest{
 		Email:   "test@example.com",
@@ -77,7 +77,7 @@ func (suite *VerificationTestSuite) TestVerifyInit() {
 }
 
 func (suite *VerificationTestSuite) TestVerifyInitTooMany() {
-	suite.SetupController(false, false)
+	suite.SetupController(false, true)
 
 	body := controllers.VerifyInitRequest{
 		Email:   "test@example.com",
@@ -159,7 +159,7 @@ func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
 	}
 
 	for _, tc := range testCases {
-		suite.SetupController(tc.passwordAuthEnabled, tc.passwordAuthEnabled) // password auth enabled, email auth disabled
+		suite.SetupController(tc.passwordAuthEnabled, !tc.passwordAuthEnabled) // password auth enabled, email auth disabled
 
 		body := controllers.VerifyInitRequest{
 			Email:   "test@example.com",
@@ -175,7 +175,7 @@ func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
 }
 
 func (suite *VerificationTestSuite) TestVerifyComplete() {
-	suite.SetupController(true, true)
+	suite.SetupController(true, false)
 
 	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
 
@@ -220,7 +220,7 @@ func (suite *VerificationTestSuite) TestVerifyComplete() {
 }
 
 func (suite *VerificationTestSuite) TestVerifyQueryResult() {
-	suite.SetupController(false, false)
+	suite.SetupController(false, true)
 
 	testCases := []struct {
 		intent              string
