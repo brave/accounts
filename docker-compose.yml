@@ -1,16 +1,16 @@
 networks:
-  accounts:
+  main:
 
 services:
   postgres:
     image: public.ecr.aws/docker/library/postgres:17
     ports:
       - "5435:5432"
+    networks:
+      - main
     environment:
       - POSTGRES_USER=accounts
       - POSTGRES_PASSWORD=password
-    networks:
-      - accounts
     volumes:
       - ./misc/create_test_db.sql:/docker-entrypoint-initdb.d/create_test_db.sql
   localstack:
@@ -18,5 +18,21 @@ services:
     ports:
       - "127.0.0.1:4566:4566"
       - "127.0.0.1:4510-4559:4510-4559"
+    networks:
+      - main
     volumes:
       - ./misc/add_verified_email.sh:/etc/localstack/init/ready.d/add_verified_email.sh
+  app:
+    build: .
+    networks:
+      - main
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://accounts:password@postgres:5432/postgres?sslmode=disable
+      AWS_ENDPOINT: http://localstack:4566
+    depends_on:
+      - postgres
+      - localstack
+    restart: on-failure
+    ports:
+      - "127.0.0.1:8080:8080"
