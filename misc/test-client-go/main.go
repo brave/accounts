@@ -226,13 +226,20 @@ func login() {
 	log.Printf("auth token: %v", resp["authToken"])
 }
 
+func generateKeypair() {
+	secretKey, publicKey := conf.KeyGen()
+	fmt.Printf("Secret key: %x\n", secretKey)
+	fmt.Printf("Public key: %x\n", publicKey)
+}
+
 func main() {
 	conf.KSF.Parameters = []int{2, 19456, 1}
 	conf.KSF.Salt = make([]byte, 16)
 
 	fmt.Println("1. Login")
 	fmt.Println("2. Register/set password")
-	fmt.Print("Choose an option (1-2): ")
+	fmt.Println("3. Generate AKE key pair")
+	fmt.Print("Choose an option (1-3): ")
 
 	reader := bufio.NewReader(os.Stdin)
 	choice, _ := reader.ReadString('\n')
@@ -243,6 +250,8 @@ func main() {
 		login()
 	case "2":
 		register()
+	case "3":
+		generateKeypair()
 	default:
 		fmt.Println("Invalid option")
 	}
