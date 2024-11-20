@@ -135,6 +135,7 @@ func (d *Datastore) WaitOnVerification(ctx context.Context, id uuid.UUID) (bool,
 	if err != nil {
 		return false, fmt.Errorf("failed to listen on channel: %w", err)
 	}
+	//nolint:errcheck
 	defer conn.Exec(ctx, "UNLISTEN "+channelName)
 
 	// Check the database to see if the verification status changed

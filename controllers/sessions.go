@@ -64,7 +64,7 @@ func (sc *SessionsController) DeleteSession(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	currentSession := r.Context().Value("session").(*datastore.SessionWithAccountInfo)
+	currentSession := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
 
 	if err := sc.datastore.DeleteSession(sessionID, currentSession.AccountID); err != nil {
 		if errors.Is(err, datastore.ErrSessionNotFound) {

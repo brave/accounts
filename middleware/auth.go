@@ -11,9 +11,11 @@ import (
 	"github.com/brave-experiments/accounts/util"
 )
 
+type contextKey string
+
 const (
-	ContextSession      = "session"
-	ContextVerification = "verification"
+	ContextSession      = contextKey("session")
+	ContextVerification = contextKey("verification")
 
 	braveServicesKeyEnv    = "BRAVE_SERVICES_KEY"
 	braveServicesKeyHeader = "brave-key"
