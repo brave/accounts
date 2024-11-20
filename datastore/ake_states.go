@@ -12,12 +12,18 @@ import (
 
 const AkeStateExpiration = 30 * time.Second
 
+// AKEState represents the state of an Authenticated Key Exchange operation
 type AKEState struct {
-	ID         uuid.UUID  `json:"id"`
-	AccountID  *uuid.UUID `json:"-"`
-	OprfSeedID int        `json:"-"`
-	State      []byte     `json:"-"`
-	CreatedAt  time.Time  `json:"createdAt" gorm:"<-:update"`
+	// ID uniquely identifies the AKE state instance
+	ID uuid.UUID `json:"id"`
+	// AccountID links to the associated account
+	AccountID *uuid.UUID `json:"-"`
+	// OprfSeedID references the seed used for the Oblivious PRF
+	OprfSeedID int `json:"-"`
+	// State stores the serialized AKE state data
+	State []byte `json:"-"`
+	// CreatedAt records when this AKE state was initialized
+	CreatedAt time.Time `json:"createdAt" gorm:"<-:update"`
 }
 
 func (d *Datastore) CreateAKEState(accountID *uuid.UUID, state []byte, oprfSeedID int) (*AKEState, error) {
