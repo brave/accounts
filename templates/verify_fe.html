@@ -11,7 +11,7 @@
       const code = urlParams.get('code');
 
       if (!id || !code) {
-        document.body.innerHTML = '<h1>Error: Missing id or code in the query string.</h1>';
+        document.body.innerText = 'Error: Missing id or code in the query string.';
         return;
       }
 
@@ -34,10 +34,10 @@
         return response.json();
       })
       .then((data) => {
-        document.body.innerHTML = `<h1>Email verification successful. Verification token = ${data.verificationToken}, service name = ${data.service}</h1>`;
+        document.body.innerText = `Email verification successful. Verification token = ${data.verificationToken}, service name = ${data.service}`;
       })
       .catch(error => {
-        document.body.innerHTML = `<h1>Error: ${error.message}</h1>`;
+        document.body.innerText = `Error: ${error.message}`;
       });
     };
   </script>

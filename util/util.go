@@ -1,14 +1,17 @@
 package util
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
+	"github.com/jackc/pgx/v5"
 )
 
 var validate = validator.New(validator.WithRequiredStructEnabled())
@@ -65,4 +68,27 @@ func DecodeJSONAndValidate(w http.ResponseWriter, r *http.Request, data interfac
 		return false
 	}
 	return true
+}
+
+func validatePGChannelName(channelName string) error {
+	if !regexp.MustCompile(`^[\w-_]+$`).MatchString(channelName) {
+		return fmt.Errorf("channel name must contain only alphanumeric characters and hyphens")
+	}
+	return nil
+}
+
+func ListenOnPGChannel(ctx context.Context, conn *pgx.Conn, channelName string) error {
+	if err := validatePGChannelName(channelName); err != nil {
+		return err
+	}
+	_, err := conn.Exec(ctx, "LISTEN \""+channelName+"\"")
+	return err
+}
+
+func UnlistenOnPGChannel(ctx context.Context, conn *pgx.Conn, channelName string) error {
+	if err := validatePGChannelName(channelName); err != nil {
+		return err
+	}
+	_, err := conn.Exec(ctx, "UNLISTEN \""+channelName+"\"")
+	return err
 }

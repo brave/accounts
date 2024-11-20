@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/brave-experiments/accounts/util"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"gorm.io/gorm"
@@ -86,7 +87,7 @@ func (d *Datastore) NewWebhookEventListener() (*WebhookEventListener, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	_, err = conn.Exec(ctx, "LISTEN "+webhookEventsChannel)
+	err = util.ListenOnPGChannel(ctx, conn, webhookEventsChannel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on channel: %w", err)
 	}

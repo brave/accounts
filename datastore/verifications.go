@@ -139,12 +139,12 @@ func (d *Datastore) WaitOnVerification(ctx context.Context, id uuid.UUID) (bool,
 	defer conn.Close(ctx)
 
 	channelName := generateNotificationChannel(id)
-	_, err = conn.Exec(ctx, "LISTEN \""+channelName+"\"")
+	err = util.ListenOnPGChannel(ctx, conn, channelName)
 	if err != nil {
 		return false, fmt.Errorf("failed to listen on channel: %w", err)
 	}
 	//nolint:errcheck
-	defer conn.Exec(ctx, "UNLISTEN "+channelName)
+	defer util.UnlistenOnPGChannel(ctx, conn, channelName)
 
 	// Check the database to see if the verification status changed
 	// while setting up the listener.
