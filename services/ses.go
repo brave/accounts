@@ -31,35 +31,62 @@ const (
 )
 
 type SESService struct {
-	client             *ses.Client
-	verifyHTMLTemplate *htmlTemplate.Template
-	verifyTextTemplate *textTemplate.Template
-	fromAddress        string
-	baseURL            string
-	frontendURL        string
-	i18nBundle         *i18n.Bundle
+	client              *ses.Client
+	verifyHTMLTemplate  *htmlTemplate.Template
+	verifyTextTemplate  *textTemplate.Template
+	generalHTMLTemplate *htmlTemplate.Template
+	generalTextTemplate *textTemplate.Template
+	fromAddress         string
+	baseURL             string
+	frontendURL         string
+	i18nBundle          *i18n.Bundle
 }
 
 type SES interface {
 	SendVerificationEmail(ctx context.Context, email string, verification *datastore.Verification, locale string) error
+	SendSimilarEmailAlert(ctx context.Context, email string, locale string) error
+}
+
+type emailFields struct {
+	Subject           string
+	Greeting          string
+	Disregard         string
+	Signature         string
+	Copyright         string
+	AllRightsReserved string
+	PrivacyPolicy     string
+	TermsOfUse        string
+	DownloadBrave     string
+	ContactSupport    string
 }
 
 type verifyEmailFields struct {
+	emailFields
 	VerifyURL          string
-	Subject            string
-	Greeting           string
 	Instructions       string
 	Action             string
-	Disregard          string
-	Signature          string
 	VerifyActionBackup string
 	ExpiryDisclaimer   string
-	Copyright          string
-	AllRightsReserved  string
-	PrivacyPolicy      string
-	TermsOfUse         string
-	DownloadBrave      string
-	ContactSupport     string
+}
+
+type similarEmailFields struct {
+	emailFields
+	Message string
+}
+
+func newEmailFields(localizer *i18n.Localizer, subjectMessageID string) emailFields {
+	return emailFields{
+		Subject:           localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: subjectMessageID}),
+		Greeting:          localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailGreeting"}),
+		Disregard:         localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailDisregard"}),
+		Signature:         localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailSignature"}),
+		Copyright:         localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailCopyright", TemplateData: map[string]string{"Year": strconv.Itoa(time.Now().Year())}}),
+		AllRightsReserved: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailAllRightsReserved"}),
+		PrivacyPolicy:     localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailPrivacyPolicy"}),
+		TermsOfUse:        localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailTermsOfUse"}),
+		DownloadBrave:     localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailDownloadBrave"}),
+		ContactSupport:    localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailContactSupport"}),
+	}
 }
 
 func NewSESService(i18nBundle *i18n.Bundle) (*SESService, error) {
@@ -77,11 +104,19 @@ func NewSESService(i18nBundle *i18n.Bundle) (*SESService, error) {
 		}
 	})
 
-	htmlTmpl, err := htmlTemplate.New("verify_html").Parse(templates.VerifyHTMLTemplateContent)
+	verifyHtmlTmpl, err := htmlTemplate.New("verify_html").Parse(templates.VerifyHTMLTemplateContent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse template: %w", err)
 	}
-	textTmpl, err := textTemplate.New("verify_text").Parse(templates.VerifyTextTemplateContent)
+	verifyTextTmpl, err := textTemplate.New("verify_text").Parse(templates.VerifyTextTemplateContent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse template: %w", err)
+	}
+	generalHtmlTmpl, err := htmlTemplate.New("general_html").Parse(templates.GeneralEmailHTMLTemplateContent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse template: %w", err)
+	}
+	generalTextTmpl, err := textTemplate.New("general_text").Parse(templates.GeneralEmailTextTemplateContent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse template: %w", err)
 	}
@@ -101,13 +136,53 @@ func NewSESService(i18nBundle *i18n.Bundle) (*SESService, error) {
 
 	return &SESService{
 		client,
-		htmlTmpl,
-		textTmpl,
+		verifyHtmlTmpl,
+		verifyTextTmpl,
+		generalHtmlTmpl,
+		generalTextTmpl,
 		fromAddress,
 		baseURL,
 		frontendURL,
 		i18nBundle,
 	}, nil
+}
+
+func (s *SESService) sendEmail(ctx context.Context, email string, subject string, contents interface{}, htmlTemplate *htmlTemplate.Template, textTemplate *textTemplate.Template) error {
+	var htmlContent, textContent bytes.Buffer
+	if err := htmlTemplate.Execute(&htmlContent, contents); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+	if err := textTemplate.Execute(&textContent, contents); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+	htmlContentString := htmlContent.String()
+	textContentString := textContent.String()
+
+	input := &ses.SendEmailInput{
+		Destination: &types.Destination{
+			ToAddresses: []string{email},
+		},
+		Message: &types.Message{
+			Body: &types.Body{
+				Html: &types.Content{
+					Data: &htmlContentString,
+				},
+				Text: &types.Content{
+					Data: &textContentString,
+				},
+			},
+			Subject: &types.Content{
+				Data: &subject,
+			},
+		},
+		Source: &s.fromAddress,
+	}
+
+	_, err := s.client.SendEmail(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+	return nil
 }
 
 func (s *SESService) SendVerificationEmail(ctx context.Context, email string, verification *datastore.Verification, locale string) error {
@@ -137,59 +212,34 @@ func (s *SESService) SendVerificationEmail(ctx context.Context, email string, ve
 	}
 
 	data := verifyEmailFields{
+		emailFields:        newEmailFields(localizer, subjectMessageID),
 		VerifyURL:          verifyURL,
-		Subject:            localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: subjectMessageID}),
-		Greeting:           localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailGreeting"}),
 		Instructions:       localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: instructionsMessageID}),
 		Action:             localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailAction"}),
-		Disregard:          localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailDisregard"}),
-		Signature:          localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailSignature"}),
 		VerifyActionBackup: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailActionBackup"}),
 		ExpiryDisclaimer:   localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailExpiryDisclaimer"}),
-		Copyright:          localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailCopyright", TemplateData: map[string]string{"Year": strconv.Itoa(time.Now().Year())}}),
-		AllRightsReserved:  localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailAllRightsReserved"}),
-		PrivacyPolicy:      localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailPrivacyPolicy"}),
-		TermsOfUse:         localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailTermsOfUse"}),
-		DownloadBrave:      localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailDownloadBrave"}),
-		ContactSupport:     localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailContactSupport"}),
 	}
 
-	var htmlContent, textContent bytes.Buffer
-	if err := s.verifyHTMLTemplate.Execute(&htmlContent, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
-	if err := s.verifyTextTemplate.Execute(&textContent, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
-	htmlContentString := htmlContent.String()
-	textContentString := textContent.String()
-
-	input := &ses.SendEmailInput{
-		Destination: &types.Destination{
-			ToAddresses: []string{email},
-		},
-		Message: &types.Message{
-			Body: &types.Body{
-				Html: &types.Content{
-					Data: &htmlContentString,
-				},
-				Text: &types.Content{
-					Data: &textContentString,
-				},
-			},
-			Subject: &types.Content{
-				Data: &data.Subject,
-			},
-		},
-		Source: &s.fromAddress,
-	}
-
-	_, err := s.client.SendEmail(ctx, input)
-	if err != nil {
+	if err := s.sendEmail(ctx, email, data.Subject, &data, s.verifyHTMLTemplate, s.verifyTextTemplate); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
 	log.Debug().Str("verify_url", verifyURL).Msg("Sent verification link")
+
+	return nil
+}
+
+func (s *SESService) SendSimilarEmailAlert(ctx context.Context, email string, locale string) error {
+	localizer := i18n.NewLocalizer(s.i18nBundle, locale)
+
+	data := similarEmailFields{
+		emailFields: newEmailFields(localizer, "SimilarEmailSubject"),
+		Message:     localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "SimilarEmailLoginMessage", TemplateData: map[string]string{"Email": email}}),
+	}
+
+	if err := s.sendEmail(ctx, email, data.Subject, &data, s.generalHTMLTemplate, s.generalTextTemplate); err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
 
 	return nil
 }

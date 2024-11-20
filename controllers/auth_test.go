@@ -42,7 +42,7 @@ func (suite *AuthTestSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 	opaqueService, err := services.NewOpaqueService(suite.ds)
 	require.NoError(suite.T(), err)
-	controller := controllers.NewAuthController(opaqueService, suite.jwtService, suite.ds)
+	controller := controllers.NewAuthController(opaqueService, suite.jwtService, suite.ds, &MockSESService{})
 
 	suite.account, err = suite.ds.GetOrCreateAccount("test@example.com")
 	require.NoError(suite.T(), err)

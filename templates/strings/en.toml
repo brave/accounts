@@ -14,8 +14,8 @@ other = "Create your Brave account"
 description = "Email subject for logging into an account"
 other = "Access your Brave account"
 
-[VerifyEmailGreeting]
-description = "Greeting in the email verification message"
+[EmailGreeting]
+description = "Greeting in the email message"
 other = "Hello,"
 
 [SetPasswordEmailInstructions]
@@ -38,10 +38,6 @@ other = "Click the link below to access your Brave account. (You can also paste 
 description = "Text on the email verification button"
 other = "Confirm your email"
 
-[VerifyEmailSignature]
-description = "Email signature"
-other = "The Brave Team"
-
 [VerifyEmailActionBackup]
 description = "Instructions for manual link usage if button doesn't work"
 other = "Don’t see a button? Click this link to confirm your email."
@@ -50,8 +46,20 @@ other = "Don’t see a button? Click this link to confirm your email."
 description = "Informs the user that the link expires after 30 minutes"
 other = "Note: This confirmation prompt will expire within 30 minutes."
 
-[VerifyEmailDisregard]
-description = "Instructs the user to ignore the email if the user did not initiate the verification request"
+[SimilarEmailLoginMessage]
+description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = "We noticed you're having trouble logging into your Brave Account. Please remember that you have an account registered with this email: {{.Email}}\n\nTry logging in using this email address. If you still need help, please contact our support team."
+
+[SimilarEmailSubject]
+description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = "Having trouble? Here's how to access your Brave Account"
+
+[EmailSignature]
+description = "Email signature"
+other = "The Brave Team"
+
+[EmailDisregard]
+description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
 other = "If you didn’t make this request, please disregard this email."
 
 [EmailCopyright]

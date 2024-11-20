@@ -13,12 +13,14 @@ import (
 	opaqueMsg "github.com/bytemare/opaque/message"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
+	"github.com/rs/zerolog/log"
 )
 
 type AuthController struct {
 	opaqueService *services.OpaqueService
 	jwtService    *services.JWTService
 	ds            *datastore.Datastore
+	sesService    services.SES
 }
 
 // @Description Request for account login
@@ -167,11 +169,12 @@ func (req *LoginFinalizeRequest) ToOpaqueKE3(opaqueService *services.OpaqueServi
 	}, nil
 }
 
-func NewAuthController(opaqueService *services.OpaqueService, jwtService *services.JWTService, ds *datastore.Datastore) *AuthController {
+func NewAuthController(opaqueService *services.OpaqueService, jwtService *services.JWTService, ds *datastore.Datastore, sesService services.SES) *AuthController {
 	return &AuthController{
 		opaqueService: opaqueService,
 		jwtService:    jwtService,
 		ds:            ds,
+		sesService:    sesService,
 	}
 }
 
@@ -249,6 +252,20 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, util.ErrIncorrectCredentials) ||
 			errors.Is(err, util.ErrIncorrectEmail) ||
 			errors.Is(err, util.ErrIncorrectPassword) {
+
+			if errors.Is(err, util.ErrIncorrectEmail) {
+				// If an account exists that matches the normalized email, notify the user
+				// that such an account exists
+				similarAccount, aerr := ac.ds.GetAccountByNormalizedEmail(requestData.Email)
+				if aerr != nil && !errors.Is(aerr, datastore.ErrAccountNotFound) {
+					log.Error().Err(aerr).Msg("failed to find account by normalized email")
+				} else if similarAccount != nil {
+					if aerr = ac.sesService.SendSimilarEmailAlert(r.Context(), similarAccount.Email, r.Header.Get("Accept-Language")); aerr != nil {
+						log.Error().Err(aerr).Msg("failed to send email alert about similar email")
+					}
+				}
+			}
+
 			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 			return
 		}

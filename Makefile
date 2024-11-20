@@ -9,6 +9,9 @@ clear-emails:
 update-swagger:
 	swag init
 
+lint:
+	golangci-lint run
+
 run:
 	docker compose up -d postgres localstack
 	go run .

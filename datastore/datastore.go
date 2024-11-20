@@ -85,7 +85,6 @@ func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
 		if !errors.Is(err, migrate.ErrNoChange) {
 			return nil, fmt.Errorf("Failed to run migrations: %w", err)
 		}
-		err = nil
 	}
 
 	pgConfig := postgres.Config{

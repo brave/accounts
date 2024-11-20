@@ -41,15 +41,15 @@ func NewWebhookService(ds *datastore.Datastore) *WebhookService {
 	}
 }
 
-func (w *WebhookService) StartProcessingEvents() {
+func (w *WebhookService) StartProcessingEvents() error {
 	listener, err := w.ds.NewWebhookEventListener()
 	if err != nil {
-		log.Panic().Err(err).Msg("failed to start webhook event listener")
+		return err
 	}
 
 	existingEvents, err := w.ds.GetPendingEvents(false)
 	if err != nil {
-		log.Panic().Err(err).Msg("failed to get pending webhook events")
+		return err
 	}
 
 	for _, event := range existingEvents {
@@ -63,7 +63,7 @@ func (w *WebhookService) StartProcessingEvents() {
 	for {
 		eventID, err := listener.WaitForEvent()
 		if err != nil {
-			log.Panic().Err(err).Msg("failed to receive webhook event notification")
+			return err
 		}
 		go w.processEvent(eventID)
 	}

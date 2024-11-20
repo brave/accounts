@@ -74,7 +74,9 @@ func main() {
 	}
 
 	if *startWebhookSenderFlag {
-		services.NewWebhookService(datastore).StartProcessingEvents()
+		if err = services.NewWebhookService(datastore).StartProcessingEvents(); err != nil {
+			log.Panic().Err(err).Msg("Webhook sender failed")
+		}
 		return
 	}
 
@@ -106,7 +108,7 @@ func main() {
 
 	r := chi.NewRouter()
 
-	authController := controllers.NewAuthController(opaqueService, jwtService, datastore)
+	authController := controllers.NewAuthController(opaqueService, jwtService, datastore, sesService)
 	accountsController := controllers.NewAccountsController(opaqueService, jwtService, datastore)
 	verificationController := controllers.NewVerificationController(datastore, jwtService, sesService, passwordAuthEnabled, emailAuthEnabled)
 	sessionsController := controllers.NewSessionsController(datastore)

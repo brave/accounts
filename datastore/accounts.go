@@ -48,6 +48,22 @@ func (d *Datastore) GetAccount(tx *gorm.DB, email string) (*Account, error) {
 	return &account, nil
 }
 
+func (d *Datastore) GetAccountByNormalizedEmail(email string) (*Account, error) {
+	var account Account
+	normalizedEmail := util.NormalizeEmail(email)
+	if normalizedEmail == nil {
+		return nil, ErrAccountNotFound
+	}
+	result := d.DB.Where("normalized_email = ?", normalizedEmail).First(&account)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, ErrAccountNotFound
+		}
+		return nil, fmt.Errorf("error fetching account by normalized email: %w", result.Error)
+	}
+	return &account, nil
+}
+
 func (d *Datastore) AccountExists(email string) (bool, error) {
 	var exists bool
 	result := d.DB.Model(&Account{}).
@@ -70,9 +86,7 @@ func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
 		account, err = d.GetAccount(tx, email)
 
 		if err != nil {
-			if errors.Is(err, ErrAccountNotFound) {
-				err = nil
-			} else {
+			if !errors.Is(err, ErrAccountNotFound) {
 				return err
 			}
 		} else {

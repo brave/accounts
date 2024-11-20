@@ -148,9 +148,7 @@ func (o *OpaqueService) SetupPasswordFinalize(email string, registration *opaque
 func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.KE2, *datastore.AKEState, error) {
 	account, err := o.ds.GetAccount(nil, email)
 	if err != nil {
-		if errors.Is(err, datastore.ErrAccountNotFound) {
-			err = nil
-		} else {
+		if !errors.Is(err, datastore.ErrAccountNotFound) {
 			return nil, nil, fmt.Errorf("failed to get account during login init: %w", err)
 		}
 	}
