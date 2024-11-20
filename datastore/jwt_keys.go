@@ -11,9 +11,13 @@ import (
 
 const keySize = 64
 
+// JWTKey represents a JSON Web Token signing key stored in the database
 type JWTKey struct {
-	ID        int
-	Key       []byte
+	// ID is the unique identifier for the JWT key
+	ID int
+	// Key contains the raw bytes of the signing key
+	Key []byte
+	// CreatedAt stores the timestamp when the key was created (read-only)
 	CreatedAt time.Time `gorm:"<-:false"`
 }
 

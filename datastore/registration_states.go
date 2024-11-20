@@ -11,10 +11,14 @@ import (
 
 const registrationStateExpiration = 30 * time.Second
 
+// RegistrationState tracks the interim state of a user's registration process
 type RegistrationState struct {
-	Email      string `gorm:"primaryKey"`
+	// Email serves as the unique identifier for the registration attempt
+	Email string `gorm:"primaryKey"`
+	// OprfSeedID references the seed used for the OPRF during registration
 	OprfSeedID int
-	CreatedAt  time.Time `gorm:"<-:false"`
+	// CreatedAt records when the registration process was initiated (read-only)
+	CreatedAt time.Time `gorm:"<-:false"`
 }
 
 func (d *Datastore) GetRegistrationStateSeedID(email string) (int, error) {

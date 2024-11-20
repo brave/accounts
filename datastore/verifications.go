@@ -13,13 +13,21 @@ import (
 	"gorm.io/gorm"
 )
 
+// Verification represents an email verification record and its status
 type Verification struct {
-	ID        uuid.UUID
-	Email     string
-	Code      string
-	Verified  bool
-	Service   string
-	Intent    string
+	// ID uniquely identifies the verification request
+	ID uuid.UUID
+	// Email stores the address to be verified
+	Email string
+	// Code contains the verification code sent to the user
+	Code string
+	// Verified indicates whether the email has been successfully verified
+	Verified bool
+	// Service identifies the actor that initiated the verification
+	Service string
+	// Intent describes the purpose of the verification
+	Intent string
+	// CreatedAt records when the verification was initiated
 	CreatedAt time.Time `gorm:"<-:update"`
 }
 

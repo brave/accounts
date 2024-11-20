@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/brave-experiments/accounts/controllers"
@@ -14,6 +15,7 @@ import (
 	"github.com/brave-experiments/accounts/services"
 	"github.com/brave-experiments/accounts/util"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 	"github.com/go-chi/docgen"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -36,6 +38,7 @@ const (
 	passwordAuthEnabledEnv = "PASSWORD_AUTH_ENABLED"
 	emailAuthEnabledEnv    = "EMAIL_AUTH_ENABLED"
 	devEndpointsEnabledEnv = "DEV_ENDPOINTS_ENABLED"
+	allowedOriginsEnv      = "ALLOWED_ORIGINS"
 )
 
 // @title Brave Accounts Service
@@ -58,6 +61,7 @@ func main() {
 	passwordAuthEnabled := os.Getenv(passwordAuthEnabledEnv) == "true"
 	emailAuthEnabled := os.Getenv(emailAuthEnabledEnv) == "true"
 	devEndpointsEnabled := os.Getenv(devEndpointsEnabledEnv) == "true"
+	allowedOrigins := strings.Split(os.Getenv(allowedOriginsEnv), ",")
 
 	if !passwordAuthEnabled && !emailAuthEnabled {
 		log.Panic().Msg("At least one authentication method must be enabled via PASSWORD_AUTH_ENABLED or EMAIL_AUTH_ENABLED env vars")
@@ -115,6 +119,16 @@ func main() {
 	userKeysController := controllers.NewUserKeysController(datastore)
 
 	r.Use(middleware.LoggerMiddleware(prometheusRegistry))
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: allowedOrigins,
+		AllowedMethods: []string{"POST", "GET"},
+	}))
+
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		//nolint:errcheck
+		w.Write([]byte("Brave Accounts Service"))
+	})
 
 	r.Route("/v2", func(r chi.Router) {
 		r.With(servicesKeyMiddleware).Mount("/auth", authController.Router(authMiddleware, passwordAuthEnabled))

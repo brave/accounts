@@ -8,9 +8,13 @@ import (
 	"gorm.io/gorm"
 )
 
+// OPRFSeed stores seed data for the Oblivious Pseudorandom Function
 type OPRFSeed struct {
-	ID        int
-	Seed      []byte
+	// ID uniquely identifies the OPRF seed
+	ID int
+	// Seed contains the raw bytes of the OPRF seed value
+	Seed []byte
+	// CreatedAt records when the seed was created (read-only)
 	CreatedAt time.Time `gorm:"<-:false"`
 }
 

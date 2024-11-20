@@ -14,6 +14,7 @@ const (
 	PasswordAuthSessionVersion = 2
 )
 
+// Session represents a user's authenticated session in the system
 type Session struct {
 	// Session UUID
 	ID uuid.UUID `json:"id"`
@@ -27,6 +28,7 @@ type Session struct {
 	CreatedAt time.Time `json:"createdAt" gorm:"<-:false"`
 }
 
+// SessionWithAccountInfo extends the basic session data with additional user account details
 type SessionWithAccountInfo struct {
 	// Session UUID
 	ID uuid.UUID `json:"id"`
