@@ -28,6 +28,7 @@ import (
 
 var (
 	routesFlag             = flag.Bool("routes", false, "Generate router documentation")
+	listenFlag             = flag.String("listen", ":8080", "Use specific address and port for listening")
 	startWebhookSenderFlag = flag.Bool("start-webhook-sender", false, "Start the webhook event sender")
 )
 
@@ -160,8 +161,8 @@ func main() {
 		}
 	}()
 
-	log.Info().Msg("Server listening on port 8080")
-	if err := http.ListenAndServe(":8080", r); err != nil {
+	log.Info().Msgf("Server listening on %v", *listenFlag)
+	if err := http.ListenAndServe(*listenFlag, r); err != nil {
 		log.Panic().Err(err).Msg("Failed to start server")
 	}
 }

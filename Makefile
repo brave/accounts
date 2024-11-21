@@ -9,6 +9,17 @@ clear-emails:
 update-swagger:
 	swag init
 
+# Only works if EMAIL_AUTH_ENABLED is set to true
+get-email-auth-token:
+	VERIFICATION_TOKEN=`curl -s --json '{"email":"test@example.com","intent":"auth_token","service":"inbox-aliases"}' \
+		http://localhost:8080/v2/verify/init | jq -r .verificationToken`; \
+	echo -e "\033[0;32mClick on the verification link in the Accounts service logs...\033[0m"; \
+	while [ -z "$$AUTH_TOKEN" ] || [ "$$AUTH_TOKEN" = "null" ]; do \
+		AUTH_TOKEN=`curl -s --json '{"wait":true}' -H "Authorization: Bearer $$VERIFICATION_TOKEN" \
+			http://localhost:8080/v2/verify/result | jq -r .authToken`; \
+	done; \
+	echo "auth token: $$AUTH_TOKEN"
+
 lint:
 	golangci-lint run
 
