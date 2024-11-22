@@ -25,6 +25,7 @@ const (
 	baseURLEnv           = "BASE_URL"
 	verifyFrontendURLEnv = "VERIFY_FRONTEND_URL"
 	awsEndpointEnv       = "AWS_ENDPOINT"
+	configSetEnv         = "SES_CONFIG_SET"
 
 	defaultFromAddress = "noreply@brave.com"
 	defaultBaseURL     = "http://localhost:8080"
@@ -39,6 +40,7 @@ type SESService struct {
 	fromAddress         string
 	baseURL             string
 	frontendURL         string
+	configSet           string
 	i18nBundle          *i18n.Bundle
 }
 
@@ -132,6 +134,8 @@ func NewSESService(i18nBundle *i18n.Bundle) (*SESService, error) {
 		baseURL = defaultBaseURL
 	}
 
+	configSet := os.Getenv(configSetEnv)
+
 	frontendURL := os.Getenv(baseURLEnv)
 
 	return &SESService{
@@ -143,6 +147,7 @@ func NewSESService(i18nBundle *i18n.Bundle) (*SESService, error) {
 		fromAddress,
 		baseURL,
 		frontendURL,
+		configSet,
 		i18nBundle,
 	}, nil
 }
@@ -176,6 +181,9 @@ func (s *SESService) sendEmail(ctx context.Context, email string, subject string
 			},
 		},
 		Source: &s.fromAddress,
+	}
+	if s.configSet != "" {
+		input.ConfigurationSetName = &s.configSet
 	}
 
 	_, err := s.client.SendEmail(ctx, input)
