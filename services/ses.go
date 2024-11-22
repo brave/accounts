@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/ses"
 	"github.com/aws/aws-sdk-go-v2/service/ses/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/brave-experiments/accounts/datastore"
 	"github.com/brave-experiments/accounts/templates"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -26,6 +28,7 @@ const (
 	verifyFrontendURLEnv = "VERIFY_FRONTEND_URL"
 	awsEndpointEnv       = "AWS_ENDPOINT"
 	configSetEnv         = "SES_CONFIG_SET"
+	sesRoleEnv           = "SES_ROLE"
 
 	defaultFromAddress = "noreply@brave.com"
 	defaultBaseURL     = "http://localhost:8080"
@@ -97,6 +100,15 @@ func NewSESService(i18nBundle *i18n.Bundle) (*SESService, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
+	sesRole := os.Getenv(sesRoleEnv)
+	if sesRole != "" {
+		stsClient := sts.NewFromConfig(cfg)
+		roleProvider := stscreds.NewAssumeRoleProvider(stsClient, sesRole)
+		cfg, err = config.LoadDefaultConfig(context.Background(), config.WithCredentialsProvider(roleProvider))
+		if err != nil {
+			return nil, fmt.Errorf("failed to load AWS config: %w", err)
+		}
+	}
 
 	// Create SES client
 	client := ses.NewFromConfig(cfg, func(o *ses.Options) {
@@ -136,7 +148,7 @@ func NewSESService(i18nBundle *i18n.Bundle) (*SESService, error) {
 
 	configSet := os.Getenv(configSetEnv)
 
-	frontendURL := os.Getenv(baseURLEnv)
+	frontendURL := os.Getenv(verifyFrontendURLEnv)
 
 	return &SESService{
 		client,

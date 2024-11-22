@@ -21,6 +21,12 @@ View API documentation at http://localhost:8080/swagger/index.html.
 | OPAQUE_PUBLIC_KEY | Yes | OPAQUE server public key |
 | PASSWORD_AUTH_ENABLED | Yes | Enable password authentication if set to 'true' |
 | EMAIL_AUTH_ENABLED | Yes | Enable email `auth_token` authentication if set to 'true' |
+| RDS_ROLE | Yes (if RDS is being used) | The AWS IAM role ARN to assume for RDS access |
+| RDS_DATABASE_PORT | Yes (if RDS is being used) | The port number for the RDS database connection |
+| RDS_WRITER_ENDPOINT | Yes (if RDS is being used) | The endpoint URL for the RDS writer instance |
+| RDS_USER | Yes (if RDS is being used) | The username for RDS database authentication |
+| RDS_DATABASE_NAME | Yes (if RDS is being used) | The name of the RDS database to connect to |
+| AWS_REGION | Yes (if RDS is being used) | The AWS region where the RDS instance is deployed |
 | AWS_ENDPOINT | No | Custom AWS endpoint for testing |
 | LOG_PRETTY | No | Enable pretty logging format if set to 'true' |
 | LOG_LEVEL | No | Logging level (default: info) |
@@ -32,3 +38,4 @@ View API documentation at http://localhost:8080/swagger/index.html.
 | DEV_ENDPOINTS_ENABLED | No | Enable the development-only endpoints |
 | ALLOWED_ORIGINS | No | List of allowed origins for CORS, separated by comma |
 | SES_CONFIG_SET | No | Configuration set name to use for SES emails |
+| SES_ROLE | No | The AWS IAM role ARN to assume for SES access |
