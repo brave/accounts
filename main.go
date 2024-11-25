@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/brave-experiments/accounts/controllers"
-	"github.com/brave-experiments/accounts/datastore"
-	_ "github.com/brave-experiments/accounts/docs"
-	"github.com/brave-experiments/accounts/middleware"
-	"github.com/brave-experiments/accounts/services"
-	"github.com/brave-experiments/accounts/util"
+	"github.com/brave/accounts/controllers"
+	"github.com/brave/accounts/datastore"
+	_ "github.com/brave/accounts/docs"
+	"github.com/brave/accounts/middleware"
+	"github.com/brave/accounts/services"
+	"github.com/brave/accounts/util"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/go-chi/docgen"
@@ -147,7 +147,7 @@ func main() {
 
 	if *routesFlag {
 		fmt.Println(docgen.MarkdownRoutesDoc(r, docgen.MarkdownOpts{
-			ProjectPath: "github.com/brave-experiments/accounts",
+			ProjectPath: "github.com/brave/accounts",
 		}))
 		return
 	}

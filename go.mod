@@ -1,4 +1,4 @@
-module github.com/brave-experiments/accounts
+module github.com/brave/accounts
 
 go 1.23.1
 

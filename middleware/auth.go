@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/brave-experiments/accounts/datastore"
-	"github.com/brave-experiments/accounts/services"
-	"github.com/brave-experiments/accounts/util"
+	"github.com/brave/accounts/datastore"
+	"github.com/brave/accounts/services"
+	"github.com/brave/accounts/util"
 )
 
 type contextKey string

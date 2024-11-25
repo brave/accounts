@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/brave-experiments/accounts/datastore"
+	"github.com/brave/accounts/datastore"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )

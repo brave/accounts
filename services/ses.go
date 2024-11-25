@@ -16,8 +16,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ses"
 	"github.com/aws/aws-sdk-go-v2/service/ses/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
-	"github.com/brave-experiments/accounts/datastore"
-	"github.com/brave-experiments/accounts/templates"
+	"github.com/brave/accounts/datastore"
+	"github.com/brave/accounts/templates"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/rs/zerolog/log"
 )

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/brave-experiments/accounts/util"
+	"github.com/brave/accounts/util"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"gorm.io/gorm"

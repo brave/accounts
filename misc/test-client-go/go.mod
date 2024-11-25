@@ -1,4 +1,4 @@
-module github.com/brave-experiments/accounts/misc/test-client-go
+module github.com/brave/accounts/misc/test-client-go
 
 go 1.23.1
 

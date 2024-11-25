@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/brave-experiments/accounts/datastore"
-	"github.com/brave-experiments/accounts/util"
+	"github.com/brave/accounts/datastore"
+	"github.com/brave/accounts/util"
 	"github.com/bytemare/crypto"
 	"github.com/bytemare/opaque"
 	opaqueMsg "github.com/bytemare/opaque/message"

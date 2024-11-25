@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/brave-experiments/accounts/datastore"
+	"github.com/brave/accounts/datastore"
 	"github.com/rs/zerolog/log"
 )
 

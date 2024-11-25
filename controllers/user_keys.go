@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/brave-experiments/accounts/datastore"
-	"github.com/brave-experiments/accounts/middleware"
-	"github.com/brave-experiments/accounts/util"
+	"github.com/brave/accounts/datastore"
+	"github.com/brave/accounts/middleware"
+	"github.com/brave/accounts/util"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/google/uuid"

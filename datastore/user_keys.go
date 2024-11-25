@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/brave-experiments/accounts/util"
+	"github.com/brave/accounts/util"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
