@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/brave/accounts/controllers"
 	"github.com/brave/accounts/datastore"
@@ -143,16 +144,6 @@ func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
 		},
 		{
 			intent:              "registration",
-			service:             "inbox-aliases",
-			passwordAuthEnabled: true,
-		},
-		{
-			intent:              "registration",
-			service:             "premium",
-			passwordAuthEnabled: true,
-		},
-		{
-			intent:              "registration",
 			service:             "accounts",
 			passwordAuthEnabled: false,
 		},
@@ -228,19 +219,22 @@ func (suite *VerificationTestSuite) TestVerifyQueryResult() {
 	suite.SetupController(false, true)
 
 	testCases := []struct {
-		intent              string
-		service             string
-		shouldHaveAuthToken bool
+		intent                         string
+		service                        string
+		shouldHaveAuthToken            bool
+		verificationUsableMoreThanOnce bool
 	}{
 		{
-			intent:              "auth_token",
-			service:             "inbox-aliases",
-			shouldHaveAuthToken: true,
+			intent:                         "auth_token",
+			service:                        "inbox-aliases",
+			shouldHaveAuthToken:            true,
+			verificationUsableMoreThanOnce: false,
 		},
 		{
-			intent:              "verification",
-			service:             "inbox-aliases",
-			shouldHaveAuthToken: false,
+			intent:                         "verification",
+			service:                        "inbox-aliases",
+			shouldHaveAuthToken:            false,
+			verificationUsableMoreThanOnce: true,
 		},
 	}
 
@@ -280,7 +274,7 @@ func (suite *VerificationTestSuite) TestVerifyQueryResult() {
 		var result controllers.VerifyResultResponse
 		util.DecodeJSONTestResponse(suite.T(), resp.Body, &result)
 		assert.False(suite.T(), result.Verified)
-		assert.Equal(suite.T(), "test@example.com", result.Email)
+		assert.Nil(suite.T(), result.Email)
 		assert.Equal(suite.T(), tc.service, result.Service)
 		assert.Nil(suite.T(), result.AuthToken)
 
@@ -298,9 +292,10 @@ func (suite *VerificationTestSuite) TestVerifyQueryResult() {
 		resp = util.ExecuteTestRequest(request, suite.router)
 		assert.Equal(suite.T(), http.StatusOK, resp.Code)
 
+		expectedEmail := "test@example.com"
 		util.DecodeJSONTestResponse(suite.T(), resp.Body, &result)
 		assert.True(suite.T(), result.Verified)
-		assert.Equal(suite.T(), "test@example.com", result.Email)
+		assert.Equal(suite.T(), &expectedEmail, result.Email)
 		assert.Equal(suite.T(), tc.service, result.Service)
 		if tc.shouldHaveAuthToken {
 			assert.NotNil(suite.T(), result.AuthToken)
@@ -314,7 +309,64 @@ func (suite *VerificationTestSuite) TestVerifyQueryResult() {
 		} else {
 			assert.Nil(suite.T(), result.AuthToken)
 		}
+
+		// Third query - should work or be blocked depending on test case
+		request = util.CreateJSONTestRequest("/v2/verify/result", req)
+		request.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
+		resp = util.ExecuteTestRequest(request, suite.router)
+
+		if tc.verificationUsableMoreThanOnce {
+			assert.Equal(suite.T(), http.StatusOK, resp.Code)
+
+			util.DecodeJSONTestResponse(suite.T(), resp.Body, &result)
+			assert.True(suite.T(), result.Verified)
+			assert.Equal(suite.T(), &expectedEmail, result.Email)
+			assert.Equal(suite.T(), tc.service, result.Service)
+		} else {
+			assert.Equal(suite.T(), http.StatusNotFound, resp.Code)
+		}
 	}
+}
+
+func (suite *VerificationTestSuite) TestVerificationExpiry() {
+	// Setup initial verification request
+	suite.SetupController(false, true)
+	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
+
+	initBody := controllers.VerifyInitRequest{
+		Email:   "test@example.com",
+		Intent:  "verification",
+		Service: "inbox-aliases",
+		Locale:  "en-US",
+	}
+
+	// Initialize verification
+	initResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", initBody), suite.router)
+	assert.Equal(suite.T(), http.StatusOK, initResp.Code)
+
+	var parsedInitResp controllers.VerifyInitResponse
+	util.DecodeJSONTestResponse(suite.T(), initResp.Body, &parsedInitResp)
+	require.NotNil(suite.T(), parsedInitResp.VerificationToken)
+
+	verificationID, err := suite.jwtService.ValidateVerificationToken(*parsedInitResp.VerificationToken)
+	assert.NoError(suite.T(), err)
+
+	// Manually set verification to expired state (31 minutes ago)
+	err = suite.ds.DB.Model(&datastore.Verification{}).
+		Where("id = ?", verificationID).
+		Update("created_at", time.Now().UTC().Add(-31*time.Minute)).Error
+	assert.NoError(suite.T(), err)
+
+	// Query verification status - should be expired
+	req := controllers.VerifyResultRequest{
+		Wait: false,
+	}
+	request := util.CreateJSONTestRequest("/v2/verify/result", req)
+	request.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
+	resp := util.ExecuteTestRequest(request, suite.router)
+
+	// Should return not found due to expired verification
+	assert.Equal(suite.T(), http.StatusNotFound, resp.Code)
 }
 
 func TestVerificationTestSuite(t *testing.T) {

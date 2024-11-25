@@ -189,7 +189,7 @@ func (suite *AuthTestSuite) TestAuthLoginNoAKEToken() {
 	assert.Equal(suite.T(), http.StatusUnauthorized, resp.Code)
 }
 
-func (suite *AuthTestSuite) TestAuthLoginInvalidEmail() {
+func (suite *AuthTestSuite) TestAuthLoginNonexistentEmail() {
 	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
 	require.NoError(suite.T(), err)
 

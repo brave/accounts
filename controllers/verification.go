@@ -67,7 +67,7 @@ type VerifyResultResponse struct {
 	// Email verification status
 	Verified bool `json:"verified"`
 	// Email associated wiith the verification
-	Email string `json:"email"`
+	Email *string `json:"email,omitempty"`
 	// Name of service requesting verification
 	Service string `json:"service"`
 }
@@ -77,7 +77,7 @@ type VerifyCompleteRequest struct {
 	// Unique verification identifier
 	ID uuid.UUID `json:"id" validate:"required"`
 	// Verification code sent to user
-	Code string `json:"code" validate:"required"`
+	Code string `json:"code" validate:"required,ascii"`
 }
 
 // @Description Response for verification completion
@@ -291,7 +291,6 @@ func (vc *VerificationController) VerifyQueryResult(w http.ResponseWriter, r *ht
 	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
 
 	responseData := VerifyResultResponse{
-		Email:   verification.Email,
 		Service: verification.Service,
 	}
 
@@ -339,6 +338,7 @@ func (vc *VerificationController) VerifyQueryResult(w http.ResponseWriter, r *ht
 
 	responseData.AuthToken = authToken
 	responseData.Verified = true
+	responseData.Email = &verification.Email
 
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, responseData)

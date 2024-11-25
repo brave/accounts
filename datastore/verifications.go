@@ -37,7 +37,7 @@ const (
 	RegistrationIntent = "registration"
 	SetPasswordIntent  = "set_password"
 
-	codeLength              = 60
+	codeLength              = 32
 	verifyWaitMaxDuration   = 20 * time.Second
 	VerificationExpiration  = 30 * time.Minute
 	maxPendingVerifications = 3

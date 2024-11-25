@@ -53,8 +53,6 @@ type RegistrationRecord struct {
 	MaskingKey *string `json:"maskingKey" validate:"required_without=SerializedRecord"`
 	// Envelope of registation record
 	Envelope *string `json:"envelope" validate:"required_without=SerializedRecord"`
-	// Optional name of the new session
-	SessionName *string `json:"sessionName" validate:"omitempty,max=50"`
 	// Serialized registration record
 	SerializedRecord *string `json:"serializedRecord" validate:"required_without_all=PublicKey MaskingKey Envelope"`
 }
