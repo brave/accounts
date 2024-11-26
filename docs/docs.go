@@ -1030,11 +1030,6 @@ const docTemplate = `{
                 "serializedRecord": {
                     "description": "Serialized registration record",
                     "type": "string"
-                },
-                "sessionName": {
-                    "description": "Optional name of the new session",
-                    "type": "string",
-                    "maxLength": 50
                 }
             }
         },

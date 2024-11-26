@@ -146,12 +146,14 @@ func NewAccountsController(opaqueService *services.OpaqueService, jwtService *se
 	}
 }
 
-func (ac *AccountsController) Router(verificationMiddleware func(http.Handler) http.Handler, authMiddleware func(http.Handler) http.Handler) chi.Router {
+func (ac *AccountsController) Router(verificationMiddleware func(http.Handler) http.Handler, authMiddleware func(http.Handler) http.Handler, accountDeletionEnabled bool) chi.Router {
 	r := chi.NewRouter()
 
 	r.With(verificationMiddleware).Post("/password/init", ac.SetupPasswordInit)
 	r.With(verificationMiddleware).Post("/password/finalize", ac.SetupPasswordFinalize)
-	r.With(authMiddleware).Delete("/", ac.DeleteAccount)
+	if accountDeletionEnabled {
+		r.With(authMiddleware).Delete("/", ac.DeleteAccount)
+	}
 
 	return r
 }
@@ -267,6 +269,11 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 		return
 	}
 
+	if err = ac.ds.UpdateAccountLastEmailVerifiedAt(account.ID); err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
 	session, err := ac.ds.CreateSession(account.ID, datastore.PasswordAuthSessionVersion, r.UserAgent())
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
@@ -310,7 +317,7 @@ func (ac *AccountsController) DeleteAccount(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if err := ac.ds.NotifyAccountDeletionEvent(session.Email, session.AccountID); err != nil {
+	if err := ac.ds.NotifyAccountDeletionEvent(session.AccountID); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}

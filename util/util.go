@@ -33,7 +33,11 @@ func ExtractAuthToken(r *http.Request) (string, error) {
 	return strings.TrimPrefix(authHeader, "Bearer "), nil
 }
 
-func NormalizeEmail(email string) *string {
+func isGmail(domain string) bool {
+	return strings.EqualFold(domain, "gmail.com") || strings.EqualFold(domain, "googlemail.com")
+}
+
+func FullyNormalizeEmail(email string) *string {
 	// Split email into local part and domain
 	parts := strings.Split(email, "@")
 	if len(parts) != 2 {
@@ -41,7 +45,7 @@ func NormalizeEmail(email string) *string {
 	}
 
 	// Check if it's a Gmail address
-	if !strings.EqualFold(parts[1], "gmail.com") {
+	if !isGmail(parts[1]) {
 		return nil
 	}
 
@@ -55,6 +59,21 @@ func NormalizeEmail(email string) *string {
 	// Construct normalized email
 	normalized := strings.ToLower(localPart + "@gmail.com")
 	return &normalized
+}
+
+func PartiallyNormalizeEmail(email string) string {
+	// Split email into local part and domain
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return email
+	}
+
+	// Check if it's a Gmail address
+	if !isGmail(parts[1]) {
+		return email
+	}
+
+	return strings.ToLower(email)
 }
 
 func DecodeJSONAndValidate(w http.ResponseWriter, r *http.Request, data interface{}) bool {

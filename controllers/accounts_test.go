@@ -48,7 +48,7 @@ func (suite *AccountsTestSuite) SetupTest() {
 	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds)
 
 	suite.router = chi.NewRouter()
-	suite.router.Mount("/v2/accounts", controller.Router(verificationAuthMiddleware, authMiddleware))
+	suite.router.Mount("/v2/accounts", controller.Router(verificationAuthMiddleware, authMiddleware, true))
 }
 
 func (suite *AccountsTestSuite) TestSetPassword() {

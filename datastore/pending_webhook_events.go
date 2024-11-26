@@ -39,8 +39,6 @@ type PendingWebhookEvent struct {
 
 // AccountDeletionEventDetails represents the payload for an account deletion webhook event
 type AccountDeletionEventDetails struct {
-	// Email address of the deleted account
-	Email string `json:"email"`
 	// Unique identifier of the deleted account
 	AccountID uuid.UUID `json:"accountId"`
 }
@@ -73,9 +71,8 @@ func (d *Datastore) notifyEvent(eventType string, details interface{}) error {
 	return nil
 }
 
-func (d *Datastore) NotifyAccountDeletionEvent(email string, accountID uuid.UUID) error {
+func (d *Datastore) NotifyAccountDeletionEvent(accountID uuid.UUID) error {
 	return d.notifyEvent(accountDeletionEventType, AccountDeletionEventDetails{
-		Email:     email,
 		AccountID: accountID,
 	})
 }

@@ -3,7 +3,6 @@ package datastore
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/brave/accounts/util"
@@ -21,14 +20,16 @@ type Account struct {
 	ID uuid.UUID
 	// Email address associated with the account
 	Email string
-	// Normalized email address associated with the account
-	NormalizedEmail *string `json:"-"`
+	// Fully normalized email address used in the account recovery flow only
+	FullyNormalizedEmail *string `json:"-"`
 	// Optional reference to the OPRF seed used for password hashing
 	OprfSeedID *int `json:"-"`
 	// Serialized OPAQUE protocol registration data
 	OpaqueRegistration []byte `json:"-"`
 	// Timestamp when the account was last used (with a MOE of 30 minutes)
 	LastUsedAt time.Time `gorm:"<-:update"`
+	// Timestamp when the account was last verified via email
+	LastEmailVerifiedAt time.Time `gorm:"<-:update"`
 	// Timestamp when the account was created
 	CreatedAt time.Time `gorm:"<-:false"`
 }
@@ -38,7 +39,7 @@ func (d *Datastore) GetAccount(tx *gorm.DB, email string) (*Account, error) {
 	if tx == nil {
 		tx = d.DB
 	}
-	result := tx.Where("email = ?", email).First(&account)
+	result := tx.Where("email = ?", util.PartiallyNormalizeEmail(email)).First(&account)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, ErrAccountNotFound
@@ -48,27 +49,24 @@ func (d *Datastore) GetAccount(tx *gorm.DB, email string) (*Account, error) {
 	return &account, nil
 }
 
-func (d *Datastore) GetAccountByNormalizedEmail(email string) (*Account, error) {
-	var account Account
-	normalizedEmail := util.NormalizeEmail(email)
+func (d *Datastore) GetAccountsByFullyNormalizedEmail(email string) ([]Account, error) {
+	var accounts []Account
+	normalizedEmail := util.FullyNormalizeEmail(email)
 	if normalizedEmail == nil {
 		return nil, ErrAccountNotFound
 	}
-	result := d.DB.Where("normalized_email = ?", normalizedEmail).First(&account)
+	result := d.DB.Where("fully_normalized_email = ?", normalizedEmail).Find(&accounts)
 	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return nil, ErrAccountNotFound
-		}
-		return nil, fmt.Errorf("error fetching account by normalized email: %w", result.Error)
+		return nil, fmt.Errorf("error fetching accounts by normalized email: %w", result.Error)
 	}
-	return &account, nil
+	return accounts, nil
 }
 
 func (d *Datastore) AccountExists(email string) (bool, error) {
 	var exists bool
 	result := d.DB.Model(&Account{}).
 		Select("1").
-		Where("email = ?", strings.TrimSpace(email)).
+		Where("email = ?", util.PartiallyNormalizeEmail(email)).
 		Limit(1).
 		Find(&exists)
 
@@ -99,9 +97,9 @@ func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
 		}
 
 		account = &Account{
-			ID:              id,
-			Email:           email,
-			NormalizedEmail: util.NormalizeEmail(email),
+			ID:                   id,
+			Email:                util.PartiallyNormalizeEmail(email),
+			FullyNormalizedEmail: util.FullyNormalizeEmail(email),
 		}
 
 		if err := tx.Create(account).Error; err != nil {
@@ -159,6 +157,18 @@ func (d *Datastore) MaybeUpdateAccountLastUsed(accountID uuid.UUID, lastUsedTime
 
 	if result.Error != nil {
 		return fmt.Errorf("error updating account last used: %w", result.Error)
+	}
+
+	return nil
+}
+
+func (d *Datastore) UpdateAccountLastEmailVerifiedAt(accountID uuid.UUID) error {
+	result := d.DB.Model(&Account{}).
+		Where("id = ?", accountID).
+		Update("last_email_verified_at", time.Now().UTC())
+
+	if result.Error != nil {
+		return fmt.Errorf("error updating account last verification time: %w", result.Error)
 	}
 
 	return nil

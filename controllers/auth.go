@@ -254,14 +254,16 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 			errors.Is(err, util.ErrIncorrectPassword) {
 
 			if errors.Is(err, util.ErrIncorrectEmail) {
-				// If an account exists that matches the normalized email, notify the user
+				// If an account exists that matches the fully normalized email, notify the user
 				// that such an account exists
-				similarAccount, aerr := ac.ds.GetAccountByNormalizedEmail(requestData.Email)
-				if aerr != nil && !errors.Is(aerr, datastore.ErrAccountNotFound) {
+				similarAccounts, aerr := ac.ds.GetAccountsByFullyNormalizedEmail(requestData.Email)
+				if aerr != nil {
 					log.Error().Err(aerr).Msg("failed to find account by normalized email")
-				} else if similarAccount != nil {
-					if aerr = ac.sesService.SendSimilarEmailAlert(r.Context(), similarAccount.Email, r.Header.Get("Accept-Language")); aerr != nil {
-						log.Error().Err(aerr).Msg("failed to send email alert about similar email")
+				} else {
+					for _, account := range similarAccounts {
+						if aerr = ac.sesService.SendSimilarEmailAlert(r.Context(), account.Email, r.Header.Get("Accept-Language")); aerr != nil {
+							log.Error().Err(aerr).Msg("failed to send email alert about similar email")
+						}
 					}
 				}
 			}

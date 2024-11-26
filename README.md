@@ -8,6 +8,8 @@
 Visit http://localhost:8080/v2/verify/email_viewer to view sent verification emails.
 Use `make clean-emails` to delete all sent emails.
 
+Run `make test` to run the test suites.
+
 View API documentation at http://localhost:8080/swagger/index.html.
 
 ## Environment variables
@@ -30,7 +32,6 @@ View API documentation at http://localhost:8080/swagger/index.html.
 | AWS_ENDPOINT | No | Custom AWS endpoint for testing |
 | LOG_PRETTY | No | Enable pretty logging format if set to 'true' |
 | LOG_LEVEL | No | Logging level (default: info) |
-| SERVE_SWAGGER | No | Serve Swagger UI if set to 'true' |
 | OPAQUE_FAKE_RECORD | No | Use OPAQUE fake record to prevent client enumeration attacks |
 | VERIFY_FRONTEND_URL | No | Frontend URL to use in verification emails |
 | BRAVE_SERVICES_KEY | No | Services key to check against (via the `Brave-Key` header) for all requests |
@@ -39,3 +40,4 @@ View API documentation at http://localhost:8080/swagger/index.html.
 | ALLOWED_ORIGINS | No | List of allowed origins for CORS, separated by comma |
 | SES_CONFIG_SET | No | Configuration set name to use for SES emails |
 | SES_ROLE | No | The AWS IAM role ARN to assume for SES access |
+| ACCOUNT_DELETION_ENABLED | No | Enables account deletion endpoint |

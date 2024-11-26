@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/brave/accounts/util"
@@ -56,9 +55,10 @@ func (d *Datastore) CreateVerification(email string, service string, intent stri
 		return nil, err
 	}
 
+	email = util.PartiallyNormalizeEmail(email)
 	verification := Verification{
 		ID:       id,
-		Email:    strings.TrimSpace(email),
+		Email:    email,
 		Code:     code,
 		Service:  service,
 		Intent:   intent,

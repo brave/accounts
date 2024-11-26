@@ -196,7 +196,7 @@ func (suite *AuthTestSuite) TestAuthLoginNonexistentEmail() {
 	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 	loginReq := controllers.LoginInitRequest{
-		Email:         "bad@example.com",
+		Email:         "nonexistent@example.com",
 		SerializedKE1: &serializedKE1,
 	}
 

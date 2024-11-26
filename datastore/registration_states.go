@@ -23,7 +23,7 @@ type RegistrationState struct {
 
 func (d *Datastore) GetRegistrationStateSeedID(email string) (int, error) {
 	var state RegistrationState
-	if err := d.DB.First(&state, "email = ?", email).Error; err != nil {
+	if err := d.DB.First(&state, "email = ?", util.PartiallyNormalizeEmail(email)).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, util.ErrRegistrationStateNotFound
 		}
@@ -48,7 +48,7 @@ func (d *Datastore) GetRegistrationStateSeedID(email string) (int, error) {
 
 func (d *Datastore) UpsertRegistrationState(email string, oprfSeedID int) error {
 	state := RegistrationState{
-		Email:      email,
+		Email:      util.PartiallyNormalizeEmail(email),
 		OprfSeedID: oprfSeedID,
 	}
 	result := d.DB.Save(&state)

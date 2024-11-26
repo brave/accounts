@@ -154,6 +154,10 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	if requestData.Locale == "" {
+		requestData.Locale = r.Header.Get("Accept-Language")
+	}
+
 	intentAllowed := true
 	switch requestData.Intent {
 	case datastore.AuthTokenIntent:
@@ -318,6 +322,11 @@ func (vc *VerificationController) VerifyQueryResult(w http.ResponseWriter, r *ht
 
 		account, err := vc.datastore.GetOrCreateAccount(verification.Email)
 		if err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		if err = vc.datastore.UpdateAccountLastEmailVerifiedAt(account.ID); err != nil {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 			return
 		}

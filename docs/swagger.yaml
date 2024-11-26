@@ -87,10 +87,6 @@ definitions:
       serializedRecord:
         description: Serialized registration record
         type: string
-      sessionName:
-        description: Optional name of the new session
-        maxLength: 50
-        type: string
     type: object
   controllers.RegistrationRequest:
     description: Request to register a new account

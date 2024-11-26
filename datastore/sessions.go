@@ -75,7 +75,6 @@ func (d *Datastore) ListSessions(accountID uuid.UUID) ([]Session, error) {
 
 func (d *Datastore) GetSession(sessionID uuid.UUID) (*SessionWithAccountInfo, error) {
 	var session SessionWithAccountInfo
-	// fix. i'm not getting email
 	if err := d.DB.Table("sessions").
 		Select(`
 			sessions.id,

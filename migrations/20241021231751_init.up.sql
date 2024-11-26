@@ -13,10 +13,11 @@ CREATE TABLE jwt_keys (
 CREATE TABLE accounts (
     id UUID PRIMARY KEY,
     email TEXT NOT NULL,
-    normalized_email TEXT,
+    fully_normalized_email TEXT,
     oprf_seed_id INT REFERENCES oprf_seeds(id),
     opaque_registration BYTEA,
     last_used_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_email_verified_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- add last_verified_at or last_active_at
     UNIQUE(email)

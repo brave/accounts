@@ -33,13 +33,13 @@ var (
 )
 
 const (
-	logPrettyEnv           = "LOG_PRETTY"
-	logLevelEnv            = "LOG_LEVEL"
-	serveSwaggerEnv        = "SERVE_SWAGGER"
-	passwordAuthEnabledEnv = "PASSWORD_AUTH_ENABLED"
-	emailAuthEnabledEnv    = "EMAIL_AUTH_ENABLED"
-	devEndpointsEnabledEnv = "DEV_ENDPOINTS_ENABLED"
-	allowedOriginsEnv      = "ALLOWED_ORIGINS"
+	logPrettyEnv              = "LOG_PRETTY"
+	logLevelEnv               = "LOG_LEVEL"
+	passwordAuthEnabledEnv    = "PASSWORD_AUTH_ENABLED"
+	emailAuthEnabledEnv       = "EMAIL_AUTH_ENABLED"
+	accountDeletionEnabledEnv = "ACCOUNT_DELETION_ENABLED"
+	devEndpointsEnabledEnv    = "DEV_ENDPOINTS_ENABLED"
+	allowedOriginsEnv         = "ALLOWED_ORIGINS"
 )
 
 // @title Brave Accounts Service
@@ -62,6 +62,7 @@ func main() {
 	passwordAuthEnabled := os.Getenv(passwordAuthEnabledEnv) == "true"
 	emailAuthEnabled := os.Getenv(emailAuthEnabledEnv) == "true"
 	devEndpointsEnabled := os.Getenv(devEndpointsEnabledEnv) == "true"
+	accountDeletionEnabled := os.Getenv(accountDeletionEnabledEnv) == "true"
 	allowedOrigins := strings.Split(os.Getenv(allowedOriginsEnv), ",")
 
 	if !passwordAuthEnabled && !emailAuthEnabled {
@@ -134,14 +135,14 @@ func main() {
 	r.Route("/v2", func(r chi.Router) {
 		r.With(servicesKeyMiddleware).Mount("/auth", authController.Router(authMiddleware, passwordAuthEnabled))
 		if passwordAuthEnabled {
-			r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware, authMiddleware))
+			r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware, authMiddleware, accountDeletionEnabled))
 		}
 		r.Mount("/verify", verificationController.Router(verificationMiddleware, servicesKeyMiddleware, devEndpointsEnabled))
 		r.With(servicesKeyMiddleware).Mount("/sessions", sessionsController.Router(authMiddleware))
 		r.With(servicesKeyMiddleware).Mount("/keys", userKeysController.Router(authMiddleware))
 	})
 
-	if os.Getenv(serveSwaggerEnv) == "true" {
+	if devEndpointsEnabled {
 		r.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL("http://localhost:8080/swagger/doc.json")))
 	}
 

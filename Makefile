@@ -28,6 +28,7 @@ run:
 	go run .
 
 test:
+	docker compose up -d postgres localstack
 	go test -p 1 -v ./...
 
 # Run `go install github.com/air-verse/air@latest` to use this
