@@ -1,15 +1,12 @@
-use std::{
-    collections::HashMap,
-    io::{stdin, stdout, Write},
-};
-
 use argon2::Argon2;
+use clap::{CommandFactory, Parser};
 use opaque_ke::{
     CipherSuite, ClientLogin, ClientLoginFinishParameters, ClientRegistration,
     ClientRegistrationFinishParameters, CredentialResponse, Identifiers, RegistrationResponse,
 };
 use rand::rngs::OsRng;
 use serde_json::Value;
+use std::collections::HashMap;
 
 #[allow(dead_code)]
 struct DefaultCipherSuite;
@@ -22,17 +19,51 @@ impl CipherSuite for DefaultCipherSuite {
     type Ksf = Argon2<'static>;
 }
 
+/// Brave Accounts test client
+#[derive(Parser, Debug)]
+#[command(about, long_about = None)]
+struct CliArgs {
+    /// Base URL for the API
+    #[arg(long, default_value = "http://localhost:8080")]
+    base_url: String,
+
+    /// User's email address
+    #[arg(long)]
+    email: String,
+
+    /// User's password
+    #[arg(long)]
+    password: String,
+
+    /// Verification token (if required)
+    #[arg(long)]
+    token: Option<String>,
+
+    /// Login mode flag
+    #[arg(short, long)]
+    login: bool,
+
+    /// Register mode flag
+    #[arg(short, long)]
+    register: bool,
+
+    /// Set password mode flag
+    #[arg(short, long)]
+    set_password: bool,
+}
+
 fn post_request(
-    url: &str,
+    args: &CliArgs,
+    path: &str,
     bearer_token: Option<&str>,
     body: HashMap<&str, Value>,
-) -> HashMap<String, String> {
+) -> HashMap<String, Value> {
     // add user agent of some sort.
     let client = reqwest::blocking::Client::builder()
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
         .build()
         .expect("Failed to create HTTP client");
-    let mut request_builder = client.post(url).json(&body);
+    let mut request_builder = client.post(args.base_url.clone() + path).json(&body);
 
     // Add authorization header if bearer token is provided
     if let Some(token) = bearer_token {
@@ -51,40 +82,60 @@ fn post_request(
     }
 
     response
-        .json::<HashMap<String, String>>()
-        .expect("Failed to parse response as HashMap<String, String>")
+        .json::<HashMap<String, Value>>()
+        .expect("Failed to parse response as HashMap<String, Value>")
 }
 
-pub fn prompt_credentials() -> (String, String) {
-    print!("Enter email: ");
-    stdout().flush().unwrap();
-    let mut email = String::new();
-    stdin().read_line(&mut email).unwrap();
+fn verify(args: &CliArgs) -> String {
+    let mut body = HashMap::new();
+    body.insert("service", Value::String("accounts".to_string()));
+    body.insert(
+        "intent",
+        Value::String(
+            if args.set_password {
+                "set_password"
+            } else {
+                "registration"
+            }
+            .to_string(),
+        ),
+    );
+    body.insert("email", Value::String(args.email.clone()));
 
-    print!("Enter password: ");
-    stdout().flush().unwrap();
-    let mut password = String::new();
-    stdin().read_line(&mut password).unwrap();
+    let init_response = post_request(args, "/v2/verify/init", None, body);
+    let token = init_response
+        .get("verificationToken")
+        .and_then(|v| v.as_str())
+        .expect("Failed to get verification token");
 
-    email = email.trim().to_string();
-    password = password.trim().to_string();
+    println!("Click on the verification link...");
 
-    (email, password)
+    loop {
+        let mut result_body = HashMap::new();
+        result_body.insert("wait", true.into());
+
+        let result = post_request(args, "/v2/verify/result", Some(token), result_body);
+
+        if result
+            .get("verified")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
+            return token.to_string();
+        }
+    }
 }
 
-fn set_password() {
-    print!("Enter verification token: ");
-    stdout().flush().unwrap();
-    let mut token = String::new();
-    stdin().read_line(&mut token).unwrap();
-
-    token = token.trim().to_string();
-    let (email, password) = prompt_credentials();
+fn set_password(args: CliArgs) {
+    let token = match &args.token {
+        Some(t) => t.trim().to_string(),
+        None => verify(&args),
+    };
 
     let mut client_rng = OsRng;
 
     let registration_request =
-        ClientRegistration::<DefaultCipherSuite>::start(&mut client_rng, password.as_bytes())
+        ClientRegistration::<DefaultCipherSuite>::start(&mut client_rng, args.password.as_bytes())
             .unwrap();
     let registration_request_hex = hex::encode(registration_request.message.serialize());
 
@@ -92,23 +143,24 @@ fn set_password() {
     body.insert("blindedMessage", registration_request_hex.into());
     body.insert("serializeResponse", true.into());
 
-    let resp = post_request(
-        "http://localhost:8080/v2/accounts/password/init",
-        Some(&token),
-        body,
-    );
+    let resp = post_request(&args, "/v2/accounts/password/init", Some(&token), body);
 
-    let resp_bin = hex::decode(resp.get("serializedResponse").unwrap()).unwrap();
+    let resp_bin = hex::decode(
+        resp.get("serializedResponse")
+            .and_then(|v| v.as_str())
+            .expect("Missing serializedResponse field"),
+    )
+    .expect("Failed to decode hex");
 
     let finish_result = registration_request
         .state
         .finish(
             &mut client_rng,
-            password.as_bytes(),
+            args.password.as_bytes(),
             RegistrationResponse::deserialize(&resp_bin).unwrap(),
             ClientRegistrationFinishParameters {
                 identifiers: Identifiers {
-                    client: Some(email.as_bytes()),
+                    client: Some(args.email.as_bytes()),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -120,40 +172,43 @@ fn set_password() {
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("serializedRecord", record_hex.into());
 
-    let resp = post_request(
-        "http://localhost:8080/v2/accounts/password/finalize",
-        Some(&token),
-        body,
-    );
+    let resp = post_request(&args, "/v2/accounts/password/finalize", Some(&token), body);
 
-    println!("auth token: {}", resp.get("authToken").unwrap())
+    println!(
+        "auth token: {}",
+        resp.get("authToken").unwrap().as_str().unwrap()
+    )
 }
 
-fn login() {
-    let (email, password) = prompt_credentials();
-
+fn login(args: CliArgs) {
     let mut client_rng = OsRng;
     let client_login_start_result =
-        ClientLogin::<DefaultCipherSuite>::start(&mut client_rng, password.as_bytes()).unwrap();
+        ClientLogin::<DefaultCipherSuite>::start(&mut client_rng, args.password.as_bytes())
+            .unwrap();
 
     let credential_request_hex = hex::encode(client_login_start_result.message.serialize());
 
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("serializedKE1", credential_request_hex.into());
-    body.insert("email", email.clone().into());
+    body.insert("email", args.email.clone().into());
 
-    let resp = post_request("http://localhost:8080/v2/auth/login/init", None, body);
+    let resp = post_request(&args, "/v2/auth/login/init", None, body);
 
-    let ke2_bin = hex::decode(resp.get("serializedKE2").unwrap()).unwrap();
+    let ke2_bin = hex::decode(
+        resp.get("serializedKE2")
+            .and_then(|v| v.as_str())
+            .expect("Missing serializedKE2 field"),
+    )
+    .expect("Failed to decode hex");
 
     let client_login_finish_result = client_login_start_result
         .state
         .finish(
-            password.as_bytes(),
+            args.password.as_bytes(),
             CredentialResponse::deserialize(&ke2_bin).unwrap(),
             ClientLoginFinishParameters {
                 identifiers: Identifiers {
-                    client: Some(email.as_bytes()),
+                    client: Some(args.email.as_bytes()),
                     server: None,
                 },
                 ..Default::default()
@@ -167,24 +222,34 @@ fn login() {
     body.insert("clientMac", credential_finalization_hex.into());
 
     let resp = post_request(
-        "http://localhost:8080/v2/auth/login/finalize",
-        Some(resp.get("akeToken").unwrap()),
+        &args,
+        "/v2/auth/login/finalize",
+        Some(
+            resp.get("akeToken")
+                .and_then(|v| v.as_str())
+                .expect("Missing akeToken field"),
+        ),
         body,
     );
 
-    println!("auth token: {}", resp.get("authToken").unwrap())
+    println!(
+        "auth token: {}",
+        resp.get("authToken").unwrap().as_str().unwrap()
+    )
 }
 
 fn main() {
-    print!("1. Login\n2. Register/set password\nEnter choice (1 or 2): ");
-    stdout().flush().unwrap();
+    let args = CliArgs::parse();
 
-    let mut choice = String::new();
-    stdin().read_line(&mut choice).unwrap();
-
-    match choice.trim() {
-        "1" => login(),
-        "2" => set_password(),
-        _ => println!("Invalid choice"),
+    if args.login {
+        login(args);
+    } else if args.register || args.set_password {
+        set_password(args);
+    } else {
+        CliArgs::command()
+            .print_help()
+            .expect("Failed to display help message");
+        eprintln!("Must supply -l, -r or -s");
+        std::process::exit(1);
     }
 }
