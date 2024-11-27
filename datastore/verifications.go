@@ -8,7 +8,6 @@ import (
 
 	"github.com/brave/accounts/util"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"gorm.io/gorm"
 )
 
@@ -132,11 +131,11 @@ func (d *Datastore) GetVerificationStatus(id uuid.UUID) (*Verification, error) {
 
 func (d *Datastore) WaitOnVerification(ctx context.Context, id uuid.UUID) (bool, error) {
 	// Setup notification listening
-	conn, err := pgx.ConnectConfig(ctx, d.dbConfig)
+	conn, err := d.listenPool.Acquire(ctx)
 	if err != nil {
-		return false, fmt.Errorf("failed to connect to database: %w", err)
+		return false, fmt.Errorf("failed to acquire database conn from pool: %w", err)
 	}
-	defer conn.Close(ctx)
+	defer conn.Release()
 
 	channelName := generateNotificationChannel(id)
 	err = util.ListenOnPGChannel(ctx, conn, channelName)
@@ -161,7 +160,7 @@ func (d *Datastore) WaitOnVerification(ctx context.Context, id uuid.UUID) (bool,
 	ctx, cancel := context.WithTimeout(ctx, verifyWaitMaxDuration)
 	defer cancel()
 
-	_, err = conn.WaitForNotification(ctx)
+	_, err = conn.Conn().WaitForNotification(ctx)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return false, nil

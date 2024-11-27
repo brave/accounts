@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var validate = validator.New(validator.WithRequiredStructEnabled())
@@ -96,7 +96,7 @@ func validatePGChannelName(channelName string) error {
 	return nil
 }
 
-func ListenOnPGChannel(ctx context.Context, conn *pgx.Conn, channelName string) error {
+func ListenOnPGChannel(ctx context.Context, conn *pgxpool.Conn, channelName string) error {
 	if err := validatePGChannelName(channelName); err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func ListenOnPGChannel(ctx context.Context, conn *pgx.Conn, channelName string) 
 	return err
 }
 
-func UnlistenOnPGChannel(ctx context.Context, conn *pgx.Conn, channelName string) error {
+func UnlistenOnPGChannel(ctx context.Context, conn *pgxpool.Conn, channelName string) error {
 	if err := validatePGChannelName(channelName); err != nil {
 		return err
 	}

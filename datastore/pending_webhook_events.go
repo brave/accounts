@@ -8,7 +8,7 @@ import (
 
 	"github.com/brave/accounts/util"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"gorm.io/gorm"
 )
 
@@ -46,7 +46,7 @@ type AccountDeletionEventDetails struct {
 // WebhookEventListener handles Postgres notifications for webhook events
 type WebhookEventListener struct {
 	// Postgres connection for listening to notifications
-	conn *pgx.Conn
+	conn *pgxpool.Conn
 }
 
 func (d *Datastore) notifyEvent(eventType string, details interface{}) error {
@@ -79,9 +79,9 @@ func (d *Datastore) NotifyAccountDeletionEvent(accountID uuid.UUID) error {
 
 func (d *Datastore) NewWebhookEventListener() (*WebhookEventListener, error) {
 	ctx := context.Background()
-	conn, err := pgx.ConnectConfig(ctx, d.dbConfig)
+	conn, err := d.listenPool.Acquire(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
+		return nil, fmt.Errorf("failed to acquire database conn from pool: %w", err)
 	}
 
 	err = util.ListenOnPGChannel(ctx, conn, webhookEventsChannel)
@@ -92,7 +92,7 @@ func (d *Datastore) NewWebhookEventListener() (*WebhookEventListener, error) {
 }
 
 func (l *WebhookEventListener) WaitForEvent() (int64, error) {
-	notification, err := l.conn.WaitForNotification(context.Background())
+	notification, err := l.conn.Conn().WaitForNotification(context.Background())
 	if err != nil {
 		return 0, fmt.Errorf("error waiting for notification: %w", err)
 	}
