@@ -26,6 +26,7 @@ type AuthTestSuite struct {
 	ds           *datastore.Datastore
 	jwtService   *services.JWTService
 	account      *datastore.Account
+	controller   *controllers.AuthController
 	router       *chi.Mux
 	opaqueConfig *opaque.Configuration
 }
@@ -42,7 +43,7 @@ func (suite *AuthTestSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 	opaqueService, err := services.NewOpaqueService(suite.ds)
 	require.NoError(suite.T(), err)
-	controller := controllers.NewAuthController(opaqueService, suite.jwtService, suite.ds, &MockSESService{})
+	suite.controller = controllers.NewAuthController(opaqueService, suite.jwtService, suite.ds, &MockSESService{})
 
 	suite.account, err = suite.ds.GetOrCreateAccount("test@example.com")
 	require.NoError(suite.T(), err)
@@ -59,10 +60,14 @@ func (suite *AuthTestSuite) SetupTest() {
 	_, err = opaqueService.SetupPasswordFinalize(suite.account.Email, registrationRec)
 	require.NoError(suite.T(), err)
 
+	suite.SetupRouter(true)
+}
+
+func (suite *AuthTestSuite) SetupRouter(passwordAuthEnabled bool) {
 	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion)
 
 	suite.router = chi.NewRouter()
-	suite.router.Mount("/v2/auth", controller.Router(authMiddleware, true))
+	suite.router.Mount("/v2/auth", suite.controller.Router(authMiddleware, passwordAuthEnabled))
 }
 
 func (suite *AuthTestSuite) createLoginFinalizeRequest(opaqueClient *opaque.Client, serializedKE2Hex string) controllers.LoginFinalizeRequest {
@@ -242,6 +247,38 @@ func (suite *AuthTestSuite) TestAuthLoginExpiredAKEToken() {
 	resp = util.ExecuteTestRequest(req, suite.router)
 	assert.Equal(suite.T(), http.StatusUnauthorized, resp.Code)
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrAKEStateExpired.Code)
+}
+
+func (suite *AuthTestSuite) TestPasswordAuthEndpointsDisabled() {
+	// Setup router with password auth disabled
+	suite.SetupRouter(false)
+
+	// Try accessing password auth endpoints, expect 404s
+	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/auth/login/init", nil), suite.router)
+	suite.Equal(404, resp.Code)
+
+	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/auth/login/finalize", nil), suite.router)
+	suite.Equal(404, resp.Code)
+
+	// Validate endpoint should still work
+	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/auth/validate", nil), suite.router)
+	suite.NotEqual(404, resp.Code)
+}
+
+func (suite *AuthTestSuite) TestPasswordAuthEndpointsEnabled() {
+	// Setup router with password auth enabled
+	suite.SetupRouter(true)
+
+	// Try accessing password auth endpoints, expect not-404s
+	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/auth/login/init", nil), suite.router)
+	suite.NotEqual(404, resp.Code)
+
+	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/auth/login/finalize", nil), suite.router)
+	suite.NotEqual(404, resp.Code)
+
+	// Validate endpoint should work
+	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/auth/validate", nil), suite.router)
+	suite.NotEqual(404, resp.Code)
 }
 
 func TestAuthTestSuite(t *testing.T) {

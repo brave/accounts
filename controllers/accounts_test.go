@@ -26,6 +26,7 @@ type AccountsTestSuite struct {
 	jwtService   *services.JWTService
 	router       *chi.Mux
 	opaqueClient *opaque.Client
+	controller   *controllers.AccountsController
 }
 
 func (suite *AccountsTestSuite) SetupTest() {
@@ -39,16 +40,19 @@ func (suite *AccountsTestSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 	opaqueService, err := services.NewOpaqueService(suite.ds)
 	require.NoError(suite.T(), err)
-	controller := controllers.NewAccountsController(opaqueService, suite.jwtService, suite.ds)
+	suite.controller = controllers.NewAccountsController(opaqueService, suite.jwtService, suite.ds)
 
 	suite.opaqueClient, err = opaque.NewClient(opaqueService.Config)
 	require.NoError(suite.T(), err)
 
+	suite.SetupRouter(true)
+}
+
+func (suite *AccountsTestSuite) SetupRouter(accountDeletionEnabled bool) {
 	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion)
 	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds)
-
 	suite.router = chi.NewRouter()
-	suite.router.Mount("/v2/accounts", controller.Router(verificationAuthMiddleware, authMiddleware, true))
+	suite.router.Mount("/v2/accounts", suite.controller.Router(verificationAuthMiddleware, authMiddleware, accountDeletionEnabled))
 }
 
 func (suite *AccountsTestSuite) TestSetPassword() {
@@ -196,6 +200,44 @@ func (suite *AccountsTestSuite) TestDeleteAccount() {
 	err = suite.ds.DB.Model(&datastore.Account{}).Where("id = ?", account.ID).Count(&accountCount).Error
 	require.NoError(suite.T(), err)
 	assert.Equal(suite.T(), int64(0), accountCount)
+}
+
+func (suite *AccountsTestSuite) TestAccountDeletionEndpointDisabled() {
+	// Setup router with account deletion disabled
+	suite.SetupRouter(false)
+
+	// Try accessing delete endpoint, expect 404
+	req := httptest.NewRequest("DELETE", "/v2/accounts", nil)
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(404, resp.Code)
+
+	// Password setup endpoints should still work
+	initReq := httptest.NewRequest("POST", "/v2/accounts/password/init", nil)
+	resp = util.ExecuteTestRequest(initReq, suite.router)
+	suite.NotEqual(404, resp.Code)
+
+	finalizeReq := httptest.NewRequest("POST", "/v2/accounts/password/finalize", nil)
+	resp = util.ExecuteTestRequest(finalizeReq, suite.router)
+	suite.NotEqual(404, resp.Code)
+}
+
+func (suite *AccountsTestSuite) TestAccountDeletionEndpointEnabled() {
+	// Setup router with account deletion enabled
+	suite.SetupRouter(true)
+
+	// Try accessing delete endpoint, expect not-404
+	req := httptest.NewRequest("DELETE", "/v2/accounts", nil)
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.NotEqual(404, resp.Code)
+
+	// Password setup endpoints should work
+	initReq := httptest.NewRequest("POST", "/v2/accounts/password/init", nil)
+	resp = util.ExecuteTestRequest(initReq, suite.router)
+	suite.NotEqual(404, resp.Code)
+
+	finalizeReq := httptest.NewRequest("POST", "/v2/accounts/password/finalize", nil)
+	resp = util.ExecuteTestRequest(finalizeReq, suite.router)
+	suite.NotEqual(404, resp.Code)
 }
 
 func TestAccountsTestSuite(t *testing.T) {

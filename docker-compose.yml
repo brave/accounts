@@ -3,11 +3,13 @@ networks:
 
 services:
   postgres:
-    image: public.ecr.aws/docker/library/postgres:17
+    build:
+      dockerfile: pg.Dockerfile
     ports:
       - "5435:5432"
     networks:
       - main
+    command: ["postgres", "-c", "shared_preload_libraries=pg_cron", "-c", "max_connections=200"]
     environment:
       - POSTGRES_USER=accounts
       - POSTGRES_PASSWORD=password

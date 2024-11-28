@@ -2,6 +2,7 @@ package datastore
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"fmt"
 	"os"
@@ -53,10 +54,18 @@ func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
 		}
 	}
 
-	iofsDriver, err := iofs.New(migrations.MigrationFiles, ".")
+	var files embed.FS
+	if isTesting {
+		files = migrations.MigrationFiles
+	} else {
+		files = migrations.MigrationFilesWithExtension
+	}
+
+	iofsDriver, err := iofs.New(files, ".")
 	if err != nil {
 		return nil, fmt.Errorf("failed to load iofs driver for migrations: %w", err)
 	}
+
 	migration, err := migrate.NewWithSourceInstance(
 		"iofs",
 		iofsDriver,
@@ -65,6 +74,7 @@ func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to init migrations: %w", err)
 	}
+
 	if isTesting {
 		if err = migration.Drop(); err != nil {
 			return nil, fmt.Errorf("failed to down migrations for testing: %w", err)
@@ -78,6 +88,7 @@ func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
 			return nil, fmt.Errorf("Failed to re-init migrations: %w", err)
 		}
 	}
+
 	if err = migration.Up(); err != nil {
 		if !errors.Is(err, migrate.ErrNoChange) {
 			return nil, fmt.Errorf("Failed to run migrations: %w", err)
