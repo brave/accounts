@@ -16,6 +16,12 @@ import (
 
 var validate = validator.New(validator.WithRequiredStructEnabled())
 
+const (
+	DevelopmentEnv = "development"
+	StagingEnv     = "staging"
+	ProductionEnv  = "production"
+)
+
 func GenerateRandomString(length int) string {
 	b := make([]byte, length)
 	if _, err := rand.Read(b); err != nil {
@@ -37,20 +43,22 @@ func isGmail(domain string) bool {
 	return strings.EqualFold(domain, "gmail.com") || strings.EqualFold(domain, "googlemail.com")
 }
 
-func FullyNormalizeEmail(email string) *string {
+// Simplify email address according to provider-specific
+// rules. To be used for recovery/login assistance flows only.
+func SimplifyEmail(email string) *string {
 	// Split email into local part and domain
 	parts := strings.Split(email, "@")
-	if len(parts) != 2 {
-		return nil
-	}
 
 	// Check if it's a Gmail address
-	if !isGmail(parts[1]) {
+	if !isGmail(parts[len(parts)-1]) {
 		return nil
 	}
 
+	email = CanonicalizeEmail(email)
+	parts = strings.Split(email, "@")
+
 	// Remove dots and everything after + in local part
-	localPart := parts[0]
+	localPart := strings.Join(parts[:len(parts)-1], "@")
 	if plusIndex := strings.Index(localPart, "+"); plusIndex != -1 {
 		localPart = localPart[:plusIndex]
 	}
@@ -61,19 +69,21 @@ func FullyNormalizeEmail(email string) *string {
 	return &normalized
 }
 
-func PartiallyNormalizeEmail(email string) string {
+// Canonicalize email for general email address storage.
+func CanonicalizeEmail(email string) string {
 	// Split email into local part and domain
 	parts := strings.Split(email, "@")
-	if len(parts) != 2 {
-		return email
-	}
+	lastIndex := len(parts) - 1
+	parts[lastIndex] = strings.ToLower(parts[lastIndex])
 
 	// Check if it's a Gmail address
-	if !isGmail(parts[1]) {
-		return email
+	if isGmail(parts[len(parts)-1]) {
+		for i := 0; i < len(parts)-1; i++ {
+			parts[i] = strings.ToLower(parts[i])
+		}
 	}
 
-	return strings.ToLower(email)
+	return strings.Join(parts, "@")
 }
 
 func DecodeJSONAndValidate(w http.ResponseWriter, r *http.Request, data interface{}) bool {

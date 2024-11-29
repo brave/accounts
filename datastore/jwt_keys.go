@@ -15,8 +15,8 @@ const keySize = 64
 type JWTKey struct {
 	// ID is the unique identifier for the JWT key
 	ID int
-	// Key contains the raw bytes of the signing key
-	Key []byte
+	// KeyMaterial contains the raw bytes of the signing key
+	KeyMaterial []byte
 	// CreatedAt stores the timestamp when the key was created (read-only)
 	CreatedAt time.Time `gorm:"<-:false"`
 }
@@ -39,7 +39,7 @@ func (d *Datastore) GetOrCreateJWTKeys() (map[int][]byte, error) {
 				panic(fmt.Errorf("failed to generate random jwt key: %w", err))
 			}
 			newKey := JWTKey{
-				Key: key,
+				KeyMaterial: key,
 			}
 
 			if err := tx.Create(&newKey).Error; err != nil {
@@ -55,7 +55,7 @@ func (d *Datastore) GetOrCreateJWTKeys() (map[int][]byte, error) {
 
 	keyMap := make(map[int][]byte)
 	for _, key := range keys {
-		keyMap[key.ID] = key.Key
+		keyMap[key.ID] = key.KeyMaterial
 	}
 
 	if err != nil {

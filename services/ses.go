@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/brave/accounts/datastore"
 	"github.com/brave/accounts/templates"
+	"github.com/brave/accounts/util"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/rs/zerolog/log"
 )
@@ -94,7 +95,7 @@ func newEmailFields(localizer *i18n.Localizer, subjectMessageID string) emailFie
 	}
 }
 
-func NewSESService(i18nBundle *i18n.Bundle) (*SESService, error) {
+func NewSESService(i18nBundle *i18n.Bundle, env string) (*SESService, error) {
 	// Create AWS config
 	cfg, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
@@ -149,6 +150,9 @@ func NewSESService(i18nBundle *i18n.Bundle) (*SESService, error) {
 	configSet := os.Getenv(configSetEnv)
 
 	frontendURL := os.Getenv(verifyFrontendURLEnv)
+	if frontendURL == "" && env == util.ProductionEnv {
+		return nil, fmt.Errorf("%s env var must be specified in production", verifyFrontendURLEnv)
+	}
 
 	return &SESService{
 		client,

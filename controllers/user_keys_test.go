@@ -13,8 +13,6 @@ import (
 	"github.com/brave/accounts/services"
 	"github.com/brave/accounts/util"
 	"github.com/go-chi/chi/v5"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -29,33 +27,33 @@ type UserKeysTestSuite struct {
 func (suite *UserKeysTestSuite) SetupTest() {
 	var err error
 	suite.ds, err = datastore.NewDatastore(datastore.PasswordAuthSessionVersion, true)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	jwtService, err := services.NewJWTService(suite.ds)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	suite.account, err = suite.ds.GetOrCreateAccount("test@example.com")
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	otherAccount, err := suite.ds.GetOrCreateAccount("test2@example.com")
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	otherTestKey := datastore.DBUserKey{
-		AccountID:    otherAccount.ID,
-		Name:         "wrapping_key",
-		EncryptedKey: []byte("test key 10"),
-		UpdatedAt:    time.Now().UTC(),
+		AccountID:   otherAccount.ID,
+		Name:        "wrapping_key",
+		KeyMaterial: []byte("test key 10"),
+		UpdatedAt:   time.Now().UTC(),
 	}
 	err = suite.ds.StoreUserKey(&otherTestKey)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	controller := controllers.NewUserKeysController(suite.ds)
 	authMiddleware := middleware.AuthMiddleware(jwtService, suite.ds, datastore.EmailAuthSessionVersion)
 
 	session, err := suite.ds.CreateSession(suite.account.ID, datastore.PasswordAuthSessionVersion, "")
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 	suite.authToken, err = jwtService.CreateAuthToken(session.ID)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	suite.router = chi.NewRouter()
 	suite.router.Mount("/v2/keys", controller.Router(authMiddleware))
@@ -70,63 +68,63 @@ func (suite *UserKeysTestSuite) TestListKeys() {
 	updatedTime := time.Now().UTC().Truncate(time.Millisecond)
 	testKeys := []datastore.DBUserKey{
 		{
-			AccountID:    suite.account.ID,
-			Name:         "wrapping_key",
-			EncryptedKey: []byte("test key 1"),
-			UpdatedAt:    updatedTime,
+			AccountID:   suite.account.ID,
+			Name:        "wrapping_key",
+			KeyMaterial: []byte("test key 1"),
+			UpdatedAt:   updatedTime,
 		},
 		{
-			AccountID:    suite.account.ID,
-			Name:         "sync_enc_seed",
-			EncryptedKey: []byte("test key 2"),
-			UpdatedAt:    updatedTime,
+			AccountID:   suite.account.ID,
+			Name:        "sync_enc_seed",
+			KeyMaterial: []byte("test key 2"),
+			UpdatedAt:   updatedTime,
 		},
 	}
 
 	for _, key := range testKeys {
 		err := suite.ds.StoreUserKey(&key)
-		require.NoError(suite.T(), err)
+		suite.Require().NoError(err)
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/v2/keys", nil)
 	req.Header.Set("Authorization", "Bearer "+suite.authToken)
 	resp := util.ExecuteTestRequest(req, suite.router)
 
-	assert.Equal(suite.T(), http.StatusOK, resp.Code)
+	suite.Equal(http.StatusOK, resp.Code)
 
 	var responseKeys []controllers.UserKey
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &responseKeys)
 
-	assert.Len(suite.T(), responseKeys, len(testKeys))
+	suite.Len(responseKeys, len(testKeys))
 	for i, testKey := range testKeys {
-		assert.Equal(suite.T(), testKey.Name, responseKeys[i].Name)
-		assert.Equal(suite.T(), hex.EncodeToString(testKey.EncryptedKey), responseKeys[i].EncryptedKey)
-		assert.Equal(suite.T(), testKey.UpdatedAt, responseKeys[i].UpdatedAt)
+		suite.Equal(testKey.Name, responseKeys[i].Name)
+		suite.Equal(hex.EncodeToString(testKey.KeyMaterial), responseKeys[i].KeyMaterial)
+		suite.Equal(testKey.UpdatedAt, responseKeys[i].UpdatedAt)
 	}
 }
 
 func (suite *UserKeysTestSuite) TestGetKey() {
 	testKey := &datastore.DBUserKey{
-		AccountID:    suite.account.ID,
-		Name:         "wrapping_key",
-		EncryptedKey: []byte("test key"),
-		UpdatedAt:    time.Now().UTC().Truncate(time.Millisecond),
+		AccountID:   suite.account.ID,
+		Name:        "wrapping_key",
+		KeyMaterial: []byte("test key"),
+		UpdatedAt:   time.Now().UTC().Truncate(time.Millisecond),
 	}
 	err := suite.ds.StoreUserKey(testKey)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	req := httptest.NewRequest(http.MethodGet, "/v2/keys/wrapping_key", nil)
 	req.Header.Set("Authorization", "Bearer "+suite.authToken)
 	resp := util.ExecuteTestRequest(req, suite.router)
 
-	assert.Equal(suite.T(), http.StatusOK, resp.Code)
+	suite.Equal(http.StatusOK, resp.Code)
 
 	var responseKey controllers.UserKey
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &responseKey)
 
-	assert.Equal(suite.T(), testKey.Name, responseKey.Name)
-	assert.Equal(suite.T(), hex.EncodeToString(testKey.EncryptedKey), responseKey.EncryptedKey)
-	assert.Equal(suite.T(), testKey.UpdatedAt, responseKey.UpdatedAt)
+	suite.Equal(testKey.Name, responseKey.Name)
+	suite.Equal(hex.EncodeToString(testKey.KeyMaterial), responseKey.KeyMaterial)
+	suite.Equal(testKey.UpdatedAt, responseKey.UpdatedAt)
 }
 
 func (suite *UserKeysTestSuite) TestSaveKey() {
@@ -139,12 +137,12 @@ func (suite *UserKeysTestSuite) TestSaveKey() {
 	req.Header.Set("Authorization", "Bearer "+suite.authToken)
 	resp := util.ExecuteTestRequest(req, suite.router)
 
-	assert.Equal(suite.T(), http.StatusNoContent, resp.Code)
+	suite.Equal(http.StatusNoContent, resp.Code)
 
 	// Verify key was stored
 	key, err := suite.ds.GetUserKey(suite.account.ID, "wrapping_key")
-	require.NoError(suite.T(), err)
-	assert.Equal(suite.T(), "wrapping_key", key.Name)
+	suite.Require().NoError(err)
+	suite.Equal("wrapping_key", key.Name)
 }
 
 func (suite *UserKeysTestSuite) TestSaveKeyInvalidKeyName() {
@@ -157,7 +155,7 @@ func (suite *UserKeysTestSuite) TestSaveKeyInvalidKeyName() {
 	req.Header.Set("Authorization", "Bearer "+suite.authToken)
 	resp := util.ExecuteTestRequest(req, suite.router)
 
-	assert.Equal(suite.T(), http.StatusBadRequest, resp.Code)
+	suite.Equal(http.StatusBadRequest, resp.Code)
 }
 
 func (suite *UserKeysTestSuite) TestSaveKeyInvalidHex() {
@@ -170,7 +168,7 @@ func (suite *UserKeysTestSuite) TestSaveKeyInvalidHex() {
 	req.Header.Set("Authorization", "Bearer "+suite.authToken)
 	resp := util.ExecuteTestRequest(req, suite.router)
 
-	assert.Equal(suite.T(), http.StatusBadRequest, resp.Code)
+	suite.Equal(http.StatusBadRequest, resp.Code)
 }
 
 func (suite *UserKeysTestSuite) TestGetKeyNotFound() {
@@ -178,5 +176,5 @@ func (suite *UserKeysTestSuite) TestGetKeyNotFound() {
 	req.Header.Set("Authorization", "Bearer "+suite.authToken)
 	resp := util.ExecuteTestRequest(req, suite.router)
 
-	assert.Equal(suite.T(), http.StatusNotFound, resp.Code)
+	suite.Equal(http.StatusNotFound, resp.Code)
 }

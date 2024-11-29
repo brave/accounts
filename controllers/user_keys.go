@@ -29,8 +29,8 @@ type UserKeyStoreRequest struct {
 type UserKey struct {
 	// Name identifies the type of key (wrapping_key or sync_enc_seed)
 	Name string `json:"name"`
-	// EncryptedKey contains the encrypted key data as hex bytes
-	EncryptedKey string `json:"encryptedKey"`
+	// KeyMaterial contains the encrypted key data as hex bytes
+	KeyMaterial string `json:"keyMaterial"`
 	// UpdatedAt is the timestamp when the key was last updated
 	UpdatedAt time.Time `json:"updatedAt"`
 }
@@ -43,19 +43,19 @@ func (r *UserKeyStoreRequest) ToDBUserKey(accountID uuid.UUID) (*datastore.DBUse
 	}
 
 	return &datastore.DBUserKey{
-		AccountID:    accountID,
-		Name:         r.Name,
-		EncryptedKey: encKey,
-		UpdatedAt:    time.Now().UTC(),
+		AccountID:   accountID,
+		Name:        r.Name,
+		KeyMaterial: encKey,
+		UpdatedAt:   time.Now().UTC(),
 	}, nil
 }
 
 // FromDBUserKey converts a datastore.DBUserKey to a UserKey
 func FromDBUserKey(dbKey *datastore.DBUserKey) UserKey {
 	return UserKey{
-		Name:         dbKey.Name,
-		EncryptedKey: hex.EncodeToString(dbKey.EncryptedKey),
-		UpdatedAt:    dbKey.UpdatedAt,
+		Name:        dbKey.Name,
+		KeyMaterial: hex.EncodeToString(dbKey.KeyMaterial),
+		UpdatedAt:   dbKey.UpdatedAt,
 	}
 }
 

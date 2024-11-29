@@ -20,8 +20,8 @@ type Account struct {
 	ID uuid.UUID
 	// Email address associated with the account
 	Email string
-	// Fully normalized email address used in the account recovery flow only
-	FullyNormalizedEmail *string `json:"-"`
+	// Simplified email address used in the account recovery flow only
+	SimplifiedEmail *string `json:"-"`
 	// Optional reference to the OPRF seed used for password hashing
 	OprfSeedID *int `json:"-"`
 	// Serialized OPAQUE protocol registration data
@@ -39,7 +39,7 @@ func (d *Datastore) GetAccount(tx *gorm.DB, email string) (*Account, error) {
 	if tx == nil {
 		tx = d.DB
 	}
-	result := tx.Where("email = ?", util.PartiallyNormalizeEmail(email)).First(&account)
+	result := tx.Where("email = ?", util.CanonicalizeEmail(email)).First(&account)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, ErrAccountNotFound
@@ -51,7 +51,7 @@ func (d *Datastore) GetAccount(tx *gorm.DB, email string) (*Account, error) {
 
 func (d *Datastore) GetAccountsByFullyNormalizedEmail(email string) ([]Account, error) {
 	var accounts []Account
-	normalizedEmail := util.FullyNormalizeEmail(email)
+	normalizedEmail := util.SimplifyEmail(email)
 	if normalizedEmail == nil {
 		return nil, ErrAccountNotFound
 	}
@@ -66,7 +66,7 @@ func (d *Datastore) AccountExists(email string) (bool, error) {
 	var exists bool
 	result := d.DB.Model(&Account{}).
 		Select("1").
-		Where("email = ?", util.PartiallyNormalizeEmail(email)).
+		Where("email = ?", util.CanonicalizeEmail(email)).
 		Limit(1).
 		Find(&exists)
 
@@ -97,9 +97,9 @@ func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
 		}
 
 		account = &Account{
-			ID:                   id,
-			Email:                util.PartiallyNormalizeEmail(email),
-			FullyNormalizedEmail: util.FullyNormalizeEmail(email),
+			ID:              id,
+			Email:           util.CanonicalizeEmail(email),
+			SimplifiedEmail: util.SimplifyEmail(email),
 		}
 
 		if err := tx.Create(account).Error; err != nil {

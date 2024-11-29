@@ -16,6 +16,7 @@ View API documentation at http://localhost:8080/swagger/index.html.
 
 | Name | Required? | Description |
 |------|-----------|-------------|
+| ENVIRONMENT | Yes | Must be `production`, `staging`, or `development` |
 | DATABASE_URL | Yes | PostgreSQL database connection URL |
 | EMAIL_FROM_ADDRESS | Yes | Email address used as sender for verification emails |
 | BASE_URL | Yes | Base URL of the service |

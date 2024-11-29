@@ -54,7 +54,7 @@ func (d *Datastore) CreateVerification(email string, service string, intent stri
 		return nil, err
 	}
 
-	email = util.PartiallyNormalizeEmail(email)
+	email = util.CanonicalizeEmail(email)
 	verification := Verification{
 		ID:       id,
 		Email:    email,

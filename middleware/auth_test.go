@@ -1,9 +1,11 @@
 package middleware_test
 
 import (
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,7 +14,6 @@ import (
 	"github.com/brave/accounts/services"
 	"github.com/brave/accounts/util"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -30,13 +31,13 @@ func TestMiddlewareTestSuite(t *testing.T) {
 func (suite *MiddlewareTestSuite) SetupTest() {
 	var err error
 	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, true)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	suite.jwtService, err = services.NewJWTService(suite.ds)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	suite.account, err = suite.ds.GetOrCreateAccount("test@example.com")
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 }
 
 func (suite *MiddlewareTestSuite) TestAuthMiddleware() {
@@ -45,14 +46,14 @@ func (suite *MiddlewareTestSuite) TestAuthMiddleware() {
 
 	// Create test token
 	session, err := suite.ds.CreateSession(suite.account.ID, datastore.EmailAuthSessionVersion, "")
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 	token, err := suite.jwtService.CreateAuthToken(session.ID)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctxSession := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
-		assert.Equal(suite.T(), ctxSession.ID, session.ID)
-		assert.Equal(suite.T(), ctxSession.Email, suite.account.Email)
+		suite.Equal(ctxSession.ID, session.ID)
+		suite.Equal(ctxSession.Email, suite.account.Email)
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -60,25 +61,33 @@ func (suite *MiddlewareTestSuite) TestAuthMiddleware() {
 	req := httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp := util.ExecuteTestRequest(req, mw(handler))
-	assert.Equal(suite.T(), http.StatusOK, resp.Code)
+	suite.Equal(http.StatusOK, resp.Code)
 
 	// Test invalid token
 	req = httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "Bearer invalid")
 	resp = util.ExecuteTestRequest(req, mw(handler))
-	assert.Equal(suite.T(), http.StatusUnauthorized, resp.Code)
+	suite.Equal(http.StatusUnauthorized, resp.Code)
+
+	noneToken := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT","kid":1}`)) + "." + strings.Split(token, ".")[1] + "." + strings.Split(token, ".")[2]
+
+	// Test alg=none token
+	req = httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer "+noneToken)
+	resp = util.ExecuteTestRequest(req, mw(handler))
+	suite.Equal(http.StatusUnauthorized, resp.Code)
 
 	// Test missing token
 	req = httptest.NewRequest("GET", "/", nil)
 	resp = util.ExecuteTestRequest(req, mw(handler))
-	assert.Equal(suite.T(), http.StatusUnauthorized, resp.Code)
+	suite.Equal(http.StatusUnauthorized, resp.Code)
 
 	// Test outdated session version
 	mw = middleware.AuthMiddleware(suite.jwtService, suite.ds, 2)
 	req = httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp = util.ExecuteTestRequest(req, mw(handler))
-	assert.Equal(suite.T(), http.StatusForbidden, resp.Code)
+	suite.Equal(http.StatusForbidden, resp.Code)
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrOutdatedSession.Code)
 }
 
@@ -92,24 +101,24 @@ func (suite *MiddlewareTestSuite) TestServicesKeyMiddleware() {
 	os.Setenv("BRAVE_SERVICES_KEY", testKey)
 	defer os.Unsetenv("BRAVE_SERVICES_KEY")
 
-	mw := middleware.ServicesKeyMiddleware()
+	mw := middleware.ServicesKeyMiddleware(util.ProductionEnv)
 
 	// Test valid key
 	req := httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("brave-key", testKey)
 	resp := util.ExecuteTestRequest(req, mw(handler))
-	assert.Equal(suite.T(), http.StatusOK, resp.Code)
+	suite.Equal(http.StatusOK, resp.Code)
 
 	// Test invalid key
 	req = httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("brave-key", "wrong-key")
 	resp = util.ExecuteTestRequest(req, mw(handler))
-	assert.Equal(suite.T(), http.StatusUnauthorized, resp.Code)
+	suite.Equal(http.StatusUnauthorized, resp.Code)
 
 	// Test missing key
 	req = httptest.NewRequest("GET", "/", nil)
 	resp = util.ExecuteTestRequest(req, mw(handler))
-	assert.Equal(suite.T(), http.StatusUnauthorized, resp.Code)
+	suite.Equal(http.StatusUnauthorized, resp.Code)
 }
 
 func (suite *MiddlewareTestSuite) TestVerificationAuthMiddleware() {
@@ -124,34 +133,34 @@ func (suite *MiddlewareTestSuite) TestVerificationAuthMiddleware() {
 
 	// Create test verification
 	verification, err := suite.ds.CreateVerification("test@example.com", "inbox-aliases", "verification")
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 	token, err := suite.jwtService.CreateVerificationToken(verification.ID, time.Minute*30, verification.Service)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	// Test valid request
 	req := httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp := util.ExecuteTestRequest(req, mw(handler))
-	assert.Equal(suite.T(), http.StatusOK, resp.Code)
+	suite.Equal(http.StatusOK, resp.Code)
 
 	// Test expired verification
 	err = suite.ds.DB.Model(&datastore.Verification{}).Where("id = ?", verification.ID).Update("created_at", time.Now().Add(-45*time.Minute)).Error
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	req = httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp = util.ExecuteTestRequest(req, mw(handler))
-	assert.Equal(suite.T(), http.StatusNotFound, resp.Code)
+	suite.Equal(http.StatusNotFound, resp.Code)
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrVerificationNotFound.Code)
 
 	// Test invalid token
 	req = httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "Bearer invalid")
 	resp = util.ExecuteTestRequest(req, mw(handler))
-	assert.Equal(suite.T(), http.StatusUnauthorized, resp.Code)
+	suite.Equal(http.StatusUnauthorized, resp.Code)
 
 	// Test missing token
 	req = httptest.NewRequest("GET", "/", nil)
 	resp = util.ExecuteTestRequest(req, mw(handler))
-	assert.Equal(suite.T(), http.StatusUnauthorized, resp.Code)
+	suite.Equal(http.StatusUnauthorized, resp.Code)
 }

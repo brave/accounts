@@ -1071,8 +1071,8 @@ const docTemplate = `{
         "controllers.UserKey": {
             "type": "object",
             "properties": {
-                "encryptedKey": {
-                    "description": "EncryptedKey contains the encrypted key data as hex bytes",
+                "keyMaterial": {
+                    "description": "KeyMaterial contains the encrypted key data as hex bytes",
                     "type": "string"
                 },
                 "name": {

@@ -15,8 +15,6 @@ import (
 	"github.com/brave/accounts/util"
 	"github.com/bytemare/opaque"
 	"github.com/go-chi/chi/v5"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -35,15 +33,15 @@ func (suite *AccountsTestSuite) SetupTest() {
 	os.Setenv("OPAQUE_PUBLIC_KEY", "98584585210c1f310e9d0aeb9ac1384b7d51808cfaf21b17b5e3dc8d35dbfb00")
 
 	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, true)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 	suite.jwtService, err = services.NewJWTService(suite.ds)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 	opaqueService, err := services.NewOpaqueService(suite.ds)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 	suite.controller = controllers.NewAccountsController(opaqueService, suite.jwtService, suite.ds)
 
 	suite.opaqueClient, err = opaque.NewClient(opaqueService.Config)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	suite.SetupRouter(true)
 }
@@ -58,13 +56,13 @@ func (suite *AccountsTestSuite) SetupRouter(accountDeletionEnabled bool) {
 func (suite *AccountsTestSuite) TestSetPassword() {
 	// Create verification
 	verification, err := suite.ds.CreateVerification("test@example.com", "accounts", "registration")
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 	_, err = suite.ds.UpdateAndGetVerificationStatus(verification.ID, verification.Code)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	// Get verification token
 	token, err := suite.jwtService.CreateVerificationToken(verification.ID, time.Minute*30, verification.Service)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
 
@@ -76,15 +74,15 @@ func (suite *AccountsTestSuite) TestSetPassword() {
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp := util.ExecuteTestRequest(req, suite.router)
-	assert.Equal(suite.T(), http.StatusOK, resp.Code)
+	suite.Equal(http.StatusOK, resp.Code)
 
 	var parsedResp controllers.RegistrationResponse
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
-	assert.NotNil(suite.T(), parsedResp.SerializedResponse)
+	suite.NotNil(parsedResp.SerializedResponse)
 	serializedRegistationResp, err := hex.DecodeString(*parsedResp.SerializedResponse)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 	registrationResp, err := suite.opaqueClient.Deserialize.RegistrationResponse(serializedRegistationResp)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	registrationRecord, _ := suite.opaqueClient.RegistrationFinalize(registrationResp, opaque.ClientRegistrationFinalizeOptions{
 		ClientIdentity: []byte(verification.Email),
@@ -98,21 +96,21 @@ func (suite *AccountsTestSuite) TestSetPassword() {
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp = util.ExecuteTestRequest(req, suite.router)
-	assert.Equal(suite.T(), http.StatusOK, resp.Code)
+	suite.Equal(http.StatusOK, resp.Code)
 
 	var parsedFinalizeResp controllers.PasswordFinalizeResponse
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedFinalizeResp)
-	assert.NotEmpty(suite.T(), parsedFinalizeResp.AuthToken)
+	suite.NotEmpty(parsedFinalizeResp.AuthToken)
 
 	// Validate auth token
 	sessionID, err := suite.jwtService.ValidateAuthToken(parsedFinalizeResp.AuthToken)
-	assert.NoError(suite.T(), err)
-	assert.NotNil(suite.T(), sessionID)
+	suite.NoError(err)
+	suite.NotNil(sessionID)
 
 	account, err := suite.ds.GetAccount(nil, verification.Email)
-	require.NoError(suite.T(), err)
-	assert.NotNil(suite.T(), account.OprfSeedID)
-	assert.NotEmpty(suite.T(), account.OpaqueRegistration)
+	suite.Require().NoError(err)
+	suite.NotNil(account.OprfSeedID)
+	suite.NotEmpty(account.OpaqueRegistration)
 
 	// Should not be able to set password again
 	req = util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
@@ -122,7 +120,7 @@ func (suite *AccountsTestSuite) TestSetPassword() {
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp = util.ExecuteTestRequest(req, suite.router)
-	assert.Equal(suite.T(), http.StatusNotFound, resp.Code)
+	suite.Equal(http.StatusNotFound, resp.Code)
 }
 
 func (suite *AccountsTestSuite) TestSetPasswordBadIntents() {
@@ -130,12 +128,12 @@ func (suite *AccountsTestSuite) TestSetPasswordBadIntents() {
 
 	for _, intent := range intents {
 		verification, err := suite.ds.CreateVerification("test@example.com", "accounts", intent)
-		require.NoError(suite.T(), err)
+		suite.Require().NoError(err)
 		_, err = suite.ds.UpdateAndGetVerificationStatus(verification.ID, verification.Code)
-		require.NoError(suite.T(), err)
+		suite.Require().NoError(err)
 
 		token, err := suite.jwtService.CreateVerificationToken(verification.ID, time.Minute*30, verification.Service)
-		require.NoError(suite.T(), err)
+		suite.Require().NoError(err)
 
 		registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
 
@@ -146,7 +144,7 @@ func (suite *AccountsTestSuite) TestSetPasswordBadIntents() {
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp := util.ExecuteTestRequest(req, suite.router)
-		assert.Equal(suite.T(), http.StatusForbidden, resp.Code)
+		suite.Equal(http.StatusForbidden, resp.Code)
 		util.AssertErrorResponseCode(suite.T(), resp, util.ErrIncorrectVerificationIntent.Code)
 	}
 }
@@ -154,11 +152,11 @@ func (suite *AccountsTestSuite) TestSetPasswordBadIntents() {
 func (suite *AccountsTestSuite) TestSetPasswordUnverifiedEmail() {
 	// Create unverified verification
 	verification, err := suite.ds.CreateVerification("test@example.com", "accounts", "password_setup")
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	// Get verification token
 	token, err := suite.jwtService.CreateVerificationToken(verification.ID, time.Minute*30, verification.Service)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
 
@@ -170,36 +168,36 @@ func (suite *AccountsTestSuite) TestSetPasswordUnverifiedEmail() {
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp := util.ExecuteTestRequest(req, suite.router)
-	assert.Equal(suite.T(), http.StatusForbidden, resp.Code)
+	suite.Equal(http.StatusForbidden, resp.Code)
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailNotVerified.Code)
 }
 
 func (suite *AccountsTestSuite) TestDeleteAccount() {
 	// Create test account
 	account, err := suite.ds.GetOrCreateAccount("test@example.com")
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 	// Create test account session
 	session, err := suite.ds.CreateSession(account.ID, datastore.EmailAuthSessionVersion, "")
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 	token, err := suite.jwtService.CreateAuthToken(session.ID)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	// Test account deletion
 	req := httptest.NewRequest("DELETE", "/v2/accounts", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp := util.ExecuteTestRequest(req, suite.router)
-	assert.Equal(suite.T(), http.StatusNoContent, resp.Code)
+	suite.Equal(http.StatusNoContent, resp.Code)
 
 	var sessionCount int64
 	err = suite.ds.DB.Model(&datastore.Session{}).Where("id = ?", session.ID).Count(&sessionCount).Error
-	require.NoError(suite.T(), err)
-	assert.Equal(suite.T(), int64(0), sessionCount)
+	suite.Require().NoError(err)
+	suite.Equal(int64(0), sessionCount)
 
 	var accountCount int64
 	err = suite.ds.DB.Model(&datastore.Account{}).Where("id = ?", account.ID).Count(&accountCount).Error
-	require.NoError(suite.T(), err)
-	assert.Equal(suite.T(), int64(0), accountCount)
+	suite.Require().NoError(err)
+	suite.Equal(int64(0), accountCount)
 }
 
 func (suite *AccountsTestSuite) TestAccountDeletionEndpointDisabled() {

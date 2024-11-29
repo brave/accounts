@@ -15,8 +15,8 @@ type DBUserKey struct {
 	AccountID uuid.UUID `json:"-" gorm:"primaryKey"`
 	// Name identifies the type of key (wrapping_key, sync_enc_seed, or sync_device_seed)
 	Name string `json:"name" gorm:"primaryKey"`
-	// EncryptedKey contains the encrypted key data as bytes
-	EncryptedKey []byte `json:"encryptedKey"`
+	// KeyMaterial contains the encrypted key data as bytes
+	KeyMaterial []byte `json:"keyMaterial"`
 	// UpdatedAt is the timestamp when the key was last updated
 	UpdatedAt time.Time `json:"updatedAt" gorm:"autoUpdateTime:false"`
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/brave/accounts/datastore"
 	"github.com/brave/accounts/services"
 	"github.com/brave/accounts/util"
+	"github.com/rs/zerolog/log"
 )
 
 type contextKey string
@@ -90,8 +91,11 @@ func VerificationAuthMiddleware(jwtService *services.JWTService, ds *datastore.D
 	}
 }
 
-func ServicesKeyMiddleware() func(http.Handler) http.Handler {
+func ServicesKeyMiddleware(env string) func(http.Handler) http.Handler {
 	servicesKey := os.Getenv(braveServicesKeyEnv)
+	if servicesKey == "" && env == util.ProductionEnv {
+		log.Panic().Msgf("%s key cannot be empty in production environment", braveServicesKeyEnv)
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// If services key is configured, verify the request header

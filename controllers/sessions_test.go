@@ -11,8 +11,6 @@ import (
 	"github.com/brave/accounts/services"
 	"github.com/brave/accounts/util"
 	"github.com/go-chi/chi/v5"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -33,10 +31,10 @@ func TestSessionsTestSuite(t *testing.T) {
 func (suite *SessionsTestSuite) SetupTest() {
 	var err error
 	suite.ds, err = datastore.NewDatastore(datastore.PasswordAuthSessionVersion, true)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	suite.jwtService, err = services.NewJWTService(suite.ds)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 	controller := controllers.NewSessionsController(suite.ds)
 
 	// Create middleware
@@ -48,16 +46,16 @@ func (suite *SessionsTestSuite) SetupTest() {
 
 	// Create test accounts
 	suite.mainAccount, err = suite.ds.GetOrCreateAccount("test@example.com")
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 	suite.otherAccount, err = suite.ds.GetOrCreateAccount("other@example.com")
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	_, err = suite.ds.CreateSession(suite.otherAccount.ID, datastore.PasswordAuthSessionVersion, "other")
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 	suite.sessions = nil
 	for i := 0; i < 2; i++ {
 		session, err := suite.ds.CreateSession(suite.mainAccount.ID, datastore.PasswordAuthSessionVersion, "test")
-		require.NoError(suite.T(), err)
+		suite.Require().NoError(err)
 		suite.sessions = append(suite.sessions, session)
 	}
 }
@@ -65,73 +63,73 @@ func (suite *SessionsTestSuite) SetupTest() {
 func (suite *SessionsTestSuite) TestListSessions() {
 	// Get auth token
 	token, err := suite.jwtService.CreateAuthToken(suite.sessions[0].ID)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	// Test list sessions
 	req := httptest.NewRequest("GET", "/v2/sessions", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp := util.ExecuteTestRequest(req, suite.router)
-	assert.Equal(suite.T(), http.StatusOK, resp.Code)
+	suite.Equal(http.StatusOK, resp.Code)
 	var sessions []datastore.Session
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &sessions)
-	assert.Len(suite.T(), sessions, 2)
+	suite.Len(sessions, 2)
 	for i, s := range sessions {
-		assert.Equal(suite.T(), suite.sessions[i].ID, s.ID)
-		assert.Equal(suite.T(), "test", s.UserAgent)
+		suite.Equal(suite.sessions[i].ID, s.ID)
+		suite.Equal("test", s.UserAgent)
 	}
 }
 
 func (suite *SessionsTestSuite) TestDeleteSession() {
 	// Get auth token
 	token, err := suite.jwtService.CreateAuthToken(suite.sessions[1].ID)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
 	// Test delete session
 	req := httptest.NewRequest("DELETE", "/v2/sessions/"+suite.sessions[0].ID.String(), nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp := util.ExecuteTestRequest(req, suite.router)
-	assert.Equal(suite.T(), http.StatusNoContent, resp.Code)
+	suite.Equal(http.StatusNoContent, resp.Code)
 
 	// Verify session was deleted
 	var sessionCount int64
 	suite.ds.DB.Model(&datastore.Session{}).Where("id = ?", suite.sessions[0].ID).Count(&sessionCount)
-	assert.Equal(suite.T(), int64(0), sessionCount)
+	suite.Equal(int64(0), sessionCount)
 
 	// Test delete non-existent session
 	req = httptest.NewRequest("DELETE", "/v2/sessions/"+suite.sessions[0].ID.String(), nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp = util.ExecuteTestRequest(req, suite.router)
-	assert.Equal(suite.T(), http.StatusNotFound, resp.Code)
+	suite.Equal(http.StatusNotFound, resp.Code)
 }
 
 func (suite *SessionsTestSuite) TestSessionsUnauthorized() {
 	// Test list sessions without auth
 	req := httptest.NewRequest("GET", "/v2/sessions", nil)
 	resp := util.ExecuteTestRequest(req, suite.router)
-	assert.Equal(suite.T(), http.StatusUnauthorized, resp.Code)
+	suite.Equal(http.StatusUnauthorized, resp.Code)
 
 	// Test delete session without auth
 	req = httptest.NewRequest("DELETE", "/v2/sessions/"+suite.sessions[0].ID.String(), nil)
 	resp = util.ExecuteTestRequest(req, suite.router)
-	assert.Equal(suite.T(), http.StatusUnauthorized, resp.Code)
+	suite.Equal(http.StatusUnauthorized, resp.Code)
 
 	// Test with invalid auth token
 	req = httptest.NewRequest("GET", "/v2/sessions", nil)
 	req.Header.Set("Authorization", "Bearer invalid-token")
 	resp = util.ExecuteTestRequest(req, suite.router)
-	assert.Equal(suite.T(), http.StatusUnauthorized, resp.Code)
+	suite.Equal(http.StatusUnauthorized, resp.Code)
 
 	// Test another account deleting a session that does not belong to account
 	otherSession, err := suite.ds.CreateSession(suite.otherAccount.ID, datastore.PasswordAuthSessionVersion, "test")
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 	token, err := suite.jwtService.CreateAuthToken(otherSession.ID)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 	req = httptest.NewRequest("DELETE", "/v2/sessions/"+suite.sessions[0].ID.String(), nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp = util.ExecuteTestRequest(req, suite.router)
-	assert.Equal(suite.T(), http.StatusNotFound, resp.Code)
+	suite.Equal(http.StatusNotFound, resp.Code)
 }

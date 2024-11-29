@@ -40,6 +40,7 @@ const (
 	accountDeletionEnabledEnv = "ACCOUNT_DELETION_ENABLED"
 	devEndpointsEnabledEnv    = "DEV_ENDPOINTS_ENABLED"
 	allowedOriginsEnv         = "ALLOWED_ORIGINS"
+	environmentEnv            = "ENVIRONMENT"
 )
 
 // @title Brave Accounts Service
@@ -59,6 +60,17 @@ func main() {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 	}
 
+	environment := os.Getenv(environmentEnv)
+	switch environment {
+	case util.DevelopmentEnv, util.StagingEnv, util.ProductionEnv:
+		// Valid environment
+	default:
+		log.Panic().Msgf("Invalid environment: %s. Must be one of: %s, %s, %s",
+			environment,
+			util.DevelopmentEnv,
+			util.StagingEnv,
+			util.ProductionEnv)
+	}
 	passwordAuthEnabled := os.Getenv(passwordAuthEnabledEnv) == "true"
 	emailAuthEnabled := os.Getenv(emailAuthEnabledEnv) == "true"
 	devEndpointsEnabled := os.Getenv(devEndpointsEnabledEnv) == "true"
@@ -96,7 +108,7 @@ func main() {
 		log.Panic().Err(err).Msg("Failed to init i18n bundle")
 	}
 
-	sesService, err := services.NewSESService(i18nBundle)
+	sesService, err := services.NewSESService(i18nBundle, environment)
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to init SES util")
 	}
@@ -108,7 +120,7 @@ func main() {
 
 	prometheusRegistry := prometheus.NewRegistry()
 
-	servicesKeyMiddleware := middleware.ServicesKeyMiddleware()
+	servicesKeyMiddleware := middleware.ServicesKeyMiddleware(environment)
 	authMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion)
 	verificationMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore)
 

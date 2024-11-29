@@ -9,7 +9,7 @@ services:
       - "5435:5432"
     networks:
       - main
-    command: ["postgres", "-c", "shared_preload_libraries=pg_cron", "-c", "max_connections=200"]
+    command: ["postgres", "-c", "shared_preload_libraries=pg_cron"]
     environment:
       - POSTGRES_USER=accounts
       - POSTGRES_PASSWORD=password
