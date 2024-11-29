@@ -1088,12 +1088,12 @@ const docTemplate = `{
         "controllers.UserKeyStoreRequest": {
             "type": "object",
             "required": [
-                "encryptedKey",
+                "keyMaterial",
                 "name"
             ],
             "properties": {
-                "encryptedKey": {
-                    "description": "EncryptedKey contains the encrypted key data as hex bytes",
+                "keyMaterial": {
+                    "description": "KeyMaterial contains the encrypted key data as hex bytes",
                     "type": "string",
                     "maxLength": 128,
                     "minLength": 16
