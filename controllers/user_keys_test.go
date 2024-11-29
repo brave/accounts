@@ -133,8 +133,8 @@ func (suite *UserKeysTestSuite) TestGetKey() {
 
 func (suite *UserKeysTestSuite) TestSaveKey() {
 	requestBody := controllers.UserKeyStoreRequest{
-		Name:         "wrapping_key",
-		EncryptedKey: "0123456789abcdef",
+		Name:        "wrapping_key",
+		KeyMaterial: "0123456789abcdef",
 	}
 
 	req := util.CreateJSONTestRequest("/v2/keys", requestBody)
@@ -151,8 +151,8 @@ func (suite *UserKeysTestSuite) TestSaveKey() {
 
 func (suite *UserKeysTestSuite) TestSaveKeyInvalidKeyName() {
 	requestBody := controllers.UserKeyStoreRequest{
-		Name:         "bad_key_name",
-		EncryptedKey: "0123456789abcdef",
+		Name:        "bad_key_name",
+		KeyMaterial: "0123456789abcdef",
 	}
 
 	req := util.CreateJSONTestRequest("/v2/keys", requestBody)
@@ -164,8 +164,8 @@ func (suite *UserKeysTestSuite) TestSaveKeyInvalidKeyName() {
 
 func (suite *UserKeysTestSuite) TestSaveKeyInvalidHex() {
 	requestBody := controllers.UserKeyStoreRequest{
-		Name:         "wrapping_key",
-		EncryptedKey: "invalid hex",
+		Name:        "wrapping_key",
+		KeyMaterial: "invalid hex",
 	}
 
 	req := util.CreateJSONTestRequest("/v2/keys", requestBody)

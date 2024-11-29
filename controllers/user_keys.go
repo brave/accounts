@@ -21,8 +21,8 @@ const keyNameURLParam = "name"
 type UserKeyStoreRequest struct {
 	// Name identifies the type of key (wrapping_key or sync_enc_seed)
 	Name string `json:"name" validate:"required,oneof=wrapping_key sync_enc_seed"`
-	// EncryptedKey contains the encrypted key data as hex bytes
-	EncryptedKey string `json:"encryptedKey" validate:"required,min=16,max=128"`
+	// KeyMaterial contains the encrypted key data as hex bytes
+	KeyMaterial string `json:"keyMaterial" validate:"required,min=16,max=128"`
 }
 
 // UserKey represents the HTTP response format for a key
@@ -37,7 +37,7 @@ type UserKey struct {
 
 // ToUserKey converts a UserKeyRequest to a UserKey
 func (r *UserKeyStoreRequest) ToDBUserKey(accountID uuid.UUID) (*datastore.DBUserKey, error) {
-	encKey, err := hex.DecodeString(r.EncryptedKey)
+	encKey, err := hex.DecodeString(r.KeyMaterial)
 	if err != nil {
 		return nil, fmt.Errorf("invalid hex encoding: %w", err)
 	}
