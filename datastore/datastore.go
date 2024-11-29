@@ -2,16 +2,19 @@ package datastore
 
 import (
 	"context"
+	"database/sql"
 	"embed"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/brave/accounts/migrations"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -26,10 +29,12 @@ const testDatabaseURLEnv = "TEST_DATABASE_URL"
 const defaultTestDatabaseURLEnv = "postgres://accounts:password@localhost:5435/test?sslmode=disable"
 
 type Datastore struct {
-	listenPool        *pgxpool.Pool
-	DB                *gorm.DB
-	minSessionVersion int
-	webhookUrls       map[string]interface{}
+	listenPool                   *pgxpool.Pool
+	DB                           *gorm.DB
+	minSessionVersion            int
+	webhookUrls                  map[string]interface{}
+	verificationEventWaitMap     map[uuid.UUID]*verificationWaitRequest
+	verificationEventWaitMapLock sync.Mutex
 }
 
 func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
@@ -121,7 +126,6 @@ func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
 		baseDB := stdlib.OpenDB(*pgxConfig, stdlib.OptionBeforeConnect(rdsConnector.updateConnConfig))
 		pgConfig.Conn = baseDB
 	}
-	listenPoolConfig.MaxConns = 200
 	db, err := gorm.Open(postgres.New(pgConfig), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
@@ -146,5 +150,15 @@ func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
 		}
 	}
 
-	return &Datastore{listenPool, db, minSessionVersion, webhookUrls}, nil
+	return &Datastore{
+		listenPool:        listenPool,
+		DB:                db,
+		minSessionVersion: minSessionVersion,
+		webhookUrls:       webhookUrls,
+	}, nil
+}
+
+func (ds *Datastore) Close() {
+	ds.listenPool.Close()
+	ds.DB.ConnPool.(*sql.DB).Close()
 }

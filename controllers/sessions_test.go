@@ -60,6 +60,10 @@ func (suite *SessionsTestSuite) SetupTest() {
 	}
 }
 
+func (suite *SessionsTestSuite) TearDownTest() {
+	suite.ds.Close()
+}
+
 func (suite *SessionsTestSuite) TestListSessions() {
 	// Get auth token
 	token, err := suite.jwtService.CreateAuthToken(suite.sessions[0].ID)

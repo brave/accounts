@@ -40,6 +40,12 @@ func (suite *VerificationTestSuite) SetupController(passwordAuthEnabled bool, em
 	suite.router.Mount("/v2/verify", controller.Router(verificationAuthMiddleware, servicesKeyMiddleware, false))
 }
 
+func (suite *VerificationTestSuite) TearDownTest() {
+	if suite.ds != nil {
+		suite.ds.Close()
+	}
+}
+
 type MockSESService struct {
 	mock.Mock
 }

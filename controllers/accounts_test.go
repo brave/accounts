@@ -46,6 +46,10 @@ func (suite *AccountsTestSuite) SetupTest() {
 	suite.SetupRouter(true)
 }
 
+func (suite *AccountsTestSuite) TearDownTest() {
+	suite.ds.Close()
+}
+
 func (suite *AccountsTestSuite) SetupRouter(accountDeletionEnabled bool) {
 	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion)
 	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds)

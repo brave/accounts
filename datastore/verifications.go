@@ -8,6 +8,7 @@ import (
 
 	"github.com/brave/accounts/util"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
 )
 
@@ -39,10 +40,13 @@ const (
 	verifyWaitMaxDuration   = 20 * time.Second
 	VerificationExpiration  = 30 * time.Minute
 	maxPendingVerifications = 3
+
+	verificationChannelName = "verification"
 )
 
-func generateNotificationChannel(id uuid.UUID) string {
-	return fmt.Sprintf("verification_%s", id.String())
+type verificationWaitRequest struct {
+	responseChan chan<- bool
+	startTime    time.Time
 }
 
 // CreateVerification creates a new verification record
@@ -100,8 +104,8 @@ func (d *Datastore) UpdateAndGetVerificationStatus(id uuid.UUID, code string) (*
 	// Send notification
 	if err := d.DB.Exec(
 		"SELECT pg_notify(?, ?)",
-		generateNotificationChannel(id),
-		"1",
+		verificationChannelName,
+		id.String(),
 	).Error; err != nil {
 		return nil, fmt.Errorf("failed to send notification: %w", err)
 	}
@@ -130,20 +134,14 @@ func (d *Datastore) GetVerificationStatus(id uuid.UUID) (*Verification, error) {
 }
 
 func (d *Datastore) WaitOnVerification(ctx context.Context, id uuid.UUID) (bool, error) {
-	// Setup notification listening
-	conn, err := d.listenPool.Acquire(ctx)
-	if err != nil {
-		return false, fmt.Errorf("failed to acquire database conn from pool: %w", err)
-	}
-	defer conn.Release()
+	waitChan := make(chan bool)
 
-	channelName := generateNotificationChannel(id)
-	err = util.ListenOnPGChannel(ctx, conn, channelName)
-	if err != nil {
-		return false, fmt.Errorf("failed to listen on channel: %w", err)
+	d.verificationEventWaitMapLock.Lock()
+	d.verificationEventWaitMap[id] = &verificationWaitRequest{
+		responseChan: waitChan,
+		startTime:    time.Now(),
 	}
-	//nolint:errcheck
-	defer util.UnlistenOnPGChannel(ctx, conn, channelName)
+	d.verificationEventWaitMapLock.Unlock()
 
 	// Check the database to see if the verification status changed
 	// while setting up the listener.
@@ -156,19 +154,64 @@ func (d *Datastore) WaitOnVerification(ctx context.Context, id uuid.UUID) (bool,
 		return true, nil
 	}
 
-	// Wait for notification with timeout
-	ctx, cancel := context.WithTimeout(ctx, verifyWaitMaxDuration)
-	defer cancel()
-
-	_, err = conn.Conn().WaitForNotification(ctx)
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return false, nil
-		}
-		return false, fmt.Errorf("error waiting for notification: %w", err)
+	select {
+	case verified := <-waitChan:
+		return verified, nil
+	case <-time.After(verifyWaitMaxDuration):
+		return false, nil
 	}
+}
 
-	return true, nil
+func (d *Datastore) StartVerificationEventListener() {
+	d.verificationEventWaitMap = make(map[uuid.UUID]*verificationWaitRequest)
+	go func() {
+		for {
+			ctx := context.Background()
+			conn, err := d.listenPool.Acquire(ctx)
+			if err != nil {
+				log.Panic().Err(err).Msg("failed to acquire database conn from pool")
+			}
+
+			err = util.ListenOnPGChannel(ctx, conn, verificationChannelName)
+			if err != nil {
+				log.Panic().Err(err).Msg("failed to listen on channel")
+			}
+
+			for {
+				notif, err := conn.Conn().WaitForNotification(ctx)
+				if err != nil {
+					log.Error().Err(err).Msg("error waiting for notification")
+					conn.Release()
+					break
+				}
+				verificationID, err := uuid.Parse(notif.Payload)
+				if err != nil {
+					log.Error().Err(err).Msg("invalid verification ID while listening")
+					continue
+				}
+				d.verificationEventWaitMapLock.Lock()
+				if request, ok := d.verificationEventWaitMap[verificationID]; ok {
+					request.responseChan <- true
+					delete(d.verificationEventWaitMap, verificationID)
+				}
+				d.verificationEventWaitMapLock.Unlock()
+			}
+		}
+	}()
+	go func() {
+		for {
+			d.verificationEventWaitMapLock.Lock()
+			for verificationID, req := range d.verificationEventWaitMap {
+				if time.Since(req.startTime) >= verifyWaitMaxDuration {
+					close(req.responseChan)
+					delete(d.verificationEventWaitMap, verificationID)
+				}
+			}
+			d.verificationEventWaitMapLock.Unlock()
+
+			time.Sleep(time.Second * 30)
+		}
+	}()
 }
 
 func (d *Datastore) DeleteVerification(id uuid.UUID) error {

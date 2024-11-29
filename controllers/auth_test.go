@@ -61,6 +61,10 @@ func (suite *AuthTestSuite) SetupTest() {
 	suite.SetupRouter(true)
 }
 
+func (suite *AuthTestSuite) TearDownTest() {
+	suite.ds.Close()
+}
+
 func (suite *AuthTestSuite) SetupRouter(passwordAuthEnabled bool) {
 	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion)
 

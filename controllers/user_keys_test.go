@@ -59,6 +59,10 @@ func (suite *UserKeysTestSuite) SetupTest() {
 	suite.router.Mount("/v2/keys", controller.Router(authMiddleware))
 }
 
+func (suite *UserKeysTestSuite) TearDownTest() {
+	suite.ds.Close()
+}
+
 func TestUserKeysTestSuite(t *testing.T) {
 	suite.Run(t, new(UserKeysTestSuite))
 }

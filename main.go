@@ -98,6 +98,8 @@ func main() {
 		return
 	}
 
+	datastore.StartVerificationEventListener()
+
 	jwtService, err := services.NewJWTService(datastore)
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to init JWT util")

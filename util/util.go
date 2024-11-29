@@ -113,11 +113,3 @@ func ListenOnPGChannel(ctx context.Context, conn *pgxpool.Conn, channelName stri
 	_, err := conn.Exec(ctx, "LISTEN \""+channelName+"\"")
 	return err
 }
-
-func UnlistenOnPGChannel(ctx context.Context, conn *pgxpool.Conn, channelName string) error {
-	if err := validatePGChannelName(channelName); err != nil {
-		return err
-	}
-	_, err := conn.Exec(ctx, "UNLISTEN \""+channelName+"\"")
-	return err
-}
