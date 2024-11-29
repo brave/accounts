@@ -64,9 +64,9 @@ func SimplifyEmail(email string) *string {
 	}
 	localPart = strings.ReplaceAll(localPart, ".", "")
 
-	// Construct normalized email
-	normalized := strings.ToLower(localPart + "@gmail.com")
-	return &normalized
+	// Construct simplified email
+	simplified := strings.ToLower(localPart + "@gmail.com")
+	return &simplified
 }
 
 // Canonicalize email for general email address storage.

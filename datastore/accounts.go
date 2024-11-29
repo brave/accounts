@@ -49,15 +49,15 @@ func (d *Datastore) GetAccount(tx *gorm.DB, email string) (*Account, error) {
 	return &account, nil
 }
 
-func (d *Datastore) GetAccountsByFullyNormalizedEmail(email string) ([]Account, error) {
+func (d *Datastore) GetAccountsBySimplifiedEmail(email string) ([]Account, error) {
 	var accounts []Account
-	normalizedEmail := util.SimplifyEmail(email)
-	if normalizedEmail == nil {
+	simplifiedEmail := util.SimplifyEmail(email)
+	if simplifiedEmail == nil {
 		return nil, ErrAccountNotFound
 	}
-	result := d.DB.Where("fully_normalized_email = ?", normalizedEmail).Find(&accounts)
+	result := d.DB.Where("simplified_email = ?", simplifiedEmail).Find(&accounts)
 	if result.Error != nil {
-		return nil, fmt.Errorf("error fetching accounts by normalized email: %w", result.Error)
+		return nil, fmt.Errorf("error fetching accounts by simplified email: %w", result.Error)
 	}
 	return accounts, nil
 }
