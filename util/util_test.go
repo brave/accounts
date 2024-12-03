@@ -53,13 +53,13 @@ func (suite *UtilTest) TestCanonicalizeEmail() {
 	suite.Require().NotNil(result)
 	suite.Equal("test@gmail.com", result)
 
-	result = util.CanonicalizeEmail("test@Foo@gmail.com")
+	result = util.CanonicalizeEmail("\"test@Foo\"@gmail.com")
 	suite.Require().NotNil(result)
-	suite.Equal("test@foo@gmail.com", result)
+	suite.Equal("\"test@foo\"@gmail.com", result)
 
-	result = util.CanonicalizeEmail("test@Foo@Example.com")
+	result = util.CanonicalizeEmail("\"test@Foo\"@Example.com")
 	suite.Require().NotNil(result)
-	suite.Equal("test@Foo@example.com", result)
+	suite.Equal("\"test@Foo\"@example.com", result)
 }
 
 func TestUtil(t *testing.T) {

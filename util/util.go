@@ -76,7 +76,8 @@ func CanonicalizeEmail(email string) string {
 	lastIndex := len(parts) - 1
 	parts[lastIndex] = strings.ToLower(parts[lastIndex])
 
-	// Check if it's a Gmail address
+	// Check if it's a GMail address
+	// If GMail, convert local part to lowercase since it's not case-sensitive
 	if isGmail(parts[len(parts)-1]) {
 		for i := 0; i < len(parts)-1; i++ {
 			parts[i] = strings.ToLower(parts[i])
