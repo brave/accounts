@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Verification</title>
+  <script>
+    window.onload = function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const id = urlParams.get('id');
+      const code = urlParams.get('code');
+
+      if (!id || !code) {
+        document.body.innerText = 'Error: Missing id or code in the query string.';
+        return;
+      }
+
+      const payload = {
+        id: id,
+        code: code
+      };
+
+      fetch('/v2/verify/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.json();
+      })
+      .then((data) => {
+        document.body.innerText = `Email verification successful. Verification token = ${data.verificationToken}, service name = ${data.service}`;
+      })
+      .catch(error => {
+        document.body.innerText = `Error: ${error.message}`;
+      });
+    };
+  </script>
+</head>
+<body>
+  <h1>Verifying email...</h1>
+</body>
+</html>

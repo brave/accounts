@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SES Messages</title>
+  <style>
+    .message {
+      margin-bottom: 20px;
+      padding: 10px;
+      border: 1px solid #ccc;
+    }
+    iframe, .text-content {
+      width: 100%;
+      border: 1px solid black;
+      margin-top: 10px;
+    }
+    iframe {
+      height: 800px;
+    }
+    .text-content {
+      padding: 10px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>SES Messages</h1>
+  <div id="messages"></div>
+
+  <script>
+    const messages = {{.Messages}};
+    const messagesContainer = document.getElementById('messages');
+    messages.forEach(message => {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'message';
+
+      const info = document.createElement('p');
+      info.textContent = `Timestamp: ${message.Timestamp}, To: ${message.Destination.ToAddresses.join(', ')}, Subject: ${message.Subject}`;
+      messageDiv.appendChild(info);
+
+      if (message.Body.html_part) {
+        const iframe = document.createElement('iframe');
+        iframe.srcdoc = message.Body.html_part;
+        messageDiv.appendChild(iframe);
+      }
+
+      if (message.Body.text_part) {
+        const textContent = document.createElement('div');
+        textContent.className = 'text-content';
+        textContent.textContent = message.Body.text_part;
+        messageDiv.appendChild(textContent);
+      }
+
+      messagesContainer.appendChild(messageDiv);
+    });
+  </script>
+</body>
+</html>
