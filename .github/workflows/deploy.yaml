@@ -2,6 +2,7 @@ name: Generalized Deployments
 on:
   push:
     branches:
+      - master
       - staging
 
 jobs:
