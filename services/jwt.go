@@ -2,9 +2,11 @@ package services
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/brave/accounts/datastore"
+	"github.com/brave/accounts/util"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
@@ -21,13 +23,23 @@ const (
 )
 
 type JWTService struct {
-	ds           *datastore.Datastore
-	keys         map[int][]byte
-	currentKeyID int
+	ds               *datastore.Datastore
+	keys             map[int]*datastore.JWTKey
+	currentKeyID     int
+	keyServiceURL    string
+	keyServiceSecret string
+	isKeyService     bool
 }
 
-func NewJWTService(ds *datastore.Datastore) (*JWTService, error) {
-	keys, err := ds.GetOrCreateJWTKeys()
+func NewJWTService(ds *datastore.Datastore, isKeyService bool) (*JWTService, error) {
+	keyServiceURL := os.Getenv(util.KeyServiceURLEnv)
+	keyServiceSecret := os.Getenv(util.KeyServiceSecretEnv)
+
+	if keyServiceURL != "" && keyServiceSecret == "" {
+		return nil, fmt.Errorf("%v must be provided if using key service", util.KeyServiceSecretEnv)
+	}
+
+	keys, err := ds.GetOrCreateJWTKeys(isKeyService || keyServiceURL != "", isKeyService || keyServiceURL == "")
 	if err != nil {
 		return nil, err
 	}
@@ -41,18 +53,54 @@ func NewJWTService(ds *datastore.Datastore) (*JWTService, error) {
 		ds,
 		keys,
 		currentKeyID,
+		keyServiceURL,
+		keyServiceSecret,
+		isKeyService,
 	}, nil
 }
 
-func (j *JWTService) createToken(claims jwt.MapClaims) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+func (j *JWTService) getKeyServiceJWTToken(claims jwt.MapClaims) (string, error) {
+	type jwtCreateRequest struct {
+		Claims map[string]interface{} `json:"claims"`
+	}
+
+	type jwtCreateResponse struct {
+		Token string `json:"token"`
+	}
+
+	reqBody := jwtCreateRequest{
+		Claims: claims,
+	}
+
+	var response jwtCreateResponse
+	if err := util.MakeKeyServiceRequest(j.keyServiceURL, j.keyServiceSecret, "/v2/server_keys/jwt", reqBody, &response); err != nil {
+		return "", err
+	}
+
+	return response.Token, nil
+}
+
+func (j *JWTService) CreateToken(claims jwt.MapClaims) (string, error) {
+	if j.keyServiceURL != "" && !j.isKeyService {
+		return j.getKeyServiceJWTToken(claims)
+	}
+	var method jwt.SigningMethod
+	var key interface{}
+	if j.isKeyService {
+		method = jwt.SigningMethodES256
+		key = j.keys[j.currentKeyID].ECDSASecretKey
+	} else {
+		method = jwt.SigningMethodHS256
+		key = j.keys[j.currentKeyID].SecretKey
+	}
+	token := jwt.NewWithClaims(method, claims)
 	token.Header[kidClaim] = j.currentKeyID
-	return token.SignedString(j.keys[j.currentKeyID])
+	return token.SignedString(key)
 }
 
 func (j *JWTService) CreateVerificationToken(verificationID uuid.UUID, expiration time.Duration, serviceName string) (string, error) {
 	now := time.Now()
-	return j.createToken(jwt.MapClaims{
+	return j.CreateToken(jwt.MapClaims{
 		verificationIdClaim: verificationID.String(),
 		expClaim:            now.Add(expiration).Unix(),
 		iatClaim:            now.Unix(),
@@ -61,7 +109,7 @@ func (j *JWTService) CreateVerificationToken(verificationID uuid.UUID, expiratio
 }
 
 func (j *JWTService) CreateAuthToken(sessionID uuid.UUID) (string, error) {
-	return j.createToken(jwt.MapClaims{
+	return j.CreateToken(jwt.MapClaims{
 		sessionIdClaim: sessionID.String(),
 		iatClaim:       time.Now().Unix(),
 	})
@@ -69,7 +117,7 @@ func (j *JWTService) CreateAuthToken(sessionID uuid.UUID) (string, error) {
 
 func (j *JWTService) CreateEphemeralAKEToken(akeStateID uuid.UUID, expiration time.Duration) (string, error) {
 	now := time.Now()
-	return j.createToken(jwt.MapClaims{
+	return j.CreateToken(jwt.MapClaims{
 		akeStateIdClaim: akeStateID.String(),
 		expClaim:        now.Add(expiration).Unix(),
 		iatClaim:        now.Unix(),
@@ -78,8 +126,14 @@ func (j *JWTService) CreateEphemeralAKEToken(akeStateID uuid.UUID, expiration ti
 
 func (j *JWTService) parseToken(tokenString string, claimKey string) (uuid.UUID, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		if j.isKeyService || j.keyServiceURL != "" {
+			if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+		} else {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
 		}
 		keyID := token.Header[kidClaim]
 		if keyID == nil {
@@ -96,7 +150,11 @@ func (j *JWTService) parseToken(tokenString string, claimKey string) (uuid.UUID,
 			return nil, fmt.Errorf("key not found")
 		}
 
-		return key, nil
+		if key.ECDSAPublicKey != nil {
+			return key.ECDSAPublicKey, nil
+		}
+
+		return key.SecretKey, nil
 	})
 
 	if err != nil {

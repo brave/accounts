@@ -18,6 +18,8 @@ type AKEState struct {
 	ID uuid.UUID `json:"id"`
 	// AccountID links to the associated account
 	AccountID *uuid.UUID `json:"-"`
+	// Email associated with the account
+	Email string `json:"-"`
 	// OprfSeedID references the seed used for the Oblivious PRF
 	OprfSeedID int `json:"-"`
 	// State stores the serialized AKE state data
@@ -26,7 +28,7 @@ type AKEState struct {
 	CreatedAt time.Time `json:"createdAt" gorm:"<-:update"`
 }
 
-func (d *Datastore) CreateAKEState(accountID *uuid.UUID, state []byte, oprfSeedID int) (*AKEState, error) {
+func (d *Datastore) CreateAKEState(accountID *uuid.UUID, email string, state []byte, oprfSeedID int) (*AKEState, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
@@ -35,6 +37,7 @@ func (d *Datastore) CreateAKEState(accountID *uuid.UUID, state []byte, oprfSeedI
 	akeState := AKEState{
 		ID:         id,
 		AccountID:  accountID,
+		Email:      email,
 		OprfSeedID: oprfSeedID,
 		State:      state,
 	}

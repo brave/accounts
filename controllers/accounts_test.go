@@ -32,11 +32,11 @@ func (suite *AccountsTestSuite) SetupTest() {
 	os.Setenv("OPAQUE_SECRET_KEY", "4355f8e6f9ec41649fbcdbcca5075a97dafc4c8d8eb8cc2ba286be7b1c938d05")
 	os.Setenv("OPAQUE_PUBLIC_KEY", "98584585210c1f310e9d0aeb9ac1384b7d51808cfaf21b17b5e3dc8d35dbfb00")
 
-	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, true)
+	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, false, true)
 	suite.Require().NoError(err)
-	suite.jwtService, err = services.NewJWTService(suite.ds)
+	suite.jwtService, err = services.NewJWTService(suite.ds, false)
 	suite.Require().NoError(err)
-	opaqueService, err := services.NewOpaqueService(suite.ds)
+	opaqueService, err := services.NewOpaqueService(suite.ds, false)
 	suite.Require().NoError(err)
 	suite.controller = controllers.NewAccountsController(opaqueService, suite.jwtService, suite.ds)
 

@@ -26,10 +26,10 @@ type UserKeysTestSuite struct {
 
 func (suite *UserKeysTestSuite) SetupTest() {
 	var err error
-	suite.ds, err = datastore.NewDatastore(datastore.PasswordAuthSessionVersion, true)
+	suite.ds, err = datastore.NewDatastore(datastore.PasswordAuthSessionVersion, false, true)
 	suite.Require().NoError(err)
 
-	jwtService, err := services.NewJWTService(suite.ds)
+	jwtService, err := services.NewJWTService(suite.ds, false)
 	suite.Require().NoError(err)
 
 	suite.account, err = suite.ds.GetOrCreateAccount("test@example.com")

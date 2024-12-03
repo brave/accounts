@@ -26,9 +26,9 @@ type VerificationTestSuite struct {
 
 func (suite *VerificationTestSuite) SetupController(passwordAuthEnabled bool, emailAuthEnabled bool) {
 	var err error
-	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, true)
+	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, false, true)
 	suite.Require().NoError(err)
-	suite.jwtService, err = services.NewJWTService(suite.ds)
+	suite.jwtService, err = services.NewJWTService(suite.ds, false)
 	suite.Require().NoError(err)
 	suite.sesMock = &MockSESService{}
 	controller := controllers.NewVerificationController(suite.ds, suite.jwtService, suite.sesMock, passwordAuthEnabled, emailAuthEnabled)

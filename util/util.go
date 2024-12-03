@@ -1,17 +1,23 @@
 package util
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog/log"
 )
 
 var validate = validator.New(validator.WithRequiredStructEnabled())
@@ -20,6 +26,10 @@ const (
 	DevelopmentEnv = "development"
 	StagingEnv     = "staging"
 	ProductionEnv  = "production"
+
+	KeyServiceSecretEnv    = "KEY_SERVICE_SECRET"
+	KeyServiceSecretHeader = "key-service-secret"
+	KeyServiceURLEnv       = "KEY_SERVICE_URL"
 )
 
 func GenerateRandomString(length int) string {
@@ -113,4 +123,50 @@ func ListenOnPGChannel(ctx context.Context, conn *pgxpool.Conn, channelName stri
 	}
 	_, err := conn.Exec(ctx, "LISTEN \""+channelName+"\"")
 	return err
+}
+
+func StartPrometheusServer(registry *prometheus.Registry, listen string) {
+	go func() {
+		r := chi.NewRouter()
+		r.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
+		log.Info().Msgf("Prometheus server listening on port %v", listen)
+		if err := http.ListenAndServe(listen, r); err != nil {
+			log.Panic().Err(err).Msg("Failed to start Prometheus server")
+		}
+	}()
+}
+
+func MakeKeyServiceRequest(keyServiceURL string, keyServiceSecret string, path string, body interface{}, response interface{}) error {
+	// Marshal request body
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// Create HTTP request
+	req, err := http.NewRequest(http.MethodPost, keyServiceURL+path, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Add key service secret header
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(KeyServiceSecretHeader, keyServiceSecret)
+
+	// Make request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to make key service request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("key service returned status %d", resp.StatusCode)
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return fmt.Errorf("failed to decode response: %w", err)
+	}
+	return nil
 }

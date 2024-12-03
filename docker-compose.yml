@@ -14,7 +14,7 @@ services:
       - POSTGRES_USER=accounts
       - POSTGRES_PASSWORD=password
     volumes:
-      - ./misc/create_test_db.sql:/docker-entrypoint-initdb.d/create_test_db.sql
+      - ./misc/create_additional_dbs.sql:/docker-entrypoint-initdb.d/create_additional_dbs.sql
   localstack:
     image: localstack/localstack
     ports:

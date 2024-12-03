@@ -25,6 +25,7 @@ import (
 )
 
 const databaseURLEnv = "DATABASE_URL"
+const keyServiceDatabaseURLEnv = "KEY_SERVICE_DATABASE_URL"
 const testDatabaseURLEnv = "TEST_DATABASE_URL"
 const defaultTestDatabaseURLEnv = "postgres://accounts:password@localhost:5435/test?sslmode=disable"
 
@@ -37,10 +38,13 @@ type Datastore struct {
 	verificationEventWaitMapLock sync.Mutex
 }
 
-func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
+func NewDatastore(minSessionVersion int, isKeyService bool, isTesting bool) (*Datastore, error) {
 	var err error
 	var rdsConnector *rdsConnector
 	envVar := databaseURLEnv
+	if isKeyService {
+		envVar = keyServiceDatabaseURLEnv
+	}
 	if isTesting {
 		envVar = testDatabaseURLEnv
 	}
@@ -60,7 +64,7 @@ func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
 	}
 
 	var files embed.FS
-	if isTesting {
+	if isTesting || isKeyService {
 		files = migrations.MigrationFiles
 	} else {
 		files = migrations.MigrationFilesWithExtension
@@ -116,7 +120,7 @@ func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error parsing database connection config: %w", err)
 	}
-	if rdsConnector != nil {
+	if !isTesting && rdsConnector != nil {
 		pgxConfig, err := pgx.ParseConfig(dbURL)
 		if err != nil {
 			return nil, err

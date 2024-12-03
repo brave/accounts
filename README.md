@@ -42,3 +42,6 @@ View API documentation at http://localhost:8080/swagger/index.html.
 | SES_CONFIG_SET | No | Configuration set name to use for SES emails |
 | SES_ROLE | No | The AWS IAM role ARN to assume for SES access |
 | ACCOUNT_DELETION_ENABLED | No | Enables account deletion endpoint |
+| KEY_SERVICE_URL | No | Use the key service for deriving OPRF seeds and signing JWTs |
+| KEY_SERVICE_SECRET | No | Secret to use for key service requests |
+| KEY_SERVICE_DATABASE_URL | No | PostgreSQL database connection URL for key service |

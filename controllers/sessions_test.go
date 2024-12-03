@@ -30,10 +30,10 @@ func TestSessionsTestSuite(t *testing.T) {
 
 func (suite *SessionsTestSuite) SetupTest() {
 	var err error
-	suite.ds, err = datastore.NewDatastore(datastore.PasswordAuthSessionVersion, true)
+	suite.ds, err = datastore.NewDatastore(datastore.PasswordAuthSessionVersion, false, true)
 	suite.Require().NoError(err)
 
-	suite.jwtService, err = services.NewJWTService(suite.ds)
+	suite.jwtService, err = services.NewJWTService(suite.ds, false)
 	suite.Require().NoError(err)
 	controller := controllers.NewSessionsController(suite.ds)
 
