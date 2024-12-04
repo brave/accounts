@@ -98,7 +98,7 @@ func (suite *MiddlewareTestSuite) TestServicesKeyMiddleware() {
 
 	// Set services key
 	testKey := "test-key"
-	os.Setenv("BRAVE_SERVICES_KEY", testKey)
+	suite.T().Setenv("BRAVE_SERVICES_KEY", testKey)
 	defer os.Unsetenv("BRAVE_SERVICES_KEY")
 
 	mw := middleware.ServicesKeyMiddleware(util.ProductionEnv)

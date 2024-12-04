@@ -135,7 +135,6 @@ func (d *Datastore) GetOrCreateJWTKeys(usePublicKeyCrypto bool, create bool) (ma
 			}
 
 			if key.PublicKey != nil {
-				fmt.Println("decoded pub key")
 				publicKey, err := decodeECDSAPublicKey(key.PublicKey)
 				if err != nil {
 					return nil, fmt.Errorf("failed to decode public key: %w", err)

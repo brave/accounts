@@ -7,7 +7,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"strings"
 
@@ -20,7 +22,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var validate = validator.New(validator.WithRequiredStructEnabled())
+var (
+	validate                      = validator.New(validator.WithRequiredStructEnabled())
+	TestKeyServiceRouter *chi.Mux = nil
+)
 
 const (
 	DevelopmentEnv = "development"
@@ -154,18 +159,31 @@ func MakeKeyServiceRequest(keyServiceURL string, keyServiceSecret string, path s
 	req.Header.Set(KeyServiceSecretHeader, keyServiceSecret)
 
 	// Make request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to make key service request: %w", err)
-	}
-	defer resp.Body.Close()
+	var respBody io.Reader
+	if TestKeyServiceRouter != nil {
+		resp := httptest.NewRecorder()
+		TestKeyServiceRouter.ServeHTTP(resp, req)
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("key service returned status %d", resp.StatusCode)
-	}
+		if resp.Code != http.StatusOK {
+			return fmt.Errorf("key service returned status %d", resp.Code)
+		}
 
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		respBody = resp.Body
+	} else {
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to make key service request: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("key service returned status %d", resp.StatusCode)
+		}
+
+		respBody = resp.Body
+	}
+	if err := json.NewDecoder(respBody).Decode(&response); err != nil {
 		return fmt.Errorf("failed to decode response: %w", err)
 	}
 	return nil

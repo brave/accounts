@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
@@ -20,20 +19,33 @@ import (
 
 type AccountsTestSuite struct {
 	suite.Suite
-	ds           *datastore.Datastore
-	jwtService   *services.JWTService
-	router       *chi.Mux
-	opaqueClient *opaque.Client
-	controller   *controllers.AccountsController
+	useKeyService bool
+	ds            *datastore.Datastore
+	keyServiceDs  *datastore.Datastore
+	jwtService    *services.JWTService
+	router        *chi.Mux
+	opaqueClient  *opaque.Client
+	controller    *controllers.AccountsController
+}
+
+func NewAccountsTestSuite(useKeyService bool) *AccountsTestSuite {
+	return &AccountsTestSuite{
+		useKeyService: useKeyService,
+	}
 }
 
 func (suite *AccountsTestSuite) SetupTest() {
 	var err error
-	os.Setenv("OPAQUE_SECRET_KEY", "4355f8e6f9ec41649fbcdbcca5075a97dafc4c8d8eb8cc2ba286be7b1c938d05")
-	os.Setenv("OPAQUE_PUBLIC_KEY", "98584585210c1f310e9d0aeb9ac1384b7d51808cfaf21b17b5e3dc8d35dbfb00")
+	suite.T().Setenv("OPAQUE_SECRET_KEY", "4355f8e6f9ec41649fbcdbcca5075a97dafc4c8d8eb8cc2ba286be7b1c938d05")
+	suite.T().Setenv("OPAQUE_PUBLIC_KEY", "98584585210c1f310e9d0aeb9ac1384b7d51808cfaf21b17b5e3dc8d35dbfb00")
 
 	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, false, true)
 	suite.Require().NoError(err)
+
+	if suite.useKeyService {
+		initKeyServiceForTest(suite.T(), &suite.keyServiceDs, suite.ds)
+	}
+
 	suite.jwtService, err = services.NewJWTService(suite.ds, false)
 	suite.Require().NoError(err)
 	opaqueService, err := services.NewOpaqueService(suite.ds, false)
@@ -48,6 +60,11 @@ func (suite *AccountsTestSuite) SetupTest() {
 
 func (suite *AccountsTestSuite) TearDownTest() {
 	suite.ds.Close()
+	if suite.keyServiceDs != nil {
+		suite.keyServiceDs.Close()
+		suite.keyServiceDs = nil
+	}
+	util.TestKeyServiceRouter = nil
 }
 
 func (suite *AccountsTestSuite) SetupRouter(accountDeletionEnabled bool) {
@@ -243,5 +260,10 @@ func (suite *AccountsTestSuite) TestAccountDeletionEndpointEnabled() {
 }
 
 func TestAccountsTestSuite(t *testing.T) {
-	suite.Run(t, new(AccountsTestSuite))
+	t.Run("NoKeyService", func(t *testing.T) {
+		suite.Run(t, NewAccountsTestSuite(false))
+	})
+	t.Run("WithKeyService", func(t *testing.T) {
+		suite.Run(t, NewAccountsTestSuite(true))
+	})
 }

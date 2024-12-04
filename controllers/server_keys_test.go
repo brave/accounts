@@ -19,20 +19,24 @@ const headerSecret = "test-secret"
 
 type ServerKeysTestSuite struct {
 	suite.Suite
+	ds         *datastore.Datastore
 	jwtService *services.JWTService
 	router     *chi.Mux
 }
 
 func (suite *ServerKeysTestSuite) SetupTest() {
+	suite.T().Setenv("OPAQUE_SECRET_KEY", "4355f8e6f9ec41649fbcdbcca5075a97dafc4c8d8eb8cc2ba286be7b1c938d05")
+	suite.T().Setenv("OPAQUE_PUBLIC_KEY", "98584585210c1f310e9d0aeb9ac1384b7d51808cfaf21b17b5e3dc8d35dbfb00")
 	suite.T().Setenv(util.KeyServiceSecretEnv, headerSecret)
 
-	ds, err := datastore.NewDatastore(datastore.EmailAuthSessionVersion, false, true)
+	var err error
+	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, false, true)
 	suite.Require().NoError(err)
 
-	opaqueService, err := services.NewOpaqueService(ds, true)
+	opaqueService, err := services.NewOpaqueService(suite.ds, true)
 	suite.Require().NoError(err)
 
-	suite.jwtService, err = services.NewJWTService(ds, true)
+	suite.jwtService, err = services.NewJWTService(suite.ds, true)
 	suite.Require().NoError(err)
 
 	controller := controllers.NewServerKeysController(opaqueService, suite.jwtService)
@@ -41,6 +45,10 @@ func (suite *ServerKeysTestSuite) SetupTest() {
 
 	suite.router = chi.NewRouter()
 	suite.router.Mount("/v2/server_keys", controller.Router(keyServiceMiddleware))
+}
+
+func (suite *ServerKeysTestSuite) TearDownTest() {
+	suite.ds.Close()
 }
 
 func TestServerKeysTestSuite(t *testing.T) {

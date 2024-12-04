@@ -45,3 +45,5 @@ View API documentation at http://localhost:8080/swagger/index.html.
 | KEY_SERVICE_URL | No | Use the key service for deriving OPRF seeds and signing JWTs |
 | KEY_SERVICE_SECRET | No | Secret to use for key service requests |
 | KEY_SERVICE_DATABASE_URL | No | PostgreSQL database connection URL for key service |
+| TEST_DATABASE_URL | No | Database URL to use for tests |
+| TEST_KEY_SERVICE_DATABASE_URL | No | Database URL to use for tests involving the key service |

@@ -18,16 +18,32 @@ import (
 
 type VerificationTestSuite struct {
 	suite.Suite
-	ds         *datastore.Datastore
-	sesMock    *MockSESService
-	jwtService *services.JWTService
-	router     *chi.Mux
+	useKeyService bool
+	ds            *datastore.Datastore
+	keyServiceDs  *datastore.Datastore
+	sesMock       *MockSESService
+	jwtService    *services.JWTService
+	router        *chi.Mux
+}
+
+func NewVerificationTestSuite(useKeyService bool) *VerificationTestSuite {
+	return &VerificationTestSuite{
+		useKeyService: useKeyService,
+	}
 }
 
 func (suite *VerificationTestSuite) SetupController(passwordAuthEnabled bool, emailAuthEnabled bool) {
 	var err error
+	suite.T().Setenv("OPAQUE_SECRET_KEY", "4355f8e6f9ec41649fbcdbcca5075a97dafc4c8d8eb8cc2ba286be7b1c938d05")
+	suite.T().Setenv("OPAQUE_PUBLIC_KEY", "98584585210c1f310e9d0aeb9ac1384b7d51808cfaf21b17b5e3dc8d35dbfb00")
+
 	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, false, true)
 	suite.Require().NoError(err)
+
+	if suite.useKeyService {
+		initKeyServiceForTest(suite.T(), &suite.keyServiceDs, suite.ds)
+	}
+
 	suite.jwtService, err = services.NewJWTService(suite.ds, false)
 	suite.Require().NoError(err)
 	suite.sesMock = &MockSESService{}
@@ -41,9 +57,12 @@ func (suite *VerificationTestSuite) SetupController(passwordAuthEnabled bool, em
 }
 
 func (suite *VerificationTestSuite) TearDownTest() {
-	if suite.ds != nil {
-		suite.ds.Close()
+	suite.ds.Close()
+	if suite.keyServiceDs != nil {
+		suite.keyServiceDs.Close()
+		suite.keyServiceDs = nil
 	}
+	util.TestKeyServiceRouter = nil
 }
 
 type MockSESService struct {
@@ -374,5 +393,10 @@ func (suite *VerificationTestSuite) TestVerificationExpiry() {
 }
 
 func TestVerificationTestSuite(t *testing.T) {
-	suite.Run(t, new(VerificationTestSuite))
+	t.Run("NoKeyService", func(t *testing.T) {
+		suite.Run(t, NewVerificationTestSuite(false))
+	})
+	t.Run("WithKeyService", func(t *testing.T) {
+		suite.Run(t, NewVerificationTestSuite(true))
+	})
 }
