@@ -583,6 +583,124 @@ const docTemplate = `{
                 }
             }
         },
+        "/v2/server_keys/jwt": {
+            "post": {
+                "description": "Creates a JWT with provided claims using server signing key",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Server Keys (server-side use only)"
+                ],
+                "summary": "Create JWT",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Key service secret",
+                        "name": "Key-Service-Secret",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "JWT claims",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.JWTCreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.JWTCreateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/server_keys/oprf_seed": {
+            "post": {
+                "description": "Derives an OPRF key using HKDF and the server OPRF seed",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Server Keys (server-side use only)"
+                ],
+                "summary": "Derive OPRF Key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Key service secret",
+                        "name": "Key-Service-Secret",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "OPRF key derivation info",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.OPRFSeedRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.OPRFSeedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v2/sessions": {
             "get": {
                 "description": "Lists all active sessions for the authenticated account",
@@ -910,6 +1028,26 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "controllers.JWTCreateRequest": {
+            "type": "object",
+            "required": [
+                "claims"
+            ],
+            "properties": {
+                "claims": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "controllers.JWTCreateResponse": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
         "controllers.LoginFinalizeRequest": {
             "description": "Request to finalize login",
             "type": "object",
@@ -998,6 +1136,31 @@ const docTemplate = `{
                 "serverNonce": {
                     "description": "Server nonce of KE2",
                     "type": "string"
+                }
+            }
+        },
+        "controllers.OPRFSeedRequest": {
+            "type": "object",
+            "required": [
+                "credentialIdentifier"
+            ],
+            "properties": {
+                "credentialIdentifier": {
+                    "type": "string"
+                },
+                "seedId": {
+                    "type": "integer"
+                }
+            }
+        },
+        "controllers.OPRFSeedResponse": {
+            "type": "object",
+            "properties": {
+                "clientSeed": {
+                    "type": "string"
+                },
+                "seedId": {
+                    "type": "integer"
                 }
             }
         },

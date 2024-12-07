@@ -30,10 +30,10 @@ func TestMiddlewareTestSuite(t *testing.T) {
 
 func (suite *MiddlewareTestSuite) SetupTest() {
 	var err error
-	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, true)
+	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, false, true)
 	suite.Require().NoError(err)
 
-	suite.jwtService, err = services.NewJWTService(suite.ds)
+	suite.jwtService, err = services.NewJWTService(suite.ds, false)
 	suite.Require().NoError(err)
 
 	suite.account, err = suite.ds.GetOrCreateAccount("test@example.com")
@@ -98,7 +98,7 @@ func (suite *MiddlewareTestSuite) TestServicesKeyMiddleware() {
 
 	// Set services key
 	testKey := "test-key"
-	os.Setenv("BRAVE_SERVICES_KEY", testKey)
+	suite.T().Setenv("BRAVE_SERVICES_KEY", testKey)
 	defer os.Unsetenv("BRAVE_SERVICES_KEY")
 
 	mw := middleware.ServicesKeyMiddleware(util.ProductionEnv)

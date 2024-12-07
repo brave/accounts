@@ -111,3 +111,21 @@ func ServicesKeyMiddleware(env string) func(http.Handler) http.Handler {
 		})
 	}
 }
+
+func KeyServiceMiddleware() func(http.Handler) http.Handler {
+	secret := os.Getenv(util.KeyServiceSecretEnv)
+	if secret == "" {
+		log.Panic().Msgf("%s key cannot be empty in production environment", util.KeyServiceSecretEnv)
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			headerSecret := r.Header.Get(util.KeyServiceSecretHeader)
+			if headerSecret != secret {
+				util.RenderErrorResponse(w, r, http.StatusUnauthorized, util.ErrInvalidServicesKey)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}

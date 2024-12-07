@@ -6,7 +6,8 @@ CREATE TABLE oprf_seeds (
 
 CREATE TABLE jwt_keys (
     id SERIAL PRIMARY KEY,
-    key_material BYTEA NOT NULL,
+    secret_key BYTEA,
+    public_key BYTEA,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -14,7 +15,7 @@ CREATE TABLE accounts (
     id UUID PRIMARY KEY,
     email TEXT NOT NULL,
     simplified_email TEXT,
-    oprf_seed_id INT REFERENCES oprf_seeds(id),
+    oprf_seed_id INT,
     opaque_registration BYTEA,
     last_used_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_email_verified_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -26,14 +27,15 @@ CREATE TABLE accounts (
 CREATE TABLE ake_states (
     id UUID PRIMARY KEY,
     account_id UUID REFERENCES accounts(id) ON DELETE CASCADE,
-    oprf_seed_id INT REFERENCES oprf_seeds(id),
+    email TEXT NOT NULL,
+    oprf_seed_id INT NOT NULL,
     state BYTEA NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE registration_states (
     email TEXT PRIMARY KEY,
-    oprf_seed_id INT REFERENCES oprf_seeds(id),
+    oprf_seed_id INT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

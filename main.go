@@ -18,7 +18,6 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/go-chi/docgen"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/swaggo/http-swagger/v2"
 
 	_ "github.com/joho/godotenv/autoload"
@@ -29,7 +28,9 @@ import (
 var (
 	routesFlag             = flag.Bool("routes", false, "Generate router documentation")
 	listenFlag             = flag.String("listen", ":8080", "Use specific address and port for listening")
+	prometheusListenFlag   = flag.String("prom-listen", ":9090", "Use specific address and port for listening for Prometheus server")
 	startWebhookSenderFlag = flag.Bool("start-webhook-sender", false, "Start the webhook event sender")
+	startKeyServiceFlag    = flag.Bool("start-key-service", false, "Start the server key service")
 )
 
 const (
@@ -42,6 +43,24 @@ const (
 	allowedOriginsEnv         = "ALLOWED_ORIGINS"
 	environmentEnv            = "ENVIRONMENT"
 )
+
+func startKeyService(jwtService *services.JWTService, opaqueService *services.OpaqueService) {
+	// Initialize controllers
+	serverKeysController := controllers.NewServerKeysController(opaqueService, jwtService)
+
+	prometheusRegistry := prometheus.NewRegistry()
+	// Setup router
+	r := chi.NewRouter()
+	r.Use(middleware.LoggerMiddleware(prometheusRegistry))
+	r.Mount("/v2/server_keys", serverKeysController.Router(middleware.KeyServiceMiddleware()))
+
+	util.StartPrometheusServer(prometheusRegistry, *prometheusListenFlag)
+
+	log.Info().Msgf("Server listening on %v", *listenFlag)
+	if err := http.ListenAndServe(*listenFlag, r); err != nil {
+		log.Panic().Err(err).Msg("Failed to start server")
+	}
+}
 
 // @title Brave Accounts Service
 // @externalDocs.description OpenAPI
@@ -86,7 +105,7 @@ func main() {
 		minSessionVersion = datastore.PasswordAuthSessionVersion
 	}
 
-	datastore, err := datastore.NewDatastore(minSessionVersion, false)
+	datastore, err := datastore.NewDatastore(minSessionVersion, *startKeyServiceFlag, false)
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to init datastore")
 	}
@@ -98,12 +117,22 @@ func main() {
 		return
 	}
 
-	datastore.StartVerificationEventListener()
-
-	jwtService, err := services.NewJWTService(datastore)
+	jwtService, err := services.NewJWTService(datastore, *startKeyServiceFlag)
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to init JWT util")
 	}
+
+	opaqueService, err := services.NewOpaqueService(datastore, *startKeyServiceFlag)
+	if err != nil {
+		log.Panic().Err(err).Msg("Failed to init OPAQUE service")
+	}
+
+	if *startKeyServiceFlag {
+		startKeyService(jwtService, opaqueService)
+		return
+	}
+
+	datastore.StartVerificationEventListener()
 
 	i18nBundle, err := util.CreateI18nBundle()
 	if err != nil {
@@ -113,11 +142,6 @@ func main() {
 	sesService, err := services.NewSESService(i18nBundle, environment)
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to init SES util")
-	}
-
-	opaqueService, err := services.NewOpaqueService(datastore)
-	if err != nil {
-		log.Panic().Err(err).Msg("Failed to init OPAQUE service")
 	}
 
 	prometheusRegistry := prometheus.NewRegistry()
@@ -167,14 +191,7 @@ func main() {
 		return
 	}
 
-	go func() {
-		r := chi.NewRouter()
-		r.Handle("/metrics", promhttp.HandlerFor(prometheusRegistry, promhttp.HandlerOpts{}))
-		log.Info().Msg("Prometheus server listening on port 9090")
-		if err := http.ListenAndServe(":9090", r); err != nil {
-			log.Panic().Err(err).Msg("Failed to start Prometheus server")
-		}
-	}()
+	util.StartPrometheusServer(prometheusRegistry, *prometheusListenFlag)
 
 	log.Info().Msgf("Server listening on %v", *listenFlag)
 	if err := http.ListenAndServe(*listenFlag, r); err != nil {

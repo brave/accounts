@@ -1,4 +1,17 @@
 definitions:
+  controllers.JWTCreateRequest:
+    properties:
+      claims:
+        additionalProperties: true
+        type: object
+    required:
+    - claims
+    type: object
+  controllers.JWTCreateResponse:
+    properties:
+      token:
+        type: string
+    type: object
   controllers.LoginFinalizeRequest:
     description: Request to finalize login
     properties:
@@ -64,6 +77,22 @@ definitions:
       serverNonce:
         description: Server nonce of KE2
         type: string
+    type: object
+  controllers.OPRFSeedRequest:
+    properties:
+      credentialIdentifier:
+        type: string
+      seedId:
+        type: integer
+    required:
+    - credentialIdentifier
+    type: object
+  controllers.OPRFSeedResponse:
+    properties:
+      clientSeed:
+        type: string
+      seedId:
+        type: integer
     type: object
   controllers.PasswordFinalizeResponse:
     description: Response for password setup or change
@@ -663,6 +692,84 @@ paths:
       summary: Get user key
       tags:
       - User keys
+  /v2/server_keys/jwt:
+    post:
+      consumes:
+      - application/json
+      description: Creates a JWT with provided claims using server signing key
+      parameters:
+      - description: Key service secret
+        in: header
+        name: Key-Service-Secret
+        required: true
+        type: string
+      - description: JWT claims
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.JWTCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.JWTCreateResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Create JWT
+      tags:
+      - Server Keys (server-side use only)
+  /v2/server_keys/oprf_seed:
+    post:
+      consumes:
+      - application/json
+      description: Derives an OPRF key using HKDF and the server OPRF seed
+      parameters:
+      - description: Key service secret
+        in: header
+        name: Key-Service-Secret
+        required: true
+        type: string
+      - description: OPRF key derivation info
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.OPRFSeedRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.OPRFSeedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Derive OPRF Key
+      tags:
+      - Server Keys (server-side use only)
   /v2/sessions:
     get:
       description: Lists all active sessions for the authenticated account

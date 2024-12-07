@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
@@ -21,25 +20,38 @@ import (
 
 type AuthTestSuite struct {
 	suite.Suite
-	ds           *datastore.Datastore
-	jwtService   *services.JWTService
-	account      *datastore.Account
-	controller   *controllers.AuthController
-	router       *chi.Mux
-	opaqueConfig *opaque.Configuration
+	useKeyService bool
+	ds            *datastore.Datastore
+	keyServiceDs  *datastore.Datastore
+	jwtService    *services.JWTService
+	account       *datastore.Account
+	controller    *controllers.AuthController
+	router        *chi.Mux
+	opaqueConfig  *opaque.Configuration
+}
+
+func NewAuthTestSuite(useKeyService bool) *AuthTestSuite {
+	return &AuthTestSuite{
+		useKeyService: useKeyService,
+	}
 }
 
 func (suite *AuthTestSuite) SetupTest() {
 	var err error
-	os.Setenv("OPAQUE_SECRET_KEY", "4355f8e6f9ec41649fbcdbcca5075a97dafc4c8d8eb8cc2ba286be7b1c938d05")
-	os.Setenv("OPAQUE_PUBLIC_KEY", "98584585210c1f310e9d0aeb9ac1384b7d51808cfaf21b17b5e3dc8d35dbfb00")
-	os.Setenv("OPAQUE_FAKE_RECORD", "false")
+	suite.T().Setenv("OPAQUE_SECRET_KEY", "4355f8e6f9ec41649fbcdbcca5075a97dafc4c8d8eb8cc2ba286be7b1c938d05")
+	suite.T().Setenv("OPAQUE_PUBLIC_KEY", "98584585210c1f310e9d0aeb9ac1384b7d51808cfaf21b17b5e3dc8d35dbfb00")
+	suite.T().Setenv("OPAQUE_FAKE_RECORD", "false")
 
-	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, true)
+	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, false, true)
 	suite.Require().NoError(err)
-	suite.jwtService, err = services.NewJWTService(suite.ds)
+
+	if suite.useKeyService {
+		initKeyServiceForTest(suite.T(), &suite.keyServiceDs, suite.ds)
+	}
+
+	suite.jwtService, err = services.NewJWTService(suite.ds, false)
 	suite.Require().NoError(err)
-	opaqueService, err := services.NewOpaqueService(suite.ds)
+	opaqueService, err := services.NewOpaqueService(suite.ds, false)
 	suite.Require().NoError(err)
 	suite.controller = controllers.NewAuthController(opaqueService, suite.jwtService, suite.ds, &MockSESService{})
 
@@ -63,6 +75,10 @@ func (suite *AuthTestSuite) SetupTest() {
 
 func (suite *AuthTestSuite) TearDownTest() {
 	suite.ds.Close()
+	if suite.keyServiceDs != nil {
+		suite.keyServiceDs.Close()
+	}
+	util.TestKeyServiceRouter = nil
 }
 
 func (suite *AuthTestSuite) SetupRouter(passwordAuthEnabled bool) {
@@ -284,5 +300,10 @@ func (suite *AuthTestSuite) TestPasswordAuthEndpointsEnabled() {
 }
 
 func TestAuthTestSuite(t *testing.T) {
-	suite.Run(t, new(AuthTestSuite))
+	t.Run("NoKeyService", func(t *testing.T) {
+		suite.Run(t, NewAuthTestSuite(false))
+	})
+	t.Run("WithKeyService", func(t *testing.T) {
+		suite.Run(t, NewAuthTestSuite(true))
+	})
 }

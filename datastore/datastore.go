@@ -2,7 +2,6 @@ package datastore
 
 import (
 	"context"
-	"database/sql"
 	"embed"
 	"errors"
 	"fmt"
@@ -25,8 +24,11 @@ import (
 )
 
 const databaseURLEnv = "DATABASE_URL"
+const keyServiceDatabaseURLEnv = "KEY_SERVICE_DATABASE_URL"
 const testDatabaseURLEnv = "TEST_DATABASE_URL"
+const testKeyServiceDatabaseURLEnv = "TEST_KEY_SERVICE_DATABASE_URL"
 const defaultTestDatabaseURLEnv = "postgres://accounts:password@localhost:5435/test?sslmode=disable"
+const defaultTestKeyServiceDatabaseURLEnv = "postgres://accounts:password@localhost:5435/keys_test?sslmode=disable"
 
 type Datastore struct {
 	listenPool                   *pgxpool.Pool
@@ -37,17 +39,31 @@ type Datastore struct {
 	verificationEventWaitMapLock sync.Mutex
 }
 
-func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
+func NewDatastore(minSessionVersion int, isKeyService bool, isTesting bool) (*Datastore, error) {
 	var err error
 	var rdsConnector *rdsConnector
-	envVar := databaseURLEnv
+	var envVar string
 	if isTesting {
-		envVar = testDatabaseURLEnv
+		if isKeyService {
+			envVar = testKeyServiceDatabaseURLEnv
+		} else {
+			envVar = testDatabaseURLEnv
+		}
+	} else {
+		if isKeyService {
+			envVar = keyServiceDatabaseURLEnv
+		} else {
+			envVar = databaseURLEnv
+		}
 	}
 	dbURL := os.Getenv(envVar)
 	if dbURL == "" {
 		if isTesting {
-			dbURL = defaultTestDatabaseURLEnv
+			if isKeyService {
+				dbURL = defaultTestKeyServiceDatabaseURLEnv
+			} else {
+				dbURL = defaultTestDatabaseURLEnv
+			}
 		} else if os.Getenv(rdsHostKey) != "" {
 			rdsConnector = newRDSConnector()
 			dbURL, err = rdsConnector.getConnectionString(context.Background())
@@ -60,7 +76,7 @@ func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
 	}
 
 	var files embed.FS
-	if isTesting {
+	if isTesting || isKeyService {
 		files = migrations.MigrationFiles
 	} else {
 		files = migrations.MigrationFilesWithExtension
@@ -84,6 +100,7 @@ func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
 		if err = migration.Drop(); err != nil {
 			return nil, fmt.Errorf("failed to down migrations for testing: %w", err)
 		}
+		migration.Close()
 		migration, err = migrate.NewWithSourceInstance(
 			"iofs",
 			iofsDriver,
@@ -99,6 +116,7 @@ func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
 			return nil, fmt.Errorf("Failed to run migrations: %w", err)
 		}
 	}
+	migration.Close()
 
 	pgConfig := postgres.Config{
 		DSN: dbURL,
@@ -116,7 +134,7 @@ func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error parsing database connection config: %w", err)
 	}
-	if rdsConnector != nil {
+	if !isTesting && rdsConnector != nil {
 		pgxConfig, err := pgx.ParseConfig(dbURL)
 		if err != nil {
 			return nil, err
@@ -160,5 +178,20 @@ func NewDatastore(minSessionVersion int, isTesting bool) (*Datastore, error) {
 
 func (ds *Datastore) Close() {
 	ds.listenPool.Close()
-	ds.DB.ConnPool.(*sql.DB).Close()
+	db, err := ds.DB.DB()
+	if err != nil {
+		panic("failed to get DB for closing")
+	}
+	conn, err := db.Conn(context.Background())
+	if err != nil {
+		panic("failed to get DB connection for closing")
+	}
+	if conn.Close() != nil {
+		panic("failed to close DB connection")
+	}
+	if err := db.Close(); err != nil {
+		panic("failed to close DB")
+	}
+	ds.DB = nil
+	ds.listenPool = nil
 }
