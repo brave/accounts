@@ -58,6 +58,11 @@ func isGmail(domain string) bool {
 	return strings.EqualFold(domain, "gmail.com") || strings.EqualFold(domain, "googlemail.com")
 }
 
+func IsEmailAllowed(email string) bool {
+	// Check if email ends with @bravealias.com
+	return !strings.HasSuffix(strings.ToLower(email), "@bravealias.com")
+}
+
 // Simplify email address according to provider-specific
 // rules. To be used for recovery/login assistance flows only.
 func SimplifyEmail(email string) *string {

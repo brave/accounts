@@ -39,6 +39,10 @@ struct CliArgs {
     #[arg(long)]
     token: Option<String>,
 
+    /// Set brave-services-key header
+    #[arg(short = 'k', long)]
+    services_key: Option<String>,
+
     /// Login mode flag
     #[arg(short, long)]
     login: bool,
@@ -50,6 +54,10 @@ struct CliArgs {
     /// Set password mode flag
     #[arg(short, long)]
     set_password: bool,
+
+    /// Email auth flag
+    #[arg(short = 'e', long)]
+    email_auth: bool,
 }
 
 fn post_request(
@@ -69,6 +77,9 @@ fn post_request(
     if let Some(token) = bearer_token {
         request_builder = request_builder.header("Authorization", format!("Bearer {}", token));
     }
+    if let Some(key) = args.services_key.as_ref() {
+        request_builder = request_builder.header("brave-key", key)
+    }
 
     let response = request_builder.send().expect("Failed to send request");
 
@@ -86,13 +97,25 @@ fn post_request(
         .expect("Failed to parse response as HashMap<String, Value>")
 }
 
-fn verify(args: &CliArgs) -> String {
+fn verify(args: &CliArgs) -> (String, Option<String>) {
     let mut body = HashMap::new();
-    body.insert("service", Value::String("accounts".to_string()));
+    body.insert(
+        "service",
+        Value::String(
+            if args.email_auth {
+                "email-aliases"
+            } else {
+                "accounts"
+            }
+            .to_string(),
+        ),
+    );
     body.insert(
         "intent",
         Value::String(
-            if args.set_password {
+            if args.email_auth {
+                "auth_token"
+            } else if args.set_password {
                 "set_password"
             } else {
                 "registration"
@@ -103,7 +126,7 @@ fn verify(args: &CliArgs) -> String {
     body.insert("email", Value::String(args.email.clone()));
 
     let init_response = post_request(args, "/v2/verify/init", None, body);
-    let token = init_response
+    let verification_token = init_response
         .get("verificationToken")
         .and_then(|v| v.as_str())
         .expect("Failed to get verification token");
@@ -114,14 +137,23 @@ fn verify(args: &CliArgs) -> String {
         let mut result_body = HashMap::new();
         result_body.insert("wait", true.into());
 
-        let result = post_request(args, "/v2/verify/result", Some(token), result_body);
+        let result = post_request(
+            args,
+            "/v2/verify/result",
+            Some(verification_token),
+            result_body,
+        );
 
         if result
             .get("verified")
             .and_then(|v| v.as_bool())
             .unwrap_or(false)
         {
-            return token.to_string();
+            let auth_token = result
+                .get("authToken")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            return (verification_token.to_string(), auth_token);
         }
     }
 }
@@ -129,7 +161,7 @@ fn verify(args: &CliArgs) -> String {
 fn set_password(args: CliArgs) {
     let token = match &args.token {
         Some(t) => t.trim().to_string(),
-        None => verify(&args),
+        None => verify(&args).0,
     };
 
     let mut client_rng = OsRng;
@@ -241,7 +273,10 @@ fn login(args: CliArgs) {
 fn main() {
     let args = CliArgs::parse();
 
-    if args.login {
+    if args.email_auth {
+        let (_, auth_token) = verify(&args);
+        println!("auth token: {}", auth_token.unwrap_or_default());
+    } else if args.login {
         login(args);
     } else if args.register || args.set_password {
         set_password(args);

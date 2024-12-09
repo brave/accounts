@@ -132,7 +132,7 @@ func (suite *MiddlewareTestSuite) TestVerificationAuthMiddleware() {
 	mw := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds)
 
 	// Create test verification
-	verification, err := suite.ds.CreateVerification("test@example.com", "inbox-aliases", "verification")
+	verification, err := suite.ds.CreateVerification("test@example.com", "email-aliases", "verification")
 	suite.Require().NoError(err)
 	token, err := suite.jwtService.CreateVerificationToken(verification.ID, time.Minute*30, verification.Service)
 	suite.Require().NoError(err)

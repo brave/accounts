@@ -85,7 +85,7 @@ func (suite *VerificationTestSuite) TestVerifyInit() {
 	body := controllers.VerifyInitRequest{
 		Email:   "test@example.com",
 		Intent:  "auth_token",
-		Service: "inbox-aliases",
+		Service: "email-aliases",
 		Locale:  "en-US",
 	}
 
@@ -111,7 +111,7 @@ func (suite *VerificationTestSuite) TestVerifyInitTooMany() {
 	body := controllers.VerifyInitRequest{
 		Email:   "test@example.com",
 		Intent:  "auth_token",
-		Service: "inbox-aliases",
+		Service: "email-aliases",
 		Locale:  "en-US",
 	}
 
@@ -139,6 +139,22 @@ func (suite *VerificationTestSuite) TestVerifyInitTooMany() {
 	suite.sesMock.AssertExpectations(suite.T())
 }
 
+func (suite *VerificationTestSuite) TestVerifyInitUnallowedEmail() {
+	suite.SetupController(false, true)
+
+	body := controllers.VerifyInitRequest{
+		Email:   "test@bravealias.com",
+		Intent:  "auth_token",
+		Service: "email-aliases",
+		Locale:  "en-US",
+	}
+
+	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotAllowed.Code)
+}
+
 func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
 	testCases := []struct {
 		intent              string
@@ -147,7 +163,7 @@ func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
 	}{
 		{
 			intent:              "auth_token",
-			service:             "inbox-aliases",
+			service:             "email-aliases",
 			passwordAuthEnabled: true,
 		},
 		{
@@ -162,7 +178,7 @@ func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
 		},
 		{
 			intent:              "registration",
-			service:             "inbox-aliases",
+			service:             "email-aliases",
 			passwordAuthEnabled: true,
 		},
 		{
@@ -249,13 +265,13 @@ func (suite *VerificationTestSuite) TestVerifyQueryResult() {
 	}{
 		{
 			intent:                         "auth_token",
-			service:                        "inbox-aliases",
+			service:                        "email-aliases",
 			shouldHaveAuthToken:            true,
 			verificationUsableMoreThanOnce: false,
 		},
 		{
 			intent:                         "verification",
-			service:                        "inbox-aliases",
+			service:                        "email-aliases",
 			shouldHaveAuthToken:            false,
 			verificationUsableMoreThanOnce: true,
 		},
@@ -359,7 +375,7 @@ func (suite *VerificationTestSuite) TestVerificationExpiry() {
 	initBody := controllers.VerifyInitRequest{
 		Email:   "test@example.com",
 		Intent:  "verification",
-		Service: "inbox-aliases",
+		Service: "email-aliases",
 		Locale:  "en-US",
 	}
 

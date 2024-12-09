@@ -11,7 +11,7 @@ update-swagger:
 
 # Only works if EMAIL_AUTH_ENABLED is set to true
 get-email-auth-token:
-	VERIFICATION_TOKEN=`curl -s --json '{"email":"test@example.com","intent":"auth_token","service":"inbox-aliases"}' \
+	VERIFICATION_TOKEN=`curl -s --json '{"email":"test@example.com","intent":"auth_token","service":"email-aliases"}' \
 		http://localhost:8080/v2/verify/init | jq -r .verificationToken`; \
 	echo -e "\033[0;32mClick on the verification link in the Accounts service logs...\033[0m"; \
 	while [ -z "$$AUTH_TOKEN" ] || [ "$$AUTH_TOKEN" = "null" ]; do \
