@@ -23,7 +23,7 @@ import (
 const (
 	accountsServiceName     = "accounts"
 	premiumServiceName      = "premium"
-	inboxAliasesServiceName = "inbox-aliases"
+	emailAliasesServiceName = "email-aliases"
 
 	localStackSESEndpoint = "http://localhost:4566/_aws/ses"
 )
@@ -43,7 +43,7 @@ type VerifyInitRequest struct {
 	// Purpose of verification (e.g., get auth token, simple verification, registration)
 	Intent string `json:"intent" validate:"required,oneof=auth_token verification registration set_password" example:"registration"`
 	// Service requesting the verification
-	Service string `json:"service" validate:"required,oneof=accounts premium inbox-aliases" example:"accounts"`
+	Service string `json:"service" validate:"required,oneof=accounts premium email-aliases" example:"accounts"`
 	// Locale for verification email
 	Locale string `json:"language" validate:"max=8" example:"en-US"`
 }
@@ -138,7 +138,7 @@ func (vc *VerificationController) maybeCreateVerificationToken(verification *dat
 // @Description - `registration`: After verification, indicate that the email was verified in the "query result" response. An account may be created by setting a password.
 // @Description - `set_password`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
 // @Description
-// @Description One of the following service names must be provided with the request: `inbox-aliases`, `accounts`, `premium`.
+// @Description One of the following service names must be provided with the request: `email-aliases`, `accounts`, `premium`.
 // @Tags Email verification
 // @Accept json
 // @Produce json
@@ -158,14 +158,19 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		requestData.Locale = r.Header.Get("Accept-Language")
 	}
 
+	if !util.IsEmailAllowed(requestData.Email) {
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailDomainNotAllowed)
+		return
+	}
+
 	intentAllowed := true
 	switch requestData.Intent {
 	case datastore.AuthTokenIntent:
-		if !vc.emailAuthEnabled || requestData.Service != inboxAliasesServiceName {
+		if !vc.emailAuthEnabled || requestData.Service != emailAliasesServiceName {
 			intentAllowed = false
 		}
 	case datastore.VerificationIntent:
-		if requestData.Service != inboxAliasesServiceName && requestData.Service != premiumServiceName {
+		if requestData.Service != emailAliasesServiceName && requestData.Service != premiumServiceName {
 			intentAllowed = false
 		}
 	case datastore.RegistrationIntent, datastore.SetPasswordIntent:
