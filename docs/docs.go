@@ -911,7 +911,7 @@ const docTemplate = `{
         },
         "/v2/verify/init": {
             "post": {
-                "description": "Starts email verification process by sending a verification email\nOne of the following intents must be provided with the request:\n- ` + "`" + `auth_token` + "`" + `: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the \"query result\" endpoint.\n- ` + "`" + `verification` + "`" + `: After verification, do not create an account, but indicate that the email was verified in the \"query result\" response. Do not allow registration after verification.\n- ` + "`" + `registration` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. An account may be created by setting a password.\n- ` + "`" + `set_password` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. A password may be set for the existing account.\n\nOne of the following service names must be provided with the request: ` + "`" + `inbox-aliases` + "`" + `, ` + "`" + `accounts` + "`" + `, ` + "`" + `premium` + "`" + `.",
+                "description": "Starts email verification process by sending a verification email\nOne of the following intents must be provided with the request:\n- ` + "`" + `auth_token` + "`" + `: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the \"query result\" endpoint.\n- ` + "`" + `verification` + "`" + `: After verification, do not create an account, but indicate that the email was verified in the \"query result\" response. Do not allow registration after verification.\n- ` + "`" + `registration` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. An account may be created by setting a password.\n- ` + "`" + `set_password` + "`" + `: After verification, indicate that the email was verified in the \"query result\" response. A password may be set for the existing account.\n\nOne of the following service names must be provided with the request: ` + "`" + `email-aliases` + "`" + `, ` + "`" + `accounts` + "`" + `, ` + "`" + `premium` + "`" + `.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1035,6 +1035,7 @@ const docTemplate = `{
             ],
             "properties": {
                 "claims": {
+                    "description": "Claims represents the JWT claims to be included in the token",
                     "type": "object",
                     "additionalProperties": true
                 }
@@ -1044,6 +1045,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "token": {
+                    "description": "Token is the signed JWT token string",
                     "type": "string"
                 }
             }
@@ -1146,9 +1148,11 @@ const docTemplate = `{
             ],
             "properties": {
                 "credentialIdentifier": {
+                    "description": "CredentialIdentifier is the unique identifier used to derive the OPRF seed",
                     "type": "string"
                 },
                 "seedId": {
+                    "description": "SeedID optionally specifies which server OPRF seed to use (defaults to latest)",
                     "type": "integer"
                 }
             }
@@ -1157,9 +1161,11 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "clientSeed": {
+                    "description": "ClientSeed is the hex-encoded derived OPRF client seed",
                     "type": "string"
                 },
                 "seedId": {
+                    "description": "SeedID is the ID of the server OPRF seed that was used",
                     "type": "integer"
                 }
             }
@@ -1358,7 +1364,7 @@ const docTemplate = `{
                     "enum": [
                         "accounts",
                         "premium",
-                        "inbox-aliases"
+                        "email-aliases"
                     ],
                     "example": "accounts"
                 }

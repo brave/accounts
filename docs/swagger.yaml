@@ -3,6 +3,7 @@ definitions:
     properties:
       claims:
         additionalProperties: true
+        description: Claims represents the JWT claims to be included in the token
         type: object
     required:
     - claims
@@ -10,6 +11,7 @@ definitions:
   controllers.JWTCreateResponse:
     properties:
       token:
+        description: Token is the signed JWT token string
         type: string
     type: object
   controllers.LoginFinalizeRequest:
@@ -81,8 +83,12 @@ definitions:
   controllers.OPRFSeedRequest:
     properties:
       credentialIdentifier:
+        description: CredentialIdentifier is the unique identifier used to derive
+          the OPRF seed
         type: string
       seedId:
+        description: SeedID optionally specifies which server OPRF seed to use (defaults
+          to latest)
         type: integer
     required:
     - credentialIdentifier
@@ -90,8 +96,10 @@ definitions:
   controllers.OPRFSeedResponse:
     properties:
       clientSeed:
+        description: ClientSeed is the hex-encoded derived OPRF client seed
         type: string
       seedId:
+        description: SeedID is the ID of the server OPRF seed that was used
         type: integer
     type: object
   controllers.PasswordFinalizeResponse:
@@ -234,7 +242,7 @@ definitions:
         enum:
         - accounts
         - premium
-        - inbox-aliases
+        - email-aliases
         example: accounts
         type: string
     required:
@@ -919,7 +927,7 @@ paths:
         - `registration`: After verification, indicate that the email was verified in the "query result" response. An account may be created by setting a password.
         - `set_password`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
 
-        One of the following service names must be provided with the request: `inbox-aliases`, `accounts`, `premium`.
+        One of the following service names must be provided with the request: `email-aliases`, `accounts`, `premium`.
       parameters:
       - description: Brave services key (if one is configured)
         in: header
