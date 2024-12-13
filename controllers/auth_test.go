@@ -14,6 +14,7 @@ import (
 	"github.com/brave/accounts/util"
 	"github.com/bytemare/opaque"
 	"github.com/go-chi/chi/v5"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 )
@@ -82,10 +83,11 @@ func (suite *AuthTestSuite) TearDownTest() {
 }
 
 func (suite *AuthTestSuite) SetupRouter(passwordAuthEnabled bool) {
-	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion)
+	permissiveAuthMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion, false)
+	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion, true)
 
 	suite.router = chi.NewRouter()
-	suite.router.Mount("/v2/auth", suite.controller.Router(authMiddleware, passwordAuthEnabled))
+	suite.router.Mount("/v2/auth", suite.controller.Router(authMiddleware, permissiveAuthMiddleware, passwordAuthEnabled))
 }
 
 func (suite *AuthTestSuite) createLoginFinalizeRequest(opaqueClient *opaque.Client, serializedKE2Hex string) controllers.LoginFinalizeRequest {
@@ -107,7 +109,10 @@ func (suite *AuthTestSuite) TestAuthValidate() {
 	// Create test account session
 	session, err := suite.ds.CreateSession(suite.account.ID, datastore.EmailAuthSessionVersion, "")
 	suite.Require().NoError(err)
-	token, err := suite.jwtService.CreateAuthToken(session.ID)
+	token, err := suite.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
+	suite.Require().NoError(err)
+
+	childToken, err := suite.jwtService.CreateAuthToken(session.ID, nil, util.EmailAliasesServiceName)
 	suite.Require().NoError(err)
 
 	// Set up request with session context
@@ -123,17 +128,31 @@ func (suite *AuthTestSuite) TestAuthValidate() {
 	suite.Equal(suite.account.Email, parsedResp.Email)
 	suite.Equal(suite.account.ID.String(), parsedResp.AccountID)
 	suite.Equal(session.ID.String(), parsedResp.SessionID)
+	suite.Equal(util.AccountsServiceName, parsedResp.Service)
 
 	updatedAccount, err := suite.ds.GetOrCreateAccount("test@example.com")
 	suite.Require().NoError(err)
 
 	suite.Greater(updatedAccount.LastUsedAt, suite.account.LastUsedAt)
+
+	req = httptest.NewRequest("GET", "/v2/auth/validate", nil)
+	req.Header.Add("Authorization", "Bearer "+childToken)
+
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
+
+	suite.Equal(suite.account.Email, parsedResp.Email)
+	suite.Equal(suite.account.ID.String(), parsedResp.AccountID)
+	suite.Equal(session.ID.String(), parsedResp.SessionID)
+	suite.Equal(util.EmailAliasesServiceName, parsedResp.Service)
 }
 
 func (suite *AuthTestSuite) TestAuthValidateBadToken() {
 	sessionID, err := uuid.NewV7()
 	suite.Require().NoError(err)
-	token, err := suite.jwtService.CreateAuthToken(sessionID)
+	token, err := suite.jwtService.CreateAuthToken(sessionID, nil, util.AccountsServiceName)
 	suite.Require().NoError(err)
 
 	// Set up request with session context
@@ -297,6 +316,77 @@ func (suite *AuthTestSuite) TestPasswordAuthEndpointsEnabled() {
 	// Validate endpoint should work
 	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/auth/validate", nil), suite.router)
 	suite.NotEqual(404, resp.Code)
+}
+
+func (suite *AuthTestSuite) TestCreateServiceToken() {
+	// Create test session and token
+	session, err := suite.ds.CreateSession(suite.account.ID, datastore.EmailAuthSessionVersion, "")
+	suite.Require().NoError(err)
+	token, err := suite.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
+	suite.Require().NoError(err)
+
+	// Test creating email-aliases service token
+	req := util.CreateJSONTestRequest("/v2/auth/service_token", controllers.CreateServiceTokenRequest{
+		Service: util.EmailAliasesServiceName,
+	})
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+
+	var parsedResp controllers.CreateServiceTokenResponse
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
+	suite.NotEmpty(parsedResp.AuthToken)
+
+	// Parse and verify the auth token
+	parser := jwt.NewParser()
+	claims := make(jwt.MapClaims)
+	_, _, err = parser.ParseUnverified(parsedResp.AuthToken, &claims)
+	suite.NoError(err)
+
+	// Check expiration time (14 days from now)
+	expectedExp := time.Now().Add(14 * 24 * time.Hour).Unix()
+	suite.InDelta(expectedExp, claims["exp"].(float64), 60) // Allow 60 seconds tolerance
+
+	// Verify audience
+	suite.Equal(util.EmailAliasesServiceName, claims["aud"])
+
+	// Validate the created service token
+	validateReq := httptest.NewRequest("GET", "/v2/auth/validate", nil)
+	validateReq.Header.Add("Authorization", "Bearer "+parsedResp.AuthToken)
+	validateResp := util.ExecuteTestRequest(validateReq, suite.router)
+	suite.Equal(http.StatusOK, validateResp.Code)
+
+	var validateParsedResp controllers.ValidateTokenResponse
+	util.DecodeJSONTestResponse(suite.T(), validateResp.Body, &validateParsedResp)
+	suite.Equal(suite.account.Email, validateParsedResp.Email)
+	suite.Equal(suite.account.ID.String(), validateParsedResp.AccountID)
+	suite.Equal(session.ID.String(), validateParsedResp.SessionID)
+	suite.Equal(util.EmailAliasesServiceName, validateParsedResp.Service)
+
+	req = util.CreateJSONTestRequest("/v2/auth/service_token", controllers.CreateServiceTokenRequest{
+		Service: util.EmailAliasesServiceName,
+	})
+	req.Header.Set("Authorization", "Bearer "+parsedResp.AuthToken)
+	// Test unauthorized request using a service token instead of an accounts auth token
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusForbidden, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrInvalidTokenAudience.Code)
+
+	// Test TLD in 'strict' list
+	ruAccount, err := suite.ds.GetOrCreateAccount("test@example.ru")
+	suite.Require().NoError(err)
+	session, err = suite.ds.CreateSession(ruAccount.ID, datastore.EmailAuthSessionVersion, "")
+	suite.Require().NoError(err)
+	token, err = suite.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
+	suite.Require().NoError(err)
+
+	req = util.CreateJSONTestRequest("/v2/auth/service_token", controllers.CreateServiceTokenRequest{
+		Service: util.EmailAliasesServiceName,
+	})
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
 }
 
 func TestAuthTestSuite(t *testing.T) {

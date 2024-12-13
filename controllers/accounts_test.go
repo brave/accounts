@@ -68,7 +68,7 @@ func (suite *AccountsTestSuite) TearDownTest() {
 }
 
 func (suite *AccountsTestSuite) SetupRouter(accountDeletionEnabled bool) {
-	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion)
+	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion, true)
 	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds)
 	suite.router = chi.NewRouter()
 	suite.router.Mount("/v2/accounts", suite.controller.Router(verificationAuthMiddleware, authMiddleware, accountDeletionEnabled))
@@ -124,7 +124,7 @@ func (suite *AccountsTestSuite) TestSetPassword() {
 	suite.NotEmpty(parsedFinalizeResp.AuthToken)
 
 	// Validate auth token
-	sessionID, err := suite.jwtService.ValidateAuthToken(parsedFinalizeResp.AuthToken)
+	sessionID, _, err := suite.jwtService.ValidateAuthToken(parsedFinalizeResp.AuthToken)
 	suite.NoError(err)
 	suite.NotNil(sessionID)
 
@@ -200,7 +200,7 @@ func (suite *AccountsTestSuite) TestDeleteAccount() {
 	// Create test account session
 	session, err := suite.ds.CreateSession(account.ID, datastore.EmailAuthSessionVersion, "")
 	suite.Require().NoError(err)
-	token, err := suite.jwtService.CreateAuthToken(session.ID)
+	token, err := suite.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
 	suite.Require().NoError(err)
 
 	// Test account deletion

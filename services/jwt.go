@@ -108,11 +108,19 @@ func (j *JWTService) CreateVerificationToken(verificationID uuid.UUID, expiratio
 	})
 }
 
-func (j *JWTService) CreateAuthToken(sessionID uuid.UUID) (string, error) {
-	return j.CreateToken(jwt.MapClaims{
+func (j *JWTService) CreateAuthToken(sessionID uuid.UUID, expiration *time.Duration, serviceName string) (string, error) {
+	now := time.Now()
+	claims := jwt.MapClaims{
 		sessionIdClaim: sessionID.String(),
-		iatClaim:       time.Now().Unix(),
-	})
+		iatClaim:       now.Unix(),
+		audClaim:       serviceName,
+	}
+
+	if expiration != nil {
+		claims[expClaim] = now.Add(*expiration).Unix()
+	}
+
+	return j.CreateToken(claims)
 }
 
 func (j *JWTService) CreateEphemeralAKEToken(akeStateID uuid.UUID, expiration time.Duration) (string, error) {
@@ -124,7 +132,7 @@ func (j *JWTService) CreateEphemeralAKEToken(akeStateID uuid.UUID, expiration ti
 	})
 }
 
-func (j *JWTService) parseToken(tokenString string, claimKey string) (uuid.UUID, error) {
+func (j *JWTService) parseToken(tokenString string, claimKey string) (uuid.UUID, string, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if j.isKeyService || j.keyServiceURL != "" {
 			if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
@@ -158,28 +166,36 @@ func (j *JWTService) parseToken(tokenString string, claimKey string) (uuid.UUID,
 	})
 
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("invalid token: %w", err)
+		return uuid.Nil, "", fmt.Errorf("invalid token: %w", err)
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		idStr, ok := claims[claimKey].(string)
 		if !ok {
-			return uuid.Nil, fmt.Errorf("%s claim not found", claimKey)
+			return uuid.Nil, "", fmt.Errorf("%s claim not found", claimKey)
 		}
-		return uuid.Parse(idStr)
+		var audStr string
+		audRaw, exists := claims[audClaim]
+		if exists {
+			audStr = audRaw.(string)
+		}
+		id, err := uuid.Parse(idStr)
+		return id, audStr, err
 	}
 
-	return uuid.Nil, fmt.Errorf("invalid token claims")
+	return uuid.Nil, "", fmt.Errorf("invalid token claims")
 }
 
 func (j *JWTService) ValidateVerificationToken(tokenString string) (uuid.UUID, error) {
-	return j.parseToken(tokenString, verificationIdClaim)
+	verificationID, _, err := j.parseToken(tokenString, verificationIdClaim)
+	return verificationID, err
 }
 
-func (j *JWTService) ValidateAuthToken(tokenString string) (uuid.UUID, error) {
+func (j *JWTService) ValidateAuthToken(tokenString string) (uuid.UUID, string, error) {
 	return j.parseToken(tokenString, sessionIdClaim)
 }
 
 func (j *JWTService) ValidateEphemeralAKEToken(tokenString string) (uuid.UUID, error) {
-	return j.parseToken(tokenString, akeStateIdClaim)
+	akeStateID, _, err := j.parseToken(tokenString, akeStateIdClaim)
+	return akeStateID, err
 }

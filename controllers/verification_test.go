@@ -139,20 +139,52 @@ func (suite *VerificationTestSuite) TestVerifyInitTooMany() {
 	suite.sesMock.AssertExpectations(suite.T())
 }
 
-func (suite *VerificationTestSuite) TestVerifyInitUnallowedEmail() {
-	suite.SetupController(false, true)
+func (suite *VerificationTestSuite) TestVerifyInitUnsupportedEmail() {
+	suite.SetupController(true, true)
 
+	suite.sesMock.On("SendVerificationEmail", mock.Anything, mock.Anything, mock.Anything, "en-US").Return(nil).Maybe()
+
+	// Test bravealias.com domain
 	body := controllers.VerifyInitRequest{
 		Email:   "test@bravealias.com",
 		Intent:  "auth_token",
 		Service: "email-aliases",
 		Locale:  "en-US",
 	}
-
 	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
 	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
 
-	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotAllowed.Code)
+	registerBody := body
+	registerBody.Intent = "registration"
+	registerBody.Service = "accounts"
+	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", registerBody), suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
+
+	// Test 'strict' TLDs for email-aliases service
+	body.Email = "test@example.ru"
+	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
+
+	body.Email = "test@example.kp"
+	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
+
+	// Test North Korea TLD for accounts registration
+	body.Intent = "registration"
+	body.Service = "accounts"
+	body.Email = "test@example.kp"
+	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
+
+	// Email with 'strict' TLD should be allowed for registration
+	body.Email = "test@example.ru"
+	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
 }
 
 func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
@@ -339,7 +371,7 @@ func (suite *VerificationTestSuite) TestVerifyQueryResult() {
 		if tc.shouldHaveAuthToken {
 			suite.NotNil(result.AuthToken)
 
-			sessionID, err := suite.jwtService.ValidateAuthToken(*result.AuthToken)
+			sessionID, _, err := suite.jwtService.ValidateAuthToken(*result.AuthToken)
 			suite.NoError(err)
 			session, err := suite.ds.GetSession(sessionID)
 			suite.NoError(err)

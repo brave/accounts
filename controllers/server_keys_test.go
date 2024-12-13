@@ -76,7 +76,7 @@ func (suite *ServerKeysTestSuite) TestCreateJWT() {
 	suite.NotEmpty(parsedResp.Token)
 
 	// Validate the token
-	sessionID, err := suite.jwtService.ValidateAuthToken(parsedResp.Token)
+	sessionID, _, err := suite.jwtService.ValidateAuthToken(parsedResp.Token)
 	suite.Require().NoError(err)
 	suite.Equal(expectedSessionID, sessionID)
 }

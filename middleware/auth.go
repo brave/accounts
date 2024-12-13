@@ -15,14 +15,15 @@ import (
 type contextKey string
 
 const (
-	ContextSession      = contextKey("session")
-	ContextVerification = contextKey("verification")
+	ContextSession            = contextKey("session")
+	ContextSessionServiceName = contextKey("sessionServiceName")
+	ContextVerification       = contextKey("verification")
 
 	braveServicesKeyEnv    = "BRAVE_SERVICES_KEY"
 	braveServicesKeyHeader = "brave-key"
 )
 
-func AuthMiddleware(jwtService *services.JWTService, ds *datastore.Datastore, minSessionVersion int) func(http.Handler) http.Handler {
+func AuthMiddleware(jwtService *services.JWTService, ds *datastore.Datastore, minSessionVersion int, enforceAccountsServiceName bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token, err := util.ExtractAuthToken(r)
@@ -31,7 +32,7 @@ func AuthMiddleware(jwtService *services.JWTService, ds *datastore.Datastore, mi
 				return
 			}
 
-			sessionID, err := jwtService.ValidateAuthToken(token)
+			sessionID, serviceName, err := jwtService.ValidateAuthToken(token)
 			if err != nil {
 				util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 				return
@@ -52,8 +53,17 @@ func AuthMiddleware(jwtService *services.JWTService, ds *datastore.Datastore, mi
 				return
 			}
 
+			if enforceAccountsServiceName && serviceName != util.AccountsServiceName {
+				util.RenderErrorResponse(w, r, http.StatusForbidden, util.ErrInvalidTokenAudience)
+				return
+			}
+
 			// Store session in context
-			ctx := context.WithValue(r.Context(), ContextSession, session)
+			ctx := context.WithValue(
+				context.WithValue(r.Context(), ContextSession, session),
+				ContextSessionServiceName,
+				serviceName,
+			)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

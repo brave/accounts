@@ -48,11 +48,11 @@ func (suite *UserKeysTestSuite) SetupTest() {
 	suite.Require().NoError(err)
 
 	controller := controllers.NewUserKeysController(suite.ds)
-	authMiddleware := middleware.AuthMiddleware(jwtService, suite.ds, datastore.EmailAuthSessionVersion)
+	authMiddleware := middleware.AuthMiddleware(jwtService, suite.ds, datastore.EmailAuthSessionVersion, true)
 
 	session, err := suite.ds.CreateSession(suite.account.ID, datastore.PasswordAuthSessionVersion, "")
 	suite.Require().NoError(err)
-	suite.authToken, err = jwtService.CreateAuthToken(session.ID)
+	suite.authToken, err = jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
 	suite.Require().NoError(err)
 
 	suite.router = chi.NewRouter()

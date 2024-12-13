@@ -32,6 +32,10 @@ const (
 	StagingEnv     = "staging"
 	ProductionEnv  = "production"
 
+	AccountsServiceName     = "accounts"
+	PremiumServiceName      = "premium"
+	EmailAliasesServiceName = "email-aliases"
+
 	KeyServiceSecretEnv    = "KEY_SERVICE_SECRET"
 	KeyServiceSecretHeader = "key-service-secret"
 	KeyServiceURLEnv       = "KEY_SERVICE_URL"
@@ -58,9 +62,28 @@ func isGmail(domain string) bool {
 	return strings.EqualFold(domain, "gmail.com") || strings.EqualFold(domain, "googlemail.com")
 }
 
-func IsEmailAllowed(email string) bool {
+func IsEmailAllowed(email string, checkStrictCountries bool) bool {
+	lowerEmail := strings.ToLower(email)
 	// Check if email ends with @bravealias.com
-	return !strings.HasSuffix(strings.ToLower(email), "@bravealias.com")
+	if strings.HasSuffix(lowerEmail, "@bravealias.com") {
+		return false
+	}
+
+	// Always block North Korea TLD
+	if strings.HasSuffix(lowerEmail, ".kp") {
+		return false
+	}
+
+	if checkStrictCountries {
+		restrictedTLDs := []string{".cu", ".ir", ".sy", ".by", ".md", ".ru", ".ve"}
+		for _, tld := range restrictedTLDs {
+			if strings.HasSuffix(lowerEmail, tld) {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 // Simplify email address according to provider-specific

@@ -21,10 +21,6 @@ import (
 )
 
 const (
-	accountsServiceName     = "accounts"
-	premiumServiceName      = "premium"
-	emailAliasesServiceName = "email-aliases"
-
 	localStackSESEndpoint = "http://localhost:4566/_aws/ses"
 )
 
@@ -119,7 +115,7 @@ func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Ha
 func (vc *VerificationController) maybeCreateVerificationToken(verification *datastore.Verification, isCompletion bool) (*string, error) {
 	// Do not generate verification token immediately for Premium verifications
 	// We'll create it later in the completion endpoint, so it can be passed to the Premium site upon redirect
-	shouldCreateOnCompletion := verification.Service == premiumServiceName && verification.Intent == datastore.VerificationIntent
+	shouldCreateOnCompletion := verification.Service == util.PremiumServiceName && verification.Intent == datastore.VerificationIntent
 	if shouldCreateOnCompletion != isCompletion {
 		return nil, nil
 	}
@@ -158,23 +154,18 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		requestData.Locale = r.Header.Get("Accept-Language")
 	}
 
-	if !util.IsEmailAllowed(requestData.Email) {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailDomainNotAllowed)
-		return
-	}
-
 	intentAllowed := true
 	switch requestData.Intent {
 	case datastore.AuthTokenIntent:
-		if !vc.emailAuthEnabled || requestData.Service != emailAliasesServiceName {
+		if !vc.emailAuthEnabled || requestData.Service != util.EmailAliasesServiceName {
 			intentAllowed = false
 		}
 	case datastore.VerificationIntent:
-		if requestData.Service != emailAliasesServiceName && requestData.Service != premiumServiceName {
+		if requestData.Service != util.EmailAliasesServiceName && requestData.Service != util.PremiumServiceName {
 			intentAllowed = false
 		}
 	case datastore.RegistrationIntent, datastore.SetPasswordIntent:
-		if !vc.passwordAuthEnabled || requestData.Service != accountsServiceName {
+		if !vc.passwordAuthEnabled || requestData.Service != util.AccountsServiceName {
 			intentAllowed = false
 		}
 	default:
@@ -182,6 +173,13 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 	}
 	if !intentAllowed {
 		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrIntentNotAllowed)
+		return
+	}
+
+	strictCountryBlock := requestData.Service == util.EmailAliasesServiceName || requestData.Service == util.PremiumServiceName
+
+	if !util.IsEmailAllowed(requestData.Email, strictCountryBlock) {
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailDomainNotSupported)
 		return
 	}
 
@@ -342,7 +340,8 @@ func (vc *VerificationController) VerifyQueryResult(w http.ResponseWriter, r *ht
 			return
 		}
 
-		authTokenResult, err := vc.jwtService.CreateAuthToken(session.ID)
+		expirationDuration := childAuthTokenExpirationTime
+		authTokenResult, err := vc.jwtService.CreateAuthToken(session.ID, &expirationDuration, verification.Service)
 		if err != nil {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 			return
