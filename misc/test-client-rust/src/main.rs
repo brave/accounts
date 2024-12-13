@@ -31,13 +31,21 @@ struct CliArgs {
     #[arg(long)]
     email: String,
 
-    /// User's password
+    /// User's password (only required for password setting and authentication)
     #[arg(long)]
-    password: String,
+    password: Option<String>,
 
-    /// Verification token (if required)
+    /// Verification token (optional)
     #[arg(long)]
     token: Option<String>,
+
+    /// Verify intent (optional)
+    #[arg(long)]
+    verify_intent: Option<String>,
+
+    /// Verify service (optional)
+    #[arg(long)]
+    verify_service: Option<String>,
 
     /// Set brave-services-key header
     #[arg(short = 'k', long)]
@@ -58,20 +66,29 @@ struct CliArgs {
     /// Email auth flag
     #[arg(short = 'e', long)]
     email_auth: bool,
+
+    /// Email verify flag
+    #[arg(long)]
+    email_verify: bool,
 }
 
-fn post_request(
+fn make_request(
     args: &CliArgs,
+    method: reqwest::Method,
     path: &str,
     bearer_token: Option<&str>,
-    body: HashMap<&str, Value>,
+    body: Option<HashMap<&str, Value>>,
 ) -> HashMap<String, Value> {
     // add user agent of some sort.
     let client = reqwest::blocking::Client::builder()
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
         .build()
         .expect("Failed to create HTTP client");
-    let mut request_builder = client.post(args.base_url.clone() + path).json(&body);
+    let mut request_builder = client.request(method, args.base_url.clone() + path);
+
+    if let Some(body) = body {
+        request_builder = request_builder.json(&body);
+    }
 
     // Add authorization header if bearer token is provided
     if let Some(token) = bearer_token {
@@ -97,12 +114,54 @@ fn post_request(
         .expect("Failed to parse response as HashMap<String, Value>")
 }
 
+fn display_account_details(args: &CliArgs, auth_token: &str) {
+    // Call validate endpoint
+    let response = make_request(
+        args,
+        reqwest::Method::GET,
+        "/v2/auth/validate",
+        Some(auth_token),
+        None,
+    );
+
+    println!("auth token: {}", auth_token);
+    // Print accountId and sessionId
+    println!(
+        "account id: {}",
+        response
+            .get("accountId")
+            .expect("account id should be in validate response")
+            .as_str()
+            .expect("account id should be a string")
+    );
+
+    println!(
+        "session id: {}",
+        response
+            .get("sessionId")
+            .expect("session id should be in validate response")
+            .as_str()
+            .expect("session id should be a string")
+    );
+
+    println!(
+        "email: {}",
+        response
+            .get("email")
+            .expect("email should be in validate response")
+            .as_str()
+            .expect("email should be a string")
+    );
+}
+
 fn verify(args: &CliArgs) -> (String, Option<String>) {
     let mut body = HashMap::new();
     body.insert(
         "service",
         Value::String(
-            if args.email_auth {
+            if let Some(service) = args.verify_service.as_ref() {
+                service.as_str()
+            } else if args.email_auth || args.email_verify {
                 "email-aliases"
             } else {
                 "accounts"
@@ -113,7 +172,11 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
     body.insert(
         "intent",
         Value::String(
-            if args.email_auth {
+            if let Some(intent) = args.verify_intent.as_ref() {
+                intent.as_str()
+            } else if args.email_verify {
+                "verification"
+            } else if args.email_auth {
                 "auth_token"
             } else if args.set_password {
                 "set_password"
@@ -123,9 +186,16 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
             .to_string(),
         ),
     );
+
     body.insert("email", Value::String(args.email.clone()));
 
-    let init_response = post_request(args, "/v2/verify/init", None, body);
+    let init_response = make_request(
+        args,
+        reqwest::Method::POST,
+        "/v2/verify/init",
+        None,
+        Some(body),
+    );
     let verification_token = init_response
         .get("verificationToken")
         .and_then(|v| v.as_str())
@@ -137,11 +207,12 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
         let mut result_body = HashMap::new();
         result_body.insert("wait", true.into());
 
-        let result = post_request(
+        let result = make_request(
             args,
+            reqwest::Method::POST,
             "/v2/verify/result",
             Some(verification_token),
-            result_body,
+            Some(result_body),
         );
 
         if result
@@ -153,6 +224,7 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
                 .get("authToken")
                 .and_then(|v| v.as_str())
                 .map(String::from);
+            println!("verification token: {}", verification_token);
             return (verification_token.to_string(), auth_token);
         }
     }
@@ -166,16 +238,26 @@ fn set_password(args: CliArgs) {
 
     let mut client_rng = OsRng;
 
+    let password = args
+        .password
+        .as_ref()
+        .expect("password must be provided")
+        .as_bytes();
     let registration_request =
-        ClientRegistration::<DefaultCipherSuite>::start(&mut client_rng, args.password.as_bytes())
-            .unwrap();
+        ClientRegistration::<DefaultCipherSuite>::start(&mut client_rng, password).unwrap();
     let registration_request_hex = hex::encode(registration_request.message.serialize());
 
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("blindedMessage", registration_request_hex.into());
     body.insert("serializeResponse", true.into());
 
-    let resp = post_request(&args, "/v2/accounts/password/init", Some(&token), body);
+    let resp = make_request(
+        &args,
+        reqwest::Method::POST,
+        "/v2/accounts/password/init",
+        Some(&token),
+        Some(body),
+    );
 
     let resp_bin = hex::decode(
         resp.get("serializedResponse")
@@ -188,7 +270,7 @@ fn set_password(args: CliArgs) {
         .state
         .finish(
             &mut client_rng,
-            args.password.as_bytes(),
+            password,
             RegistrationResponse::deserialize(&resp_bin).unwrap(),
             ClientRegistrationFinishParameters {
                 identifiers: Identifiers {
@@ -204,19 +286,26 @@ fn set_password(args: CliArgs) {
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("serializedRecord", record_hex.into());
 
-    let resp = post_request(&args, "/v2/accounts/password/finalize", Some(&token), body);
+    let resp = make_request(
+        &args,
+        reqwest::Method::POST,
+        "/v2/accounts/password/finalize",
+        Some(&token),
+        Some(body),
+    );
 
-    println!(
-        "auth token: {}",
-        resp.get("authToken").unwrap().as_str().unwrap()
-    )
+    display_account_details(&args, resp.get("authToken").unwrap().as_str().unwrap());
 }
 
 fn login(args: CliArgs) {
     let mut client_rng = OsRng;
+    let password = args
+        .password
+        .as_ref()
+        .expect("password must be provided")
+        .as_bytes();
     let client_login_start_result =
-        ClientLogin::<DefaultCipherSuite>::start(&mut client_rng, args.password.as_bytes())
-            .unwrap();
+        ClientLogin::<DefaultCipherSuite>::start(&mut client_rng, password).unwrap();
 
     let credential_request_hex = hex::encode(client_login_start_result.message.serialize());
 
@@ -224,7 +313,13 @@ fn login(args: CliArgs) {
     body.insert("serializedKE1", credential_request_hex.into());
     body.insert("email", args.email.clone().into());
 
-    let resp = post_request(&args, "/v2/auth/login/init", None, body);
+    let resp = make_request(
+        &args,
+        reqwest::Method::POST,
+        "/v2/auth/login/init",
+        None,
+        Some(body),
+    );
 
     let ke2_bin = hex::decode(
         resp.get("serializedKE2")
@@ -236,7 +331,7 @@ fn login(args: CliArgs) {
     let client_login_finish_result = client_login_start_result
         .state
         .finish(
-            args.password.as_bytes(),
+            password,
             CredentialResponse::deserialize(&ke2_bin).unwrap(),
             ClientLoginFinishParameters {
                 identifiers: Identifiers {
@@ -253,29 +348,29 @@ fn login(args: CliArgs) {
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("clientMac", credential_finalization_hex.into());
 
-    let resp = post_request(
+    let resp = make_request(
         &args,
+        reqwest::Method::POST,
         "/v2/auth/login/finalize",
         Some(
             resp.get("akeToken")
                 .and_then(|v| v.as_str())
                 .expect("Missing akeToken field"),
         ),
-        body,
+        Some(body),
     );
 
-    println!(
-        "auth token: {}",
-        resp.get("authToken").unwrap().as_str().unwrap()
-    )
+    display_account_details(&args, resp.get("authToken").unwrap().as_str().unwrap());
 }
 
 fn main() {
     let args = CliArgs::parse();
 
-    if args.email_auth {
+    if args.email_verify {
+        verify(&args);
+    } else if args.email_auth {
         let (_, auth_token) = verify(&args);
-        println!("auth token: {}", auth_token.unwrap_or_default());
+        display_account_details(&args, auth_token.unwrap_or_default().as_str());
     } else if args.login {
         login(args);
     } else if args.register || args.set_password {
@@ -284,7 +379,7 @@ fn main() {
         CliArgs::command()
             .print_help()
             .expect("Failed to display help message");
-        eprintln!("Must supply -l, -r or -s");
+        eprintln!("Must supply -l, -r, -s, -e or --email-verify");
         std::process::exit(1);
     }
 }
