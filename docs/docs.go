@@ -1104,7 +1104,8 @@ const docTemplate = `{
                     "type": "string",
                     "enum": [
                         "email-aliases",
-                        "sync"
+                        "sync",
+                        "premium"
                     ]
                 }
             }

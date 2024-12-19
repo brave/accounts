@@ -6,6 +6,7 @@ definitions:
         enum:
         - email-aliases
         - sync
+        - premium
         type: string
     required:
     - service
