@@ -29,13 +29,13 @@ struct CliArgs {
 
     /// User's email address
     #[arg(long)]
-    email: String,
+    email: Option<String>,
 
     /// User's password (only required for password setting and authentication)
     #[arg(long)]
     password: Option<String>,
 
-    /// Verification token (optional)
+    /// Verification or auth token
     #[arg(long)]
     token: Option<String>,
 
@@ -43,9 +43,9 @@ struct CliArgs {
     #[arg(long)]
     verify_intent: Option<String>,
 
-    /// Verify service (optional)
+    /// Service name (optional)
     #[arg(long)]
-    verify_service: Option<String>,
+    service_name: Option<String>,
 
     /// Set brave-services-key header
     #[arg(short = 'k', long)]
@@ -70,6 +70,10 @@ struct CliArgs {
     /// Email verify flag
     #[arg(long)]
     email_verify: bool,
+
+    /// Service token flag
+    #[arg(short = 't', long)]
+    create_service_token: bool,
 }
 
 fn make_request(
@@ -152,6 +156,15 @@ fn display_account_details(args: &CliArgs, auth_token: &str) {
             .as_str()
             .expect("email should be a string")
     );
+
+    println!(
+        "service: {}",
+        response
+            .get("service")
+            .expect("service should be in validate response")
+            .as_str()
+            .expect("service should be a string")
+    );
 }
 
 fn verify(args: &CliArgs) -> (String, Option<String>) {
@@ -159,7 +172,7 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
     body.insert(
         "service",
         Value::String(
-            if let Some(service) = args.verify_service.as_ref() {
+            if let Some(service) = args.service_name.as_ref() {
                 service.as_str()
             } else if args.email_auth || args.email_verify {
                 "email-aliases"
@@ -187,7 +200,10 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
         ),
     );
 
-    body.insert("email", Value::String(args.email.clone()));
+    body.insert(
+        "email",
+        Value::String(args.email.as_ref().expect("email must be provided").clone()),
+    );
 
     let init_response = make_request(
         args,
@@ -274,7 +290,12 @@ fn set_password(args: CliArgs) {
             RegistrationResponse::deserialize(&resp_bin).unwrap(),
             ClientRegistrationFinishParameters {
                 identifiers: Identifiers {
-                    client: Some(args.email.as_bytes()),
+                    client: Some(
+                        args.email
+                            .as_ref()
+                            .expect("email must be provided")
+                            .as_bytes(),
+                    ),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -335,7 +356,12 @@ fn login(args: CliArgs) {
             CredentialResponse::deserialize(&ke2_bin).unwrap(),
             ClientLoginFinishParameters {
                 identifiers: Identifiers {
-                    client: Some(args.email.as_bytes()),
+                    client: Some(
+                        args.email
+                            .as_ref()
+                            .expect("email must be provided")
+                            .as_bytes(),
+                    ),
                     server: None,
                 },
                 ..Default::default()
@@ -363,10 +389,40 @@ fn login(args: CliArgs) {
     display_account_details(&args, resp.get("authToken").unwrap().as_str().unwrap());
 }
 
+fn get_service_token(args: &CliArgs) {
+    let mut body = HashMap::new();
+
+    body.insert(
+        "service",
+        Value::String(
+            args.service_name
+                .as_ref()
+                .expect("service name must be provided")
+                .to_string(),
+        ),
+    );
+
+    let resp = make_request(
+        args,
+        reqwest::Method::POST,
+        "/v2/auth/service_token",
+        Some(
+            args.token
+                .as_ref()
+                .expect("auth token is required for acquired session token"),
+        ),
+        Some(body),
+    );
+
+    display_account_details(&args, resp.get("authToken").unwrap().as_str().unwrap());
+}
+
 fn main() {
     let args = CliArgs::parse();
 
-    if args.email_verify {
+    if args.create_service_token {
+        get_service_token(&args)
+    } else if args.email_verify {
         verify(&args);
     } else if args.email_auth {
         let (_, auth_token) = verify(&args);
@@ -379,7 +435,7 @@ fn main() {
         CliArgs::command()
             .print_help()
             .expect("Failed to display help message");
-        eprintln!("Must supply -l, -r, -s, -e or --email-verify");
+        eprintln!("Must supply -l, -r, -s, -e, -t or --email-verify");
         std::process::exit(1);
     }
 }

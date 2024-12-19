@@ -38,7 +38,7 @@ func (suite *SessionsTestSuite) SetupTest() {
 	controller := controllers.NewSessionsController(suite.ds)
 
 	// Create middleware
-	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, 1)
+	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, 1, true)
 
 	// Setup router
 	suite.router = chi.NewRouter()
@@ -66,7 +66,7 @@ func (suite *SessionsTestSuite) TearDownTest() {
 
 func (suite *SessionsTestSuite) TestListSessions() {
 	// Get auth token
-	token, err := suite.jwtService.CreateAuthToken(suite.sessions[0].ID)
+	token, err := suite.jwtService.CreateAuthToken(suite.sessions[0].ID, nil, util.AccountsServiceName)
 	suite.Require().NoError(err)
 
 	// Test list sessions
@@ -86,7 +86,7 @@ func (suite *SessionsTestSuite) TestListSessions() {
 
 func (suite *SessionsTestSuite) TestDeleteSession() {
 	// Get auth token
-	token, err := suite.jwtService.CreateAuthToken(suite.sessions[1].ID)
+	token, err := suite.jwtService.CreateAuthToken(suite.sessions[1].ID, nil, util.AccountsServiceName)
 	suite.Require().NoError(err)
 
 	// Test delete session
@@ -129,7 +129,7 @@ func (suite *SessionsTestSuite) TestSessionsUnauthorized() {
 	// Test another account deleting a session that does not belong to account
 	otherSession, err := suite.ds.CreateSession(suite.otherAccount.ID, datastore.PasswordAuthSessionVersion, "test")
 	suite.Require().NoError(err)
-	token, err := suite.jwtService.CreateAuthToken(otherSession.ID)
+	token, err := suite.jwtService.CreateAuthToken(otherSession.ID, nil, util.AccountsServiceName)
 	suite.Require().NoError(err)
 	req = httptest.NewRequest("DELETE", "/v2/sessions/"+suite.sessions[0].ID.String(), nil)
 	req.Header.Set("Authorization", "Bearer "+token)

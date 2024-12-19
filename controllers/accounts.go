@@ -280,7 +280,7 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 		return
 	}
 
-	authToken, err := ac.jwtService.CreateAuthToken(session.ID)
+	authToken, err := ac.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return

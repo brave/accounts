@@ -147,7 +147,8 @@ func main() {
 	prometheusRegistry := prometheus.NewRegistry()
 
 	servicesKeyMiddleware := middleware.ServicesKeyMiddleware(environment)
-	authMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion)
+	authMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion, true)
+	permissiveAuthMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion, false)
 	verificationMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore)
 
 	r := chi.NewRouter()
@@ -171,7 +172,7 @@ func main() {
 	})
 
 	r.Route("/v2", func(r chi.Router) {
-		r.With(servicesKeyMiddleware).Mount("/auth", authController.Router(authMiddleware, passwordAuthEnabled))
+		r.With(servicesKeyMiddleware).Mount("/auth", authController.Router(authMiddleware, permissiveAuthMiddleware, passwordAuthEnabled))
 		if passwordAuthEnabled {
 			r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware, authMiddleware, accountDeletionEnabled))
 		}

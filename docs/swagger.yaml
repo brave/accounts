@@ -1,4 +1,22 @@
 definitions:
+  controllers.CreateServiceTokenRequest:
+    properties:
+      service:
+        description: Service is the name of the service for which to create the token
+        enum:
+        - email-aliases
+        - sync
+        - premium
+        type: string
+    required:
+    - service
+    type: object
+  controllers.CreateServiceTokenResponse:
+    properties:
+      authToken:
+        description: AuthToken is the JWT token created for the requested service
+        type: string
+    type: object
   controllers.JWTCreateRequest:
     properties:
       claims:
@@ -187,6 +205,9 @@ definitions:
         type: string
       email:
         description: Email address associated with the account
+        type: string
+      service:
+        description: Audience of the auth token
         type: string
       sessionId:
         description: UUID of the session associated with the account
@@ -534,6 +555,50 @@ paths:
           schema:
             $ref: '#/definitions/util.ErrorResponse'
       summary: Initialize login
+      tags:
+      - Auth
+  /v2/auth/service_token:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new auth token for a specifc service using the current
+        session
+      parameters:
+      - description: Bearer + auth token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Service token request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.CreateServiceTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.CreateServiceTokenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Create service token
       tags:
       - Auth
   /v2/auth/validate:

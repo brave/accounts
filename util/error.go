@@ -22,12 +22,12 @@ var (
 	ErrKeyNotFound = NewExposedError(12001, "key not found")
 
 	// Verification errors, prefixed with '13'
-	ErrTooManyVerifications  = NewExposedError(13001, "too many pending verification requests for email")
-	ErrVerificationNotFound  = NewExposedError(13002, "verification not found or invalid id/code")
-	ErrIntentNotAllowed      = NewExposedError(13003, "intent not allowed")
-	ErrAccountExists         = NewExposedError(13004, "account already exists")
-	ErrAccountDoesNotExist   = NewExposedError(13005, "account does not exist")
-	ErrEmailDomainNotAllowed = NewExposedError(13006, "email domain is not allowed")
+	ErrTooManyVerifications    = NewExposedError(13001, "too many pending verification requests for email")
+	ErrVerificationNotFound    = NewExposedError(13002, "verification not found or invalid id/code")
+	ErrIntentNotAllowed        = NewExposedError(13003, "intent not allowed")
+	ErrAccountExists           = NewExposedError(13004, "account already exists")
+	ErrAccountDoesNotExist     = NewExposedError(13005, "account does not exist")
+	ErrEmailDomainNotSupported = NewExposedError(13006, "email domain is not supported")
 
 	// Auth errors, prefixed with '14'
 	ErrAKEStateNotFound     = NewExposedError(14001, "AKE state not found")
@@ -36,6 +36,7 @@ var (
 	ErrIncorrectCredentials = NewExposedError(14004, "incorrect credentials")
 	ErrIncorrectEmail       = NewExposedError(14005, "incorrect email")
 	ErrIncorrectPassword    = NewExposedError(14006, "incorrect password")
+	ErrInvalidTokenAudience = NewExposedError(14007, "invalid token audience")
 
 	// Misc errors, prefixed with '15'
 	ErrInvalidServicesKey = NewExposedError(15001, "invalid services key")

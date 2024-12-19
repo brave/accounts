@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/brave/accounts/datastore"
 	"github.com/brave/accounts/middleware"
@@ -15,6 +16,8 @@ import (
 	"github.com/go-chi/render"
 	"github.com/rs/zerolog/log"
 )
+
+const childAuthTokenExpirationTime = time.Hour * 24 * 14
 
 type AuthController struct {
 	opaqueService *services.OpaqueService
@@ -77,6 +80,20 @@ type ValidateTokenResponse struct {
 	AccountID string `json:"accountId"`
 	// UUID of the session associated with the account
 	SessionID string `json:"sessionId"`
+	// Audience of the auth token
+	Service string `json:"service"`
+}
+
+// CreateServiceTokenRequest represents the request body for creating a service token
+type CreateServiceTokenRequest struct {
+	// Service is the name of the service for which to create the token
+	Service string `json:"service" validate:"required,oneof=email-aliases sync premium"`
+}
+
+// CreateServiceTokenResponse represents the response body containing the generated service token
+type CreateServiceTokenResponse struct {
+	// AuthToken is the JWT token created for the requested service
+	AuthToken string `json:"authToken"`
 }
 
 func (req *LoginInitRequest) ToOpaqueKE1(opaqueService *services.OpaqueService) (*opaqueMsg.KE1, error) {
@@ -178,10 +195,11 @@ func NewAuthController(opaqueService *services.OpaqueService, jwtService *servic
 	}
 }
 
-func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler, passwordAuthEnabled bool) chi.Router {
+func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler, permissiveAuthMiddleware func(http.Handler) http.Handler, passwordAuthEnabled bool) chi.Router {
 	r := chi.NewRouter()
 
-	r.With(authMiddleware).Get("/validate", ac.Validate)
+	r.With(permissiveAuthMiddleware).Get("/validate", ac.Validate)
+	r.With(authMiddleware).Post("/service_token", ac.CreateServiceToken)
 	if passwordAuthEnabled {
 		r.Post("/login/init", ac.LoginInit)
 		r.Post("/login/finalize", ac.LoginFinalize)
@@ -203,6 +221,7 @@ func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler,
 // @Router /v2/auth/validate [get]
 func (ac *AuthController) Validate(w http.ResponseWriter, r *http.Request) {
 	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
+	serviceName := r.Context().Value(middleware.ContextSessionServiceName).(string)
 
 	if err := ac.ds.MaybeUpdateAccountLastUsed(session.AccountID, session.LastUsedAt); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
@@ -213,6 +232,7 @@ func (ac *AuthController) Validate(w http.ResponseWriter, r *http.Request) {
 		Email:     session.Email,
 		AccountID: session.AccountID.String(),
 		SessionID: session.ID.String(),
+		Service:   serviceName,
 	}
 
 	render.Status(r, http.StatusOK)
@@ -348,7 +368,7 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	authToken, err := ac.jwtService.CreateAuthToken(session.ID)
+	authToken, err := ac.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
@@ -359,4 +379,43 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, response)
+}
+
+// @Summary Create service token
+// @Description Creates a new auth token for a specifc service using the current session
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer + auth token"
+// @Param request body CreateServiceTokenRequest true "Service token request"
+// @Success 200 {object} CreateServiceTokenResponse
+// @Failure 400 {object} util.ErrorResponse
+// @Failure 401 {object} util.ErrorResponse
+// @Failure 403 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/auth/service_token [post]
+func (ac *AuthController) CreateServiceToken(w http.ResponseWriter, r *http.Request) {
+	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
+
+	var req CreateServiceTokenRequest
+	if !util.DecodeJSONAndValidate(w, r, &req) {
+		return
+	}
+
+	if req.Service == util.EmailAliasesServiceName {
+		if !util.IsEmailAllowed(session.Email, true) {
+			util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailDomainNotSupported)
+			return
+		}
+	}
+
+	expirationDuration := childAuthTokenExpirationTime
+	token, err := ac.jwtService.CreateAuthToken(session.ID, &expirationDuration, req.Service)
+	if err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	render.Status(r, http.StatusOK)
+	render.JSON(w, r, CreateServiceTokenResponse{AuthToken: token})
 }

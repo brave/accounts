@@ -336,6 +336,71 @@ const docTemplate = `{
                 }
             }
         },
+        "/v2/auth/service_token": {
+            "post": {
+                "description": "Creates a new auth token for a specifc service using the current session",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Create service token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Service token request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.CreateServiceTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.CreateServiceTokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v2/auth/validate": {
             "get": {
                 "description": "Validates an auth token and returns session details",
@@ -1028,6 +1093,32 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "controllers.CreateServiceTokenRequest": {
+            "type": "object",
+            "required": [
+                "service"
+            ],
+            "properties": {
+                "service": {
+                    "description": "Service is the name of the service for which to create the token",
+                    "type": "string",
+                    "enum": [
+                        "email-aliases",
+                        "sync",
+                        "premium"
+                    ]
+                }
+            }
+        },
+        "controllers.CreateServiceTokenResponse": {
+            "type": "object",
+            "properties": {
+                "authToken": {
+                    "description": "AuthToken is the JWT token created for the requested service",
+                    "type": "string"
+                }
+            }
+        },
         "controllers.JWTCreateRequest": {
             "type": "object",
             "required": [
@@ -1287,6 +1378,10 @@ const docTemplate = `{
                 },
                 "email": {
                     "description": "Email address associated with the account",
+                    "type": "string"
+                },
+                "service": {
+                    "description": "Audience of the auth token",
                     "type": "string"
                 },
                 "sessionId": {
