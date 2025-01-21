@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"slices"
+	"strings"
 
 	"github.com/brave/accounts/datastore"
 	"github.com/brave/accounts/services"
@@ -102,16 +104,18 @@ func VerificationAuthMiddleware(jwtService *services.JWTService, ds *datastore.D
 }
 
 func ServicesKeyMiddleware(env string) func(http.Handler) http.Handler {
-	servicesKey := os.Getenv(braveServicesKeyEnv)
-	if servicesKey == "" && env == util.ProductionEnv {
-		log.Panic().Msgf("%s key cannot be empty in production environment", braveServicesKeyEnv)
+	servicesKeys := strings.FieldsFunc(os.Getenv(braveServicesKeyEnv), func(r rune) bool {
+		return r == ','
+	})
+	if len(servicesKeys) < 1 && env == util.ProductionEnv {
+		log.Panic().Msgf("%s must contain at least one key in production environment", braveServicesKeyEnv)
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// If services key is configured, verify the request header
-			if servicesKey != "" {
+			if len(servicesKeys) > 0 {
 				headerKey := r.Header.Get(braveServicesKeyHeader)
-				if headerKey != servicesKey {
+				if !slices.Contains(servicesKeys, headerKey) {
 					util.RenderErrorResponse(w, r, http.StatusUnauthorized, util.ErrInvalidServicesKey)
 					return
 				}
