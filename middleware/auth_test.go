@@ -152,6 +152,27 @@ func (suite *MiddlewareTestSuite) TestServicesKeyMiddleware() {
 	req = httptest.NewRequest("GET", "/", nil)
 	resp = util.ExecuteTestRequest(req, mw(handler))
 	suite.Equal(http.StatusUnauthorized, resp.Code)
+
+	// Set multiple services keys
+	suite.T().Setenv("BRAVE_SERVICES_KEY", ",test-key1,,test-key2,test-key3,")
+	mw = middleware.ServicesKeyMiddleware(util.ProductionEnv)
+
+	// Test first valid key
+	req = httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("brave-key", "test-key1")
+	resp = util.ExecuteTestRequest(req, mw(handler))
+	suite.Equal(http.StatusOK, resp.Code)
+
+	// Test second valid key
+	req = httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("brave-key", "test-key2")
+	resp = util.ExecuteTestRequest(req, mw(handler))
+	suite.Equal(http.StatusOK, resp.Code)
+
+	// Test missing key
+	req = httptest.NewRequest("GET", "/", nil)
+	resp = util.ExecuteTestRequest(req, mw(handler))
+	suite.Equal(http.StatusUnauthorized, resp.Code)
 }
 
 func (suite *MiddlewareTestSuite) TestVerificationAuthMiddleware() {
