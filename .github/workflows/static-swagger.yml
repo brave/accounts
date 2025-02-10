@@ -41,7 +41,7 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - run: cp ./accounts/docs/swagger.json ./swagger-ui/dist/
-      - run: sed -i -E 's/https.+\.json/\/swagger.json/g' ./swagger-ui/dist/swagger-initializer.js
+      - run: sed -i -E 's/https.+\.json/\/accounts\/swagger.json/g' ./swagger-ui/dist/swagger-initializer.js
       - run: |
           sed -i 's/layout/supportedSubmitMethods: [],\nlayout/' ./swagger-ui/dist/swagger-initializer.js
       - name: Upload swagger-ui artifact
