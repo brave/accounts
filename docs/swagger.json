@@ -867,6 +867,58 @@
             }
         },
         "/v2/verify/complete": {
+            "get": {
+                "description": "Checks if email verification code is valid and still pending",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Email verification"
+                ],
+                "summary": "Check verification code validity",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Verification ID",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Verification code",
+                        "name": "code",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Verification is pending"
+                    },
+                    "400": {
+                        "description": "Missing/invalid verification parameters",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Verification not found or expired",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
             "post": {
                 "description": "Completes the email verification process",
                 "consumes": [

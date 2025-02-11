@@ -133,6 +133,20 @@ func (d *Datastore) GetVerificationStatus(id uuid.UUID) (*Verification, error) {
 	return &verification, nil
 }
 
+// Authenticates id and code with pending verification, and returns true if verification is still pending
+func (d *Datastore) EnsureVerificationCodeIsPending(id uuid.UUID, code string) error {
+	verification, err := d.GetVerificationStatus(id)
+	if err != nil {
+		return err
+	}
+
+	if verification.Code != code || verification.Verified {
+		return util.ErrVerificationNotFound
+	}
+
+	return nil
+}
+
 func (d *Datastore) WaitOnVerification(ctx context.Context, id uuid.UUID) (bool, error) {
 	waitChan := make(chan bool)
 

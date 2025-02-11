@@ -33,6 +33,7 @@ const (
 
 	defaultFromAddress = "noreply@brave.com"
 	defaultBaseURL     = "http://localhost:8080"
+	expiresHeaderName  = "X-Expires-At"
 )
 
 type SESService struct {
@@ -71,6 +72,7 @@ type verifyEmailFields struct {
 	VerifyURL          string
 	Instructions       string
 	Action             string
+	ShortAction        string
 	VerifyActionBackup string
 	ExpiryDisclaimer   string
 }
@@ -181,7 +183,7 @@ func (s *SESService) sendEmail(ctx context.Context, email string, subject string
 
 	input := &ses.SendEmailInput{
 		Destination: &types.Destination{
-			ToAddresses: []string{email},
+			ToAddresses: []string{util.CanonicalizeEmail(email)},
 		},
 		Message: &types.Message{
 			Body: &types.Body{
@@ -198,6 +200,7 @@ func (s *SESService) sendEmail(ctx context.Context, email string, subject string
 		},
 		Source: &s.fromAddress,
 	}
+
 	if s.configSet != "" {
 		input.ConfigurationSetName = &s.configSet
 	}
@@ -240,6 +243,7 @@ func (s *SESService) SendVerificationEmail(ctx context.Context, email string, ve
 		VerifyURL:          verifyURL,
 		Instructions:       localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: instructionsMessageID}),
 		Action:             localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailAction"}),
+		ShortAction:        localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailShortAction"}),
 		VerifyActionBackup: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailActionBackup"}),
 		ExpiryDisclaimer:   localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailExpiryDisclaimer"}),
 	}
