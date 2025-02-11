@@ -102,6 +102,7 @@ func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Ha
 	r := chi.NewRouter()
 
 	r.With(servicesKeyMiddleware).Post("/init", vc.VerifyInit)
+	r.Get("/complete", vc.VerifyValidCheck)
 	r.Post("/complete", vc.VerifyComplete)
 	if devEndpointsEnabled {
 		r.Get("/complete_fe", vc.VerifyCompleteFrontend)
@@ -229,6 +230,45 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 	render.JSON(w, r, &VerifyInitResponse{
 		VerificationToken: verificationToken,
 	})
+}
+
+// @Summary Check verification code validity
+// @Description Checks if email verification code is valid and still pending
+// @Tags Email verification
+// @Accept json
+// @Produce json
+// @Param id query string true "Verification ID"
+// @Param code query string true "Verification code"
+// @Success 204 "Verification is pending"
+// @Failure 400 {string} string "Missing/invalid verification parameters"
+// @Failure 404 {string} string "Verification not found or expired"
+// @Failure 500 {string} string "Internal server error"
+// @Router /v2/verify/complete [get]
+func (vc *VerificationController) VerifyValidCheck(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.URL.Query().Get("id"))
+	if err != nil {
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, errors.New("invalid verification id"))
+		return
+	}
+
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, errors.New("missing verification code"))
+		return
+	}
+
+	err = vc.datastore.EnsureVerificationCodeIsPending(id, code)
+	if err != nil {
+		if errors.Is(err, util.ErrVerificationNotFound) {
+			util.RenderErrorResponse(w, r, http.StatusNotFound, err)
+			return
+		}
+		log.Err(err).Msg("failed to check verification status")
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // @Summary Complete email verification

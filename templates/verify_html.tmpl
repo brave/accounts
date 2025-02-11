@@ -241,5 +241,17 @@
       </tr>
     </table>
   </div>
+  <script type="application/ld+json">
+  {
+    "@context": "http://schema.org",
+    "@type": "EmailMessage",
+    "potentialAction": {
+      "@type": "ViewAction",
+      "url": "{{.VerifyURL}}",
+      "name": "{{.ShortAction}}"
+    },
+    "description": "{{.Action}}"
+  }
+  </script>
 </body>
 </html>
