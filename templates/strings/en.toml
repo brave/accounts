@@ -38,6 +38,10 @@ other = "Click the link below to access your Brave account. (You can also paste 
 description = "Text on the email verification button"
 other = "Confirm your email"
 
+[VerifyEmailShortAction]
+description = "Text on the inbox action button for email verification"
+other = "Confirm"
+
 [VerifyEmailActionBackup]
 description = "Instructions for manual link usage if button doesn't work"
 other = "Don’t see a button? Click this link to confirm your email."

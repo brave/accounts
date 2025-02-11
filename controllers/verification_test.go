@@ -2,7 +2,9 @@ package controllers_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -239,6 +241,71 @@ func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
 		suite.Equal(http.StatusBadRequest, resp.Code)
 		util.AssertErrorResponseCode(suite.T(), resp, util.ErrIntentNotAllowed.Code)
 	}
+}
+
+func (suite *VerificationTestSuite) TestVerifyValidCheck() {
+	suite.SetupController(true, false)
+
+	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
+
+	// Initialize verification
+	initBody := controllers.VerifyInitRequest{
+		Email:   "test@example.com",
+		Intent:  "registration",
+		Service: "accounts",
+		Locale:  "en-US",
+	}
+
+	initResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", initBody), suite.router)
+	suite.Equal(http.StatusOK, initResp.Code)
+
+	var parsedInitResp controllers.VerifyInitResponse
+	util.DecodeJSONTestResponse(suite.T(), initResp.Body, &parsedInitResp)
+	suite.Require().NotNil(parsedInitResp.VerificationToken)
+
+	verificationID, err := suite.jwtService.ValidateVerificationToken(*parsedInitResp.VerificationToken)
+	suite.NoError(err)
+
+	verification, err := suite.ds.GetVerificationStatus(verificationID)
+	suite.NoError(err)
+
+	// Check valid verification - should return 204
+	checkURL := fmt.Sprintf("/v2/verify/complete?id=%s&code=%s", verification.ID, verification.Code)
+	checkReq := httptest.NewRequest(http.MethodGet, checkURL, nil)
+	checkResp := util.ExecuteTestRequest(checkReq, suite.router)
+	suite.Equal(http.StatusNoContent, checkResp.Code)
+
+	// Should not be able to check with invalid code - should return 404
+	badCheckURL := fmt.Sprintf("/v2/verify/complete?id=%s&code=%s", verification.ID, "abc123")
+	checkReq = httptest.NewRequest(http.MethodGet, badCheckURL, nil)
+	checkResp = util.ExecuteTestRequest(checkReq, suite.router)
+	suite.Equal(http.StatusNotFound, checkResp.Code)
+
+	// Complete verification
+	completeBody := controllers.VerifyCompleteRequest{
+		ID:   verification.ID,
+		Code: verification.Code,
+	}
+	completeResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/complete", completeBody), suite.router)
+	suite.Equal(http.StatusOK, completeResp.Code)
+
+	// Check after completion - should return 404
+	checkReq = httptest.NewRequest(http.MethodGet, checkURL, nil)
+	checkResp = util.ExecuteTestRequest(checkReq, suite.router)
+	suite.Equal(http.StatusNotFound, checkResp.Code)
+	util.AssertErrorResponseCode(suite.T(), checkResp, util.ErrVerificationNotFound.Code)
+
+	// Check with invalid ID - should return 400
+	checkURL = fmt.Sprintf("/v2/verify/complete?id=invalid&code=%s", verification.Code)
+	checkReq = httptest.NewRequest(http.MethodGet, checkURL, nil)
+	checkResp = util.ExecuteTestRequest(checkReq, suite.router)
+	suite.Equal(http.StatusBadRequest, checkResp.Code)
+
+	// Check with missing code - should return 400
+	checkURL = fmt.Sprintf("/v2/verify/complete?id=%s", verification.ID)
+	checkReq = httptest.NewRequest(http.MethodGet, checkURL, nil)
+	checkResp = util.ExecuteTestRequest(checkReq, suite.router)
+	suite.Equal(http.StatusBadRequest, checkResp.Code)
 }
 
 func (suite *VerificationTestSuite) TestVerifyComplete() {
