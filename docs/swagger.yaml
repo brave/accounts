@@ -917,6 +917,41 @@ paths:
       tags:
       - Sessions
   /v2/verify/complete:
+    get:
+      consumes:
+      - application/json
+      description: Checks if email verification code is valid and still pending
+      parameters:
+      - description: Verification ID
+        in: query
+        name: id
+        required: true
+        type: string
+      - description: Verification code
+        in: query
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Verification is pending
+        "400":
+          description: Missing/invalid verification parameters
+          schema:
+            type: string
+        "404":
+          description: Verification not found or expired
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Check verification code validity
+      tags:
+      - Email verification
     post:
       consumes:
       - application/json
