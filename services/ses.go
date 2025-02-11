@@ -183,7 +183,7 @@ func (s *SESService) sendEmail(ctx context.Context, email string, subject string
 
 	input := &ses.SendEmailInput{
 		Destination: &types.Destination{
-			ToAddresses: []string{email},
+			ToAddresses: []string{util.CanonicalizeEmail(email)},
 		},
 		Message: &types.Message{
 			Body: &types.Body{
