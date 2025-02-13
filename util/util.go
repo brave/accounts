@@ -69,9 +69,12 @@ func IsEmailAllowed(email string, checkStrictCountries bool) bool {
 		return false
 	}
 
-	// Always block North Korea TLD
-	if strings.HasSuffix(lowerEmail, ".kp") {
-		return false
+	// Always block these TLDs
+	unsupportedTLDs := []string{".kp", ".tz"}
+	for _, tld := range unsupportedTLDs {
+		if strings.HasSuffix(lowerEmail, tld) {
+			return false
+		}
 	}
 
 	if checkStrictCountries {
