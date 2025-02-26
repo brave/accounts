@@ -162,9 +162,8 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 			intentAllowed = false
 		}
 	case datastore.VerificationIntent:
-		if requestData.Service != util.EmailAliasesServiceName && requestData.Service != util.PremiumServiceName {
-			intentAllowed = false
-		}
+		// All services are allowed to verify email addresses
+		intentAllowed = true
 	case datastore.RegistrationIntent, datastore.SetPasswordIntent:
 		if !vc.passwordAuthEnabled || requestData.Service != util.AccountsServiceName {
 			intentAllowed = false
