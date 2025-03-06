@@ -205,7 +205,12 @@ func (d *Datastore) StartVerificationEventListener() {
 				}
 				d.verificationEventWaitMapLock.Lock()
 				if request, ok := d.verificationEventWaitMap[verificationID]; ok {
-					request.responseChan <- true
+					select {
+					case request.responseChan <- true:
+						// Successfully sent the verification status
+					default:
+						// Channel is closed, skip sending
+					}
 					delete(d.verificationEventWaitMap, verificationID)
 				}
 				d.verificationEventWaitMapLock.Unlock()
@@ -217,7 +222,6 @@ func (d *Datastore) StartVerificationEventListener() {
 			d.verificationEventWaitMapLock.Lock()
 			for verificationID, req := range d.verificationEventWaitMap {
 				if time.Since(req.startTime) >= verifyWaitMaxDuration {
-					close(req.responseChan)
 					delete(d.verificationEventWaitMap, verificationID)
 				}
 			}
