@@ -201,11 +201,6 @@ func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
 			passwordAuthEnabled: true,
 		},
 		{
-			intent:              "verification",
-			service:             "accounts",
-			passwordAuthEnabled: true,
-		},
-		{
 			intent:              "registration",
 			service:             "premium",
 			passwordAuthEnabled: true,

@@ -240,7 +240,19 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
                 .get("authToken")
                 .and_then(|v| v.as_str())
                 .map(String::from);
+            let email = result
+                .get("email")
+                .expect("email should be in result response")
+                .as_str()
+                .expect("email should be a string");
+            let service_name = result
+                .get("service")
+                .expect("service should be in result response")
+                .as_str()
+                .expect("service should be a string");
             println!("verification token: {}", verification_token);
+            println!("email: {}", email);
+            println!("service: {}", service_name);
             return (verification_token.to_string(), auth_token);
         }
     }
