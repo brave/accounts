@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/mail"
 	"regexp"
 	"strings"
 
@@ -23,6 +24,7 @@ import (
 )
 
 var (
+	emailRegex                    = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 	validate                      = validator.New(validator.WithRequiredStructEnabled())
 	TestKeyServiceRouter *chi.Mux = nil
 )
@@ -40,6 +42,23 @@ const (
 	KeyServiceSecretHeader = "key-service-secret"
 	KeyServiceURLEnv       = "KEY_SERVICE_URL"
 )
+
+func init() {
+	_ = validate.RegisterValidation("email", validateEmail)
+}
+
+func validateEmail(fl validator.FieldLevel) bool {
+	email := fl.Field().String()
+
+	// First check: Using Go's standard mail.ParseAddress
+	_, err := mail.ParseAddress(email)
+	if err != nil {
+		return false
+	}
+
+	// Second check: Using regex pattern for additional validation
+	return emailRegex.MatchString(email)
+}
 
 func GenerateRandomString(length int) string {
 	b := make([]byte, length)
