@@ -22,12 +22,13 @@ var (
 	ErrKeyNotFound = NewExposedError(12001, "key not found")
 
 	// Verification errors, prefixed with '13'
-	ErrTooManyVerifications    = NewExposedError(13001, "too many pending verification requests for email")
-	ErrVerificationNotFound    = NewExposedError(13002, "verification not found or invalid id/code")
-	ErrIntentNotAllowed        = NewExposedError(13003, "intent not allowed")
-	ErrAccountExists           = NewExposedError(13004, "account already exists")
-	ErrAccountDoesNotExist     = NewExposedError(13005, "account does not exist")
-	ErrEmailDomainNotSupported = NewExposedError(13006, "email domain is not supported")
+	ErrTooManyVerifications           = NewExposedError(13001, "too many pending verification requests for email")
+	ErrVerificationNotFound           = NewExposedError(13002, "verification not found or invalid id/code")
+	ErrIntentNotAllowed               = NewExposedError(13003, "intent not allowed")
+	ErrAccountExists                  = NewExposedError(13004, "account already exists")
+	ErrAccountDoesNotExist            = NewExposedError(13005, "account does not exist")
+	ErrEmailDomainNotSupported        = NewExposedError(13006, "email domain is not supported")
+	ErrFailedToSendEmailInvalidFormat = NewExposedError(13007, "failed to send email due to invalid format")
 
 	// Auth errors, prefixed with '14'
 	ErrAKEStateNotFound     = NewExposedError(14001, "AKE state not found")
