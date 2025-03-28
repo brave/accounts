@@ -221,6 +221,10 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		verification,
 		requestData.Locale,
 	); err != nil {
+		if errors.Is(err, util.ErrFailedToSendEmailInvalidFormat) {
+			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+			return
+		}
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, fmt.Errorf("failed to send verification email: %w", err))
 		return
 	}
