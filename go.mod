@@ -95,7 +95,7 @@ require (
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0
-	gorm.io/driver/postgres v1.5.9
+	gorm.io/driver/postgres v1.5.11
 )
 
 replace github.com/bytemare/opaque v0.0.0 => github.com/brave-experiments/opaque v0.0.0-20241130024823-6de096621e59
