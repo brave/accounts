@@ -222,6 +222,10 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		requestData.Locale,
 	); err != nil {
 		if errors.Is(err, util.ErrFailedToSendEmailInvalidFormat) {
+			if vc.datastore.DeleteVerification(verification.ID) != nil {
+				// Don't override the more descriptive error code and let cron handle the cleanup
+				_ = true
+			}
 			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
 			return
 		}
