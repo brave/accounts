@@ -14,6 +14,7 @@ import (
 	opaqueMsg "github.com/bytemare/opaque/message"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -22,6 +23,7 @@ const childAuthTokenExpirationTime = time.Hour * 24 * 14
 type AuthController struct {
 	opaqueService *services.OpaqueService
 	jwtService    *services.JWTService
+	twoFAService  *services.TwoFAService
 	ds            *datastore.Datastore
 	sesService    services.SES
 }
@@ -43,7 +45,7 @@ type LoginInitRequest struct {
 // @Description Response for account login
 type LoginInitResponse struct {
 	// Interim authentication token for future login finalization
-	AkeToken string `json:"akeToken"`
+	LoginToken string `json:"loginToken"`
 	// Evaluated message component of KE2
 	EvaluatedMessage *string `json:"evaluatedMessage,omitempty"`
 	// Server masking nonce of KE2
@@ -69,7 +71,9 @@ type LoginFinalizeRequest struct {
 // @Description Response containing auth token after successful login
 type LoginFinalizeResponse struct {
 	// Authentication token for future requests
-	AuthToken string `json:"authToken"`
+	AuthToken *string `json:"authToken"`
+	// Indicates if 2FA verification is required before authentication is complete
+	RequiresTwoFA bool `json:"requiresTwoFA"`
 }
 
 // @Description	Response containing validated token details
@@ -94,6 +98,15 @@ type CreateServiceTokenRequest struct {
 type CreateServiceTokenResponse struct {
 	// AuthToken is the JWT token created for the requested service
 	AuthToken string `json:"authToken"`
+}
+
+// @Description Response after successful 2FA verification and login
+type LoginFinalize2FAResponse struct {
+	// Authentication token for future requests
+	AuthToken string `json:"authToken"`
+	// Indicates to the client that 2FA was disabled as a result of using a recovery
+	// key (and should probably lead to the user being invited to re-enable 2FA)
+	TwoFADisabled bool `json:"twoFADisabled"`
 }
 
 func (req *LoginInitRequest) ToOpaqueKE1(opaqueService *services.OpaqueService) (*opaqueMsg.KE1, error) {
@@ -142,11 +155,11 @@ func (req *LoginInitRequest) ToOpaqueKE1(opaqueService *services.OpaqueService) 
 	}, nil
 }
 
-func FromOpaqueKE2(opaqueResp *opaqueMsg.KE2, akeToken string, useBinary bool) (*LoginInitResponse, error) {
+func FromOpaqueKE2(opaqueResp *opaqueMsg.KE2, loginToken string, useBinary bool) (*LoginInitResponse, error) {
 	if useBinary {
 		serializedBin := hex.EncodeToString(opaqueResp.Serialize())
 		return &LoginInitResponse{
-			AkeToken:      akeToken,
+			LoginToken:    loginToken,
 			SerializedKE2: &serializedBin,
 		}, nil
 	}
@@ -166,7 +179,7 @@ func FromOpaqueKE2(opaqueResp *opaqueMsg.KE2, akeToken string, useBinary bool) (
 	mac := hex.EncodeToString(opaqueResp.ServerMac)
 
 	return &LoginInitResponse{
-		AkeToken:         akeToken,
+		LoginToken:       loginToken,
 		EvaluatedMessage: &evalMsg,
 		MaskingNonce:     &maskNonce,
 		MaskedResponse:   &maskResp,
@@ -186,10 +199,11 @@ func (req *LoginFinalizeRequest) ToOpaqueKE3(opaqueService *services.OpaqueServi
 	}, nil
 }
 
-func NewAuthController(opaqueService *services.OpaqueService, jwtService *services.JWTService, ds *datastore.Datastore, sesService services.SES) *AuthController {
+func NewAuthController(opaqueService *services.OpaqueService, jwtService *services.JWTService, twoFAService *services.TwoFAService, ds *datastore.Datastore, sesService services.SES) *AuthController {
 	return &AuthController{
 		opaqueService: opaqueService,
 		jwtService:    jwtService,
+		twoFAService:  twoFAService,
 		ds:            ds,
 		sesService:    sesService,
 	}
@@ -203,6 +217,7 @@ func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler,
 	if passwordAuthEnabled {
 		r.Post("/login/init", ac.LoginInit)
 		r.Post("/login/finalize", ac.LoginFinalize)
+		r.Post("/login/finalize_2fa", ac.LoginFinalize2FA)
 	}
 
 	return r
@@ -295,13 +310,13 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	akeToken, err := ac.jwtService.CreateEphemeralAKEToken(akeState.ID, datastore.AkeStateExpiration)
+	loginToken, err := ac.jwtService.CreateEphemeralLoginToken(akeState.ID, datastore.TwoFAStateExpiration)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
 
-	response, err := FromOpaqueKE2(ke2, akeToken, requestData.SerializedKE1 != nil)
+	response, err := FromOpaqueKE2(ke2, loginToken, requestData.SerializedKE1 != nil)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
@@ -311,12 +326,27 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, response)
 }
 
+// createSessionAndToken creates a new session for the account and generates an auth token
+func (ac *AuthController) createSessionAndToken(accountID uuid.UUID, userAgent string) (string, error) {
+	session, err := ac.ds.CreateSession(accountID, datastore.PasswordAuthSessionVersion, userAgent)
+	if err != nil {
+		return "", fmt.Errorf("failed to create session: %w", err)
+	}
+
+	authToken, err := ac.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
+	if err != nil {
+		return "", fmt.Errorf("failed to create auth token: %w", err)
+	}
+
+	return authToken, nil
+}
+
 // @Summary Finalize login
-// @Description Final step of login flow, verifies KE3 message and creates session.
+// @Description Final step of login flow, verifies KE3 message and creates session or prompts for 2FA.
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer + ake token"
+// @Param Authorization header string true "Bearer + login state token"
 // @Param Brave-Key header string false "Brave services key (if one is configured)"
 // @Param request body LoginFinalizeRequest true "login finalize request"
 // @Success 200 {object} LoginFinalizeResponse
@@ -331,7 +361,7 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	akeStateID, err := ac.jwtService.ValidateEphemeralAKEToken(token)
+	loginStateID, err := ac.jwtService.ValidateEphemeralLoginToken(token)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 		return
@@ -348,13 +378,80 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	accountID, err := ac.opaqueService.LoginFinalize(akeStateID, opaqueReq)
+	loginState, err := ac.opaqueService.LoginFinalize(loginStateID, opaqueReq)
 	if err != nil {
 		if errors.Is(err, util.ErrIncorrectCredentials) ||
 			errors.Is(err, util.ErrIncorrectEmail) ||
 			errors.Is(err, util.ErrIncorrectPassword) ||
-			errors.Is(err, util.ErrAKEStateNotFound) ||
-			errors.Is(err, util.ErrAKEStateExpired) {
+			errors.Is(err, util.ErrInterimPasswordStateNotFound) ||
+			errors.Is(err, util.ErrInterimPasswordStateExpired) {
+			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
+			return
+		}
+		if errors.Is(err, util.ErrInterimPasswordStateMismatch) {
+			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+			return
+		}
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	response := LoginFinalizeResponse{
+		RequiresTwoFA: loginState.RequiresTwoFA,
+	}
+	if !loginState.RequiresTwoFA {
+		// Create a session and return an auth token
+		authToken, err := ac.createSessionAndToken(*loginState.AccountID, r.UserAgent())
+		if err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
+		response.AuthToken = &authToken
+	}
+
+	render.Status(r, http.StatusOK)
+	render.JSON(w, r, response)
+}
+
+// @Summary Finalize login with 2FA
+// @Description Final step of 2FA login flow, verifies TOTP code or recovery key and creates a session. If a recovery key is used, 2FA will be disabled.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer + login state token"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param request body services.TwoFAAuthRequest true "2FA verification request"
+// @Success 200 {object} LoginFinalize2FAResponse
+// @Failure 400 {object} util.ErrorResponse
+// @Failure 401 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/auth/login/finalize_2fa [post]
+func (ac *AuthController) LoginFinalize2FA(w http.ResponseWriter, r *http.Request) {
+	token, err := util.ExtractAuthToken(r)
+	if err != nil {
+		util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
+		return
+	}
+
+	loginStateID, err := ac.jwtService.ValidateEphemeralLoginToken(token)
+	if err != nil {
+		util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
+		return
+	}
+
+	var requestData services.TwoFAAuthRequest
+	if !util.DecodeJSONAndValidate(w, r, &requestData) {
+		return
+	}
+
+	// Get the account ID from the login state, specifying this is for 2FA
+	loginState, err := ac.ds.GetLoginState(loginStateID, true)
+	if err != nil {
+		if errors.Is(err, util.ErrInterimPasswordStateMismatch) {
+			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+			return
+		}
+		if errors.Is(err, util.ErrInterimPasswordStateNotFound) || errors.Is(err, util.ErrInterimPasswordStateExpired) {
 			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 			return
 		}
@@ -362,19 +459,26 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	session, err := ac.ds.CreateSession(*accountID, datastore.PasswordAuthSessionVersion, r.UserAgent())
+	// Process the 2FA authentication request
+	if err := ac.twoFAService.ProcessChallenge(loginState, &requestData); err != nil {
+		if errors.Is(err, util.ErrBadTOTPCode) || errors.Is(err, util.ErrBadRecoveryKey) || errors.Is(err, util.ErrTOTPCodeAlreadyUsed) {
+			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
+			return
+		}
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Create a session and return an auth token
+	authToken, err := ac.createSessionAndToken(*loginState.AccountID, r.UserAgent())
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
 
-	authToken, err := ac.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
-	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
-	response := LoginFinalizeResponse{
-		AuthToken: authToken,
+	response := LoginFinalize2FAResponse{
+		AuthToken:     authToken,
+		TwoFADisabled: requestData.RecoveryKey != nil,
 	}
 
 	render.Status(r, http.StatusOK)

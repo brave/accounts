@@ -13,8 +13,6 @@ import (
 
 var (
 	// Account errors, prefixed with '11'
-	ErrRegistrationStateNotFound   = NewExposedError(11001, "registration state not found")
-	ErrRegistrationStateExpired    = NewExposedError(11002, "registration state has expired")
 	ErrEmailNotVerified            = NewExposedError(11003, "email not verified")
 	ErrIncorrectVerificationIntent = NewExposedError(11004, "incorrect verification intent")
 
@@ -31,13 +29,18 @@ var (
 	ErrFailedToSendEmailInvalidFormat = NewExposedError(13007, "failed to send email due to invalid format")
 
 	// Auth errors, prefixed with '14'
-	ErrAKEStateNotFound     = NewExposedError(14001, "AKE state not found")
-	ErrAKEStateExpired      = NewExposedError(14002, "AKE state has expired")
-	ErrOutdatedSession      = NewExposedError(14003, "outdated session")
-	ErrIncorrectCredentials = NewExposedError(14004, "incorrect credentials")
-	ErrIncorrectEmail       = NewExposedError(14005, "incorrect email")
-	ErrIncorrectPassword    = NewExposedError(14006, "incorrect password")
-	ErrInvalidTokenAudience = NewExposedError(14007, "invalid token audience")
+	ErrInterimPasswordStateNotFound = NewExposedError(14001, "interim password state not found")
+	ErrInterimPasswordStateExpired  = NewExposedError(14002, "interim password state has expired")
+	ErrOutdatedSession              = NewExposedError(14003, "outdated session")
+	ErrIncorrectCredentials         = NewExposedError(14004, "incorrect credentials")
+	ErrIncorrectEmail               = NewExposedError(14005, "incorrect email")
+	ErrIncorrectPassword            = NewExposedError(14006, "incorrect password")
+	ErrInvalidTokenAudience         = NewExposedError(14007, "invalid token audience")
+	ErrBadTOTPCode                  = NewExposedError(14008, "invalid TOTP code")
+	ErrInterimPasswordStateMismatch = NewExposedError(14009, "interim password state mismatch")
+	ErrBadRecoveryKey               = NewExposedError(14010, "invalid recovery key")
+	ErrTOTPAlreadyEnabled           = NewExposedError(14011, "TOTP authentication is already enabled for this account")
+	ErrTOTPCodeAlreadyUsed          = NewExposedError(14012, "TOTP code has already been used")
 
 	// Misc errors, prefixed with '15'
 	ErrInvalidServicesKey = NewExposedError(15001, "invalid services key")

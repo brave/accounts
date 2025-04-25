@@ -16,6 +16,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/pquerna/otp"
+	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -29,6 +31,7 @@ type AuthTestSuite struct {
 	controller    *controllers.AuthController
 	router        *chi.Mux
 	opaqueConfig  *opaque.Configuration
+	totpKey       *otp.Key
 }
 
 func NewAuthTestSuite(useKeyService bool) *AuthTestSuite {
@@ -36,6 +39,8 @@ func NewAuthTestSuite(useKeyService bool) *AuthTestSuite {
 		useKeyService: useKeyService,
 	}
 }
+
+const testRecoveryKey = "MFZWIZTBONSWM53BONSWMYLTMVTGC43F"
 
 func (suite *AuthTestSuite) SetupTest() {
 	var err error
@@ -50,11 +55,18 @@ func (suite *AuthTestSuite) SetupTest() {
 		initKeyServiceForTest(suite.T(), &suite.keyServiceDs, suite.ds)
 	}
 
+	suite.totpKey, err = totp.Generate(totp.GenerateOpts{
+		Issuer:      "Brave Account",
+		AccountName: "test@example.com",
+	})
+	suite.Require().NoError(err)
+
 	suite.jwtService, err = services.NewJWTService(suite.ds, false)
 	suite.Require().NoError(err)
 	opaqueService, err := services.NewOpaqueService(suite.ds, false)
 	suite.Require().NoError(err)
-	suite.controller = controllers.NewAuthController(opaqueService, suite.jwtService, suite.ds, &MockSESService{})
+	twoFAService := services.NewTwoFAService(suite.ds, false)
+	suite.controller = controllers.NewAuthController(opaqueService, suite.jwtService, twoFAService, suite.ds, &MockSESService{})
 
 	suite.account, err = suite.ds.GetOrCreateAccount("test@example.com")
 	suite.Require().NoError(err)
@@ -163,7 +175,7 @@ func (suite *AuthTestSuite) TestAuthValidateBadToken() {
 	suite.Equal(http.StatusUnauthorized, resp.Code)
 }
 
-func (suite *AuthTestSuite) TestAuthLogin() {
+func (suite *AuthTestSuite) performLoginSteps() (*controllers.LoginFinalizeResponse, string) {
 	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
 	suite.Require().NoError(err)
 
@@ -175,35 +187,39 @@ func (suite *AuthTestSuite) TestAuthLogin() {
 	}
 
 	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
-
 	resp := util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusOK, resp.Code)
 
-	var parsedResp controllers.LoginInitResponse
-	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
-	suite.NotNil(parsedResp.SerializedKE2)
-	suite.NotEmpty(parsedResp.AkeToken)
+	var initResp controllers.LoginInitResponse
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &initResp)
+	suite.NotNil(initResp.SerializedKE2)
+	suite.NotEmpty(initResp.LoginToken)
 
-	loginFinalReq := suite.createLoginFinalizeRequest(opaqueClient, *parsedResp.SerializedKE2)
-
+	loginFinalReq := suite.createLoginFinalizeRequest(opaqueClient, *initResp.SerializedKE2)
 	req = util.CreateJSONTestRequest("/v2/auth/login/finalize", loginFinalReq)
-	req.Header.Set("Authorization", "Bearer "+parsedResp.AkeToken)
-
+	req.Header.Set("Authorization", "Bearer "+initResp.LoginToken)
 	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusOK, resp.Code)
 
-	var parsedFinalResp controllers.LoginFinalizeResponse
-	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedFinalResp)
-	suite.NotEmpty(parsedFinalResp.AuthToken)
+	var finalizeResp controllers.LoginFinalizeResponse
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &finalizeResp)
 
-	req = httptest.NewRequest("GET", "/v2/auth/validate", nil)
-	req.Header.Add("Authorization", "Bearer "+parsedFinalResp.AuthToken)
+	return &finalizeResp, initResp.LoginToken
+}
 
-	resp = util.ExecuteTestRequest(req, suite.router)
+func (suite *AuthTestSuite) TestAuthLogin() {
+	finalizeResp, _ := suite.performLoginSteps()
+	suite.NotEmpty(finalizeResp.AuthToken)
+	suite.False(finalizeResp.RequiresTwoFA)
+
+	req := httptest.NewRequest("GET", "/v2/auth/validate", nil)
+	req.Header.Add("Authorization", "Bearer "+*finalizeResp.AuthToken)
+
+	resp := util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusOK, resp.Code)
 }
 
-func (suite *AuthTestSuite) TestAuthLoginNoAKEToken() {
+func (suite *AuthTestSuite) TestAuthLoginNoLoginState() {
 	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
 	suite.Require().NoError(err)
 
@@ -215,7 +231,6 @@ func (suite *AuthTestSuite) TestAuthLoginNoAKEToken() {
 	}
 
 	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
-
 	resp := util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusOK, resp.Code)
 
@@ -249,7 +264,7 @@ func (suite *AuthTestSuite) TestAuthLoginNonexistentEmail() {
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrIncorrectEmail.Code)
 }
 
-func (suite *AuthTestSuite) TestAuthLoginExpiredAKEToken() {
+func (suite *AuthTestSuite) TestAuthLoginExpiredLoginState() {
 	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
 	suite.Require().NoError(err)
 
@@ -268,22 +283,22 @@ func (suite *AuthTestSuite) TestAuthLoginExpiredAKEToken() {
 	var parsedResp controllers.LoginInitResponse
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
 	suite.NotNil(parsedResp.SerializedKE2)
-	suite.NotEmpty(parsedResp.AkeToken)
+	suite.NotEmpty(parsedResp.LoginToken)
 
-	akeStateID, err := suite.jwtService.ValidateEphemeralAKEToken(parsedResp.AkeToken)
+	loginStateID, err := suite.jwtService.ValidateEphemeralLoginToken(parsedResp.LoginToken)
 	suite.Require().NoError(err)
 
-	err = suite.ds.DB.Model(&datastore.AKEState{}).Where("id = ?", akeStateID).Update("created_at", time.Now().Add(-30*time.Minute)).Error
+	err = suite.ds.DB.Model(&datastore.InterimPasswordState{}).Where("id = ?", loginStateID).Update("created_at", time.Now().Add(-30*time.Minute)).Error
 	suite.Require().NoError(err)
 
 	loginFinalReq := suite.createLoginFinalizeRequest(opaqueClient, *parsedResp.SerializedKE2)
 
 	req = util.CreateJSONTestRequest("/v2/auth/login/finalize", loginFinalReq)
-	req.Header.Set("Authorization", "Bearer "+parsedResp.AkeToken)
+	req.Header.Set("Authorization", "Bearer "+parsedResp.LoginToken)
 
 	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusUnauthorized, resp.Code)
-	util.AssertErrorResponseCode(suite.T(), resp, util.ErrAKEStateExpired.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrInterimPasswordStateExpired.Code)
 }
 
 func (suite *AuthTestSuite) TestPasswordAuthEndpointsDisabled() {
@@ -387,6 +402,162 @@ func (suite *AuthTestSuite) TestCreateServiceToken() {
 	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusBadRequest, resp.Code)
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
+}
+
+func (suite *AuthTestSuite) TestAuth2FAWithTOTPCode() {
+	// First, enable 2FA for the account
+	err := suite.ds.SetTOTPSetting(suite.account.ID, true)
+	suite.Require().NoError(err)
+
+	totpDs := suite.ds
+	if suite.useKeyService {
+		totpDs = suite.keyServiceDs
+	}
+
+	recoveryKey := testRecoveryKey
+	err = suite.ds.SetRecoveryKey(suite.account.ID, &recoveryKey)
+	suite.Require().NoError(err)
+
+	// Generate and store a test TOTP key
+	err = totpDs.StoreTOTPKey(suite.account.ID, suite.totpKey)
+	suite.Require().NoError(err)
+
+	// Perform login initialization and finalization
+	finalizeResp, loginToken := suite.performLoginSteps()
+
+	// Verify we need 2FA
+	suite.True(finalizeResp.RequiresTwoFA)
+	suite.Nil(finalizeResp.AuthToken)
+
+	// Try using invalid TOTP code first
+	invalidCode := "000000"
+	twoFAReq := services.TwoFAAuthRequest{
+		TOTPCode: &invalidCode,
+	}
+	req := util.CreateJSONTestRequest("/v2/auth/login/finalize_2fa", twoFAReq)
+	req.Header.Set("Authorization", "Bearer "+loginToken)
+	resp := util.ExecuteTestRequest(req, suite.router)
+
+	// Should get unauthorized with invalid code
+	suite.Equal(http.StatusUnauthorized, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrBadTOTPCode.Code)
+
+	validCode, err := totp.GenerateCode(suite.totpKey.Secret(), time.Now().UTC())
+	suite.Require().NoError(err)
+
+	twoFAReq = services.TwoFAAuthRequest{
+		TOTPCode: &validCode,
+	}
+	req = util.CreateJSONTestRequest("/v2/auth/login/finalize_2fa", twoFAReq)
+	req.Header.Set("Authorization", "Bearer "+loginToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
+
+	// Should succeed with valid code
+	suite.Equal(http.StatusOK, resp.Code)
+
+	var parsedTwoFAResp controllers.LoginFinalize2FAResponse
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedTwoFAResp)
+	suite.NotEmpty(parsedTwoFAResp.AuthToken)
+	suite.False(parsedTwoFAResp.TwoFADisabled)
+
+	// Perform login steps again to get a new login state
+	finalizeResp, loginToken = suite.performLoginSteps()
+	suite.True(finalizeResp.RequiresTwoFA)
+	suite.Nil(finalizeResp.AuthToken)
+
+	// Try to reuse the same code with the new login state
+	req = util.CreateJSONTestRequest("/v2/auth/login/finalize_2fa", twoFAReq)
+	req.Header.Set("Authorization", "Bearer "+loginToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
+
+	// Should get unauthorized with reused code
+	suite.Equal(http.StatusUnauthorized, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrTOTPCodeAlreadyUsed.Code)
+
+	// Verify the auth token works
+	validateReq := httptest.NewRequest("GET", "/v2/auth/validate", nil)
+	validateReq.Header.Add("Authorization", "Bearer "+parsedTwoFAResp.AuthToken)
+	validateResp := util.ExecuteTestRequest(validateReq, suite.router)
+	suite.Equal(http.StatusOK, validateResp.Code)
+
+	account, err := suite.ds.GetOrCreateAccount(suite.account.Email)
+	suite.Require().NoError(err)
+	suite.True(account.IsTwoFAEnabled())
+	suite.NotNil(account.RecoveryKeyHash)
+}
+
+func (suite *AuthTestSuite) TestAuth2FAWithRecoveryKey() {
+	// First, enable 2FA for the account
+	err := suite.ds.SetTOTPSetting(suite.account.ID, true)
+	suite.Require().NoError(err)
+
+	// Determine which datastore to use for TOTP storage (main or key service)
+	totpDs := suite.ds
+	if suite.useKeyService {
+		totpDs = suite.keyServiceDs
+	}
+
+	// Create a recovery key
+	recoveryKey := testRecoveryKey
+	err = suite.ds.SetRecoveryKey(suite.account.ID, &recoveryKey)
+	suite.Require().NoError(err)
+
+	// Generate and store a test TOTP key
+	err = totpDs.StoreTOTPKey(suite.account.ID, suite.totpKey)
+	suite.Require().NoError(err)
+
+	// Perform login initialization and finalization
+	finalizeResp, loginToken := suite.performLoginSteps()
+
+	// Verify we need 2FA
+	suite.True(finalizeResp.RequiresTwoFA)
+	suite.Nil(finalizeResp.AuthToken)
+
+	// Test 2FA with bad recovery key
+	badRecoveryKey := "bad-recovery-key"
+	recoveryReq := services.TwoFAAuthRequest{
+		RecoveryKey: &badRecoveryKey,
+	}
+	req := util.CreateJSONTestRequest("/v2/auth/login/finalize_2fa", recoveryReq)
+	req.Header.Set("Authorization", "Bearer "+loginToken)
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusUnauthorized, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrBadRecoveryKey.Code)
+
+	// Test 2FA with recovery key
+	recoveryReq = services.TwoFAAuthRequest{
+		RecoveryKey: &recoveryKey,
+	}
+	req = util.CreateJSONTestRequest("/v2/auth/login/finalize_2fa", recoveryReq)
+	req.Header.Set("Authorization", "Bearer "+loginToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+
+	var parsedRecoveryResp controllers.LoginFinalize2FAResponse
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedRecoveryResp)
+	suite.NotEmpty(parsedRecoveryResp.AuthToken)
+	suite.True(parsedRecoveryResp.TwoFADisabled)
+
+	// Verify the auth token works
+	validateReq := httptest.NewRequest("GET", "/v2/auth/validate", nil)
+	validateReq.Header.Add("Authorization", "Bearer "+parsedRecoveryResp.AuthToken)
+	validateResp := util.ExecuteTestRequest(validateReq, suite.router)
+	suite.Equal(http.StatusOK, validateResp.Code)
+
+	// 2FA should now be disabled because we used recovery key
+	account, err := suite.ds.GetOrCreateAccount(suite.account.Email)
+	suite.Require().NoError(err)
+	suite.False(account.IsTwoFAEnabled())
+	suite.Nil(account.RecoveryKeyHash)
+
+	finalizeResp, _ = suite.performLoginSteps()
+	suite.False(finalizeResp.RequiresTwoFA)
+	suite.NotNil(finalizeResp.AuthToken)
+
+	validateReq = httptest.NewRequest("GET", "/v2/auth/validate", nil)
+	validateReq.Header.Add("Authorization", "Bearer "+*finalizeResp.AuthToken)
+	validateResp = util.ExecuteTestRequest(validateReq, suite.router)
+	suite.Equal(http.StatusOK, validateResp.Code)
 }
 
 func TestAuthTestSuite(t *testing.T) {

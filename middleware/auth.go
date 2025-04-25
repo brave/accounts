@@ -126,9 +126,9 @@ func ServicesKeyMiddleware(env string) func(http.Handler) http.Handler {
 	}
 }
 
-func KeyServiceMiddleware() func(http.Handler) http.Handler {
+func KeyServiceMiddleware(env string) func(http.Handler) http.Handler {
 	secret := os.Getenv(util.KeyServiceSecretEnv)
-	if secret == "" {
+	if secret == "" && env == util.ProductionEnv {
 		log.Panic().Msgf("%s key cannot be empty in production environment", util.KeyServiceSecretEnv)
 	}
 	return func(next http.Handler) http.Handler {

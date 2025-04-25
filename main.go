@@ -18,7 +18,7 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/go-chi/docgen"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/swaggo/http-swagger/v2"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/rs/zerolog"
@@ -31,6 +31,9 @@ var (
 	prometheusListenFlag   = flag.String("prom-listen", ":9090", "Use specific address and port for listening for Prometheus server")
 	startWebhookSenderFlag = flag.Bool("start-webhook-sender", false, "Start the webhook event sender")
 	startKeyServiceFlag    = flag.Bool("start-key-service", false, "Start the server key service")
+
+	devEndpointsEnabled = os.Getenv(devEndpointsEnabledEnv) == "true"
+	environment         = os.Getenv(environmentEnv)
 )
 
 const (
@@ -44,15 +47,22 @@ const (
 	environmentEnv            = "ENVIRONMENT"
 )
 
-func startKeyService(jwtService *services.JWTService, opaqueService *services.OpaqueService) {
+func addSwaggerToRouter(r *chi.Mux) {
+	if devEndpointsEnabled {
+		r.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
+	}
+}
+
+func startKeyService(jwtService *services.JWTService, opaqueService *services.OpaqueService, twoFAService *services.TwoFAService, environment string) {
 	// Initialize controllers
-	serverKeysController := controllers.NewServerKeysController(opaqueService, jwtService)
+	serverKeysController := controllers.NewServerKeysController(opaqueService, jwtService, twoFAService)
 
 	prometheusRegistry := prometheus.NewRegistry()
 	// Setup router
 	r := chi.NewRouter()
 	r.Use(middleware.LoggerMiddleware(prometheusRegistry))
-	r.Mount("/v2/server_keys", serverKeysController.Router(middleware.KeyServiceMiddleware()))
+	r.Mount("/v2/server_keys", serverKeysController.Router(middleware.KeyServiceMiddleware(environment)))
+	addSwaggerToRouter(r)
 
 	util.StartPrometheusServer(prometheusRegistry, *prometheusListenFlag)
 
@@ -79,7 +89,6 @@ func main() {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 	}
 
-	environment := os.Getenv(environmentEnv)
 	switch environment {
 	case util.DevelopmentEnv, util.StagingEnv, util.ProductionEnv:
 		// Valid environment
@@ -92,7 +101,6 @@ func main() {
 	}
 	passwordAuthEnabled := os.Getenv(passwordAuthEnabledEnv) == "true"
 	emailAuthEnabled := os.Getenv(emailAuthEnabledEnv) == "true"
-	devEndpointsEnabled := os.Getenv(devEndpointsEnabledEnv) == "true"
 	accountDeletionEnabled := os.Getenv(accountDeletionEnabledEnv) == "true"
 	allowedOrigins := strings.Split(os.Getenv(allowedOriginsEnv), ",")
 
@@ -127,8 +135,10 @@ func main() {
 		log.Panic().Err(err).Msg("Failed to init OPAQUE service")
 	}
 
+	twoFAService := services.NewTwoFAService(datastore, *startKeyServiceFlag)
+
 	if *startKeyServiceFlag {
-		startKeyService(jwtService, opaqueService)
+		startKeyService(jwtService, opaqueService, twoFAService, environment)
 		return
 	}
 
@@ -153,11 +163,11 @@ func main() {
 
 	r := chi.NewRouter()
 
-	authController := controllers.NewAuthController(opaqueService, jwtService, datastore, sesService)
-	accountsController := controllers.NewAccountsController(opaqueService, jwtService, datastore)
+	authController := controllers.NewAuthController(opaqueService, jwtService, twoFAService, datastore, sesService)
 	verificationController := controllers.NewVerificationController(datastore, jwtService, sesService, passwordAuthEnabled, emailAuthEnabled)
 	sessionsController := controllers.NewSessionsController(datastore)
 	userKeysController := controllers.NewUserKeysController(datastore)
+	accountsController := controllers.NewAccountsController(opaqueService, jwtService, twoFAService, datastore)
 
 	r.Use(middleware.LoggerMiddleware(prometheusRegistry))
 	r.Use(cors.Handler(cors.Options{
@@ -181,9 +191,7 @@ func main() {
 		r.With(servicesKeyMiddleware).Mount("/keys", userKeysController.Router(authMiddleware))
 	})
 
-	if devEndpointsEnabled {
-		r.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL("http://localhost:8080/swagger/doc.json")))
-	}
+	addSwaggerToRouter(r)
 
 	if *routesFlag {
 		fmt.Println(docgen.MarkdownRoutesDoc(r, docgen.MarkdownOpts{

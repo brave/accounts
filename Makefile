@@ -25,12 +25,17 @@ lint:
 
 run:
 	docker compose up -d postgres localstack
+	swag init
 	go run .
 
 test:
 	docker compose up -d postgres localstack
+	swag init
 	go test -p 1 -v ./...
 
 # Run `go install github.com/air-verse/air@latest` to use this
 dev:
 	air
+
+dev-key-service:
+	air -- -start-key-service -listen :8081 -prom-listen :9091
