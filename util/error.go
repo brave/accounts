@@ -38,6 +38,7 @@ var (
 	ErrIncorrectEmail       = NewExposedError(14005, "incorrect email")
 	ErrIncorrectPassword    = NewExposedError(14006, "incorrect password")
 	ErrInvalidTokenAudience = NewExposedError(14007, "invalid token audience")
+	ErrBadTOTPCode          = NewExposedError(14008, "invalid TOTP code")
 
 	// Misc errors, prefixed with '15'
 	ErrInvalidServicesKey = NewExposedError(15001, "invalid services key")
