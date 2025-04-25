@@ -168,6 +168,37 @@ definitions:
         description: Serialized OPAQUE registration response
         type: string
     type: object
+  controllers.TOTPGenerateRequest:
+    properties:
+      accountId:
+        description: AccountID is the UUID of the account for which to generate/delete
+          a TOTP key
+        type: string
+      email:
+        description: Email is the email address for the account (used for TOTP generation)
+        type: string
+    required:
+    - accountId
+    - email
+    type: object
+  controllers.TOTPGenerateResponse:
+    properties:
+      url:
+        description: URL is the URL of the TOTP key QR code
+        type: string
+    type: object
+  controllers.TOTPValidateRequest:
+    properties:
+      accountId:
+        description: AccountID is the UUID of the account to validate against
+        type: string
+      code:
+        description: Code is the TOTP code to validate
+        type: string
+    required:
+    - accountId
+    - code
+    type: object
   controllers.UserKey:
     properties:
       keyMaterial:
@@ -774,7 +805,6 @@ paths:
       - description: Key service secret
         in: header
         name: Key-Service-Secret
-        required: true
         type: string
       - description: JWT claims
         in: body
@@ -813,7 +843,6 @@ paths:
       - description: Key service secret
         in: header
         name: Key-Service-Secret
-        required: true
         type: string
       - description: OPRF key derivation info
         in: body
@@ -841,6 +870,127 @@ paths:
           schema:
             $ref: '#/definitions/util.ErrorResponse'
       summary: Derive OPRF Key
+      tags:
+      - Server Keys (server-side use only)
+  /v2/server_keys/totp:
+    post:
+      consumes:
+      - application/json
+      description: Creates a TOTP key for an account using secure random generation
+      parameters:
+      - description: Key service secret
+        in: header
+        name: Key-Service-Secret
+        type: string
+      - description: TOTP key generation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.TOTPGenerateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.TOTPGenerateResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Create TOTP Key
+      tags:
+      - Server Keys (server-side use only)
+  /v2/server_keys/totp/{accountId}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a TOTP key for an account
+      parameters:
+      - description: Key service secret
+        in: header
+        name: Key-Service-Secret
+        type: string
+      - description: Account ID
+        in: path
+        name: accountId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Success
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Delete TOTP Key
+      tags:
+      - Server Keys (server-side use only)
+  /v2/server_keys/totp/validate:
+    post:
+      consumes:
+      - application/json
+      description: Validates a TOTP code for an account
+      parameters:
+      - description: Key service secret
+        in: header
+        name: Key-Service-Secret
+        type: string
+      - description: Validation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.TOTPValidateRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Success
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Validate TOTP Code
       tags:
       - Server Keys (server-side use only)
   /v2/sessions:

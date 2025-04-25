@@ -666,8 +666,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Key service secret",
                         "name": "Key-Service-Secret",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "description": "JWT claims",
@@ -725,8 +724,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Key service secret",
                         "name": "Key-Service-Secret",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "description": "OPRF key derivation info",
@@ -753,6 +751,190 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/server_keys/totp": {
+            "post": {
+                "description": "Creates a TOTP key for an account using secure random generation",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Server Keys (server-side use only)"
+                ],
+                "summary": "Create TOTP Key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Key service secret",
+                        "name": "Key-Service-Secret",
+                        "in": "header"
+                    },
+                    {
+                        "description": "TOTP key generation request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.TOTPGenerateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.TOTPGenerateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/server_keys/totp/validate": {
+            "post": {
+                "description": "Validates a TOTP code for an account",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Server Keys (server-side use only)"
+                ],
+                "summary": "Validate TOTP Code",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Key service secret",
+                        "name": "Key-Service-Secret",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Validation request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.TOTPValidateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Success"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/server_keys/totp/{accountId}": {
+            "delete": {
+                "description": "Deletes a TOTP key for an account",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Server Keys (server-side use only)"
+                ],
+                "summary": "Delete TOTP Key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Key service secret",
+                        "name": "Key-Service-Secret",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Account ID",
+                        "name": "accountId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Success"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/util.ErrorResponse"
                         }
@@ -1376,6 +1558,49 @@ const docTemplate = `{
                 },
                 "serializedResponse": {
                     "description": "Serialized OPAQUE registration response",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.TOTPGenerateRequest": {
+            "type": "object",
+            "required": [
+                "accountId",
+                "email"
+            ],
+            "properties": {
+                "accountId": {
+                    "description": "AccountID is the UUID of the account for which to generate/delete a TOTP key",
+                    "type": "string"
+                },
+                "email": {
+                    "description": "Email is the email address for the account (used for TOTP generation)",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.TOTPGenerateResponse": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "description": "URL is the URL of the TOTP key QR code",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.TOTPValidateRequest": {
+            "type": "object",
+            "required": [
+                "accountId",
+                "code"
+            ],
+            "properties": {
+                "accountId": {
+                    "description": "AccountID is the UUID of the account to validate against",
+                    "type": "string"
+                },
+                "code": {
+                    "description": "Code is the TOTP code to validate",
                     "type": "string"
                 }
             }

@@ -1,0 +1,5 @@
+CREATE TABLE totp_keys (
+    account_id UUID PRIMARY KEY,
+    key TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
