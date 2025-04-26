@@ -53,9 +53,9 @@ func addSwaggerToRouter(r *chi.Mux) {
 	}
 }
 
-func startKeyService(jwtService *services.JWTService, opaqueService *services.OpaqueService, datastore *datastore.Datastore, environment string) {
+func startKeyService(jwtService *services.JWTService, opaqueService *services.OpaqueService, twoFAService *services.TwoFAService) {
 	// Initialize controllers
-	serverKeysController := controllers.NewServerKeysController(opaqueService, jwtService, datastore)
+	serverKeysController := controllers.NewServerKeysController(opaqueService, jwtService, twoFAService)
 
 	prometheusRegistry := prometheus.NewRegistry()
 	// Setup router
@@ -135,8 +135,10 @@ func main() {
 		log.Panic().Err(err).Msg("Failed to init OPAQUE service")
 	}
 
+	twoFAService := services.NewTwoFAService(datastore)
+
 	if *startKeyServiceFlag {
-		startKeyService(jwtService, opaqueService, datastore, environment)
+		startKeyService(jwtService, opaqueService, twoFAService)
 		return
 	}
 
