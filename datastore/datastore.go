@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/brave/accounts/migrations"
-	"github.com/brave/accounts/util"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
@@ -38,7 +37,6 @@ type Datastore struct {
 	webhookUrls                  map[string]interface{}
 	verificationEventWaitMap     map[uuid.UUID]*verificationWaitRequest
 	verificationEventWaitMapLock sync.Mutex
-	totpUtil                     *util.TOTPUtil
 }
 
 func NewDatastore(minSessionVersion int, isKeyService bool, isTesting bool) (*Datastore, error) {
@@ -175,7 +173,6 @@ func NewDatastore(minSessionVersion int, isKeyService bool, isTesting bool) (*Da
 		DB:                db,
 		minSessionVersion: minSessionVersion,
 		webhookUrls:       webhookUrls,
-		totpUtil:          util.NewTOTPUtil(),
 	}, nil
 }
 

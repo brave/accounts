@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/brave/accounts/datastore"
 	"github.com/brave/accounts/services"
 	"github.com/brave/accounts/util"
 	"github.com/go-chi/chi/v5"
@@ -16,8 +15,7 @@ import (
 type ServerKeysController struct {
 	opaqueService *services.OpaqueService
 	jwtService    *services.JWTService
-	datastore     *datastore.Datastore
-	totpUtil      *util.TOTPUtil
+	twoFAService  *services.TwoFAService
 }
 
 // JWTCreateRequest represents the request body for creating a JWT token
@@ -70,12 +68,11 @@ type TOTPValidateRequest struct {
 	Code string `json:"code" validate:"required"`
 }
 
-func NewServerKeysController(opaqueService *services.OpaqueService, jwtService *services.JWTService, datastore *datastore.Datastore) *ServerKeysController {
+func NewServerKeysController(opaqueService *services.OpaqueService, jwtService *services.JWTService, twoFAService *services.TwoFAService) *ServerKeysController {
 	return &ServerKeysController{
 		opaqueService: opaqueService,
 		jwtService:    jwtService,
-		datastore:     datastore,
-		totpUtil:      util.NewTOTPUtil(),
+		twoFAService:  twoFAService,
 	}
 }
 
@@ -177,7 +174,7 @@ func (sc *ServerKeysController) CreateTOTPKey(w http.ResponseWriter, r *http.Req
 	}
 
 	// Generate TOTP key for the specified account
-	key, err := sc.datastore.GenerateAndStoreTOTPKey(request.AccountID, request.Email)
+	key, err := sc.twoFAService.GenerateAndStoreTOTPKey(request.AccountID, request.Email)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
@@ -212,7 +209,7 @@ func (sc *ServerKeysController) ValidateTOTPCode(w http.ResponseWriter, r *http.
 	}
 
 	// Validate TOTP code for the specified account
-	err := sc.datastore.ValidateTOTPCode(request.AccountID, request.Code)
+	err := sc.twoFAService.ValidateTOTPCode(request.AccountID, request.Code)
 	if err != nil {
 		if errors.Is(err, util.ErrKeyNotFound) {
 			util.RenderErrorResponse(w, r, http.StatusNotFound, err)
@@ -248,7 +245,7 @@ func (sc *ServerKeysController) DeleteTOTPKey(w http.ResponseWriter, r *http.Req
 	}
 
 	// Delete TOTP key for the specified account
-	err = sc.datastore.DeleteTOTPKey(accountId)
+	err = sc.twoFAService.DeleteKeys(accountId)
 	if err != nil {
 		if errors.Is(err, util.ErrKeyNotFound) {
 			util.RenderErrorResponse(w, r, http.StatusNotFound, err)

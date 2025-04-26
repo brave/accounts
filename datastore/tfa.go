@@ -20,15 +20,8 @@ type TOTPKey struct {
 	CreatedAt time.Time `json:"createdAt" gorm:"<-:false"`
 }
 
-// GenerateAndStoreTOTPKey creates a new TOTP key for an account and stores it
-func (d *Datastore) GenerateAndStoreTOTPKey(accountID uuid.UUID, email string) (*otp.Key, error) {
-	// Generate TOTP key
-	key, err := d.totpUtil.GenerateKey(email)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate TOTP key: %w", err)
-	}
-
-	// Store in database
+// StoreTOTPKey stores a TOTP key for an account
+func (d *Datastore) StoreTOTPKey(accountID uuid.UUID, key *otp.Key) error {
 	totpKey := &TOTPKey{
 		AccountID: accountID,
 		Key:       key.Secret(),
@@ -36,27 +29,24 @@ func (d *Datastore) GenerateAndStoreTOTPKey(accountID uuid.UUID, email string) (
 
 	result := d.DB.Save(totpKey)
 	if result.Error != nil {
-		return nil, fmt.Errorf("failed to store TOTP key: %w", result.Error)
+		return fmt.Errorf("failed to store TOTP key: %w", result.Error)
 	}
 
-	return key, nil
+	return nil
 }
 
-// ValidateTOTPCode checks if the provided code is valid for the specified account
-func (d *Datastore) ValidateTOTPCode(accountID uuid.UUID, code string) error {
+// GetTOTPKey retrieves the TOTP key string for an account
+func (d *Datastore) GetTOTPKey(accountID uuid.UUID) (string, error) {
 	var key TOTPKey
 	result := d.DB.Where("account_id = ?", accountID).First(&key)
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
-			return util.ErrKeyNotFound
+			return "", util.ErrKeyNotFound
 		}
-		return fmt.Errorf("failed to retrieve TOTP key: %w", result.Error)
+		return "", fmt.Errorf("failed to retrieve TOTP key: %w", result.Error)
 	}
 
-	if !d.totpUtil.ValidateCode(key.Key, code) {
-		return util.ErrBadTOTPCode
-	}
-	return nil
+	return key.Key, nil
 }
 
 // DeleteTOTPKey deletes a TOTP key from the database
