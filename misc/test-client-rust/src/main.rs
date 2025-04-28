@@ -4,7 +4,7 @@ use argon2::Argon2;
 use clap::{CommandFactory, Parser};
 use opaque_ke::{
     CipherSuite, ClientLogin, ClientLoginFinishParameters, ClientRegistration,
-    ClientRegistrationFinishParameters, CredentialResponse, Identifiers, RegistrationResponse,
+    ClientRegistrationFinishParameters, CredentialResponse, Identifiers, errors::ProtocolError, RegistrationResponse,
 };
 use rand::rngs::OsRng;
 use serde_json::Value;
@@ -333,7 +333,7 @@ fn login(args: CliArgs) {
     )
     .expect("Failed to decode hex");
 
-    let client_login_finish_result = client_login_start_result
+    let client_login_finish_result = match client_login_start_result
         .state
         .finish(
             password,
@@ -350,8 +350,14 @@ fn login(args: CliArgs) {
                 },
                 ..Default::default()
             },
-        )
-        .unwrap();
+        ) {
+            Ok(result) => result,
+            Err(protocol_err) => match protocol_err {
+                ProtocolError::InvalidLoginError => panic!("Invalid credentials"),
+                ProtocolError::LibraryError(_) => panic!("Internal opaque_ke error"),
+                _ => panic!("Invalid result returned from server"),
+            }
+        };
 
     let credential_finalization_hex = hex::encode(client_login_finish_result.message.serialize());
 
