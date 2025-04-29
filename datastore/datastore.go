@@ -93,30 +93,30 @@ func NewDatastore(minSessionVersion int, isKeyService bool, isTesting bool) (*Da
 		dbURL,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to init migrations: %w", err)
+		return nil, fmt.Errorf("failed to init migrations: %w", err)
 	}
 
 	if isTesting {
 		if err = migration.Drop(); err != nil {
 			return nil, fmt.Errorf("failed to down migrations for testing: %w", err)
 		}
-		migration.Close()
+		migration.Close() //nolint:errcheck
 		migration, err = migrate.NewWithSourceInstance(
 			"iofs",
 			iofsDriver,
 			dbURL,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to re-init migrations: %w", err)
+			return nil, fmt.Errorf("failed to re-init migrations: %w", err)
 		}
 	}
 
 	if err = migration.Up(); err != nil {
 		if !errors.Is(err, migrate.ErrNoChange) {
-			return nil, fmt.Errorf("Failed to run migrations: %w", err)
+			return nil, fmt.Errorf("failed to run migrations: %w", err)
 		}
 	}
-	migration.Close()
+	migration.Close() //nolint:errcheck
 
 	pgConfig := postgres.Config{
 		DSN: dbURL,

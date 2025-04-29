@@ -10,7 +10,7 @@ import (
 
 	"github.com/brave/accounts/datastore"
 	"github.com/brave/accounts/util"
-	"github.com/bytemare/crypto"
+	"github.com/bytemare/ecc"
 	"github.com/bytemare/opaque"
 	opaqueMsg "github.com/bytemare/opaque/message"
 	"github.com/google/uuid"
@@ -123,7 +123,7 @@ func (o *OpaqueService) DeriveOPRFClientSeed(credentialIdentifier string, oprfSe
 	return derivedKey, *seedID, nil
 }
 
-func (o *OpaqueService) NewElement() *crypto.Element {
+func (o *OpaqueService) NewElement() *ecc.Element {
 	return o.Config.OPRF.Group().NewElement()
 }
 

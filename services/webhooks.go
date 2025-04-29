@@ -106,7 +106,7 @@ func (s *WebhookService) sendWebhook(event *datastore.PendingWebhookEvent) error
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return fmt.Errorf("webhook request failed with status: %d", resp.StatusCode)
