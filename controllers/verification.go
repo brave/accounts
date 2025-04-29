@@ -427,7 +427,7 @@ func (vc *VerificationController) EmailViewer(w http.ResponseWriter, r *http.Req
 		http.Error(w, "Failed to fetch emails", http.StatusInternalServerError)
 		return
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	var data localStackEmails
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {

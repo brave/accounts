@@ -132,7 +132,7 @@ func (suite *MiddlewareTestSuite) TestServicesKeyMiddleware() {
 	// Set services key
 	testKey := "test-key"
 	suite.T().Setenv("BRAVE_SERVICES_KEY", testKey)
-	defer os.Unsetenv("BRAVE_SERVICES_KEY")
+	defer os.Unsetenv("BRAVE_SERVICES_KEY") //nolint:errcheck
 
 	mw := middleware.ServicesKeyMiddleware(util.ProductionEnv)
 
