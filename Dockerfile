@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/golang:1.23-bookworm as builder
+FROM public.ecr.aws/docker/library/golang:1.24-bookworm as builder
 
 WORKDIR /src
 COPY . .
