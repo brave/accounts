@@ -31,14 +31,15 @@ var (
 	ErrFailedToSendEmailInvalidFormat = NewExposedError(13007, "failed to send email due to invalid format")
 
 	// Auth errors, prefixed with '14'
-	ErrAKEStateNotFound     = NewExposedError(14001, "AKE state not found")
-	ErrAKEStateExpired      = NewExposedError(14002, "AKE state has expired")
+	ErrLoginStateNotFound   = NewExposedError(14001, "login state not found")
+	ErrLoginStateExpired    = NewExposedError(14002, "login state has expired")
 	ErrOutdatedSession      = NewExposedError(14003, "outdated session")
 	ErrIncorrectCredentials = NewExposedError(14004, "incorrect credentials")
 	ErrIncorrectEmail       = NewExposedError(14005, "incorrect email")
 	ErrIncorrectPassword    = NewExposedError(14006, "incorrect password")
 	ErrInvalidTokenAudience = NewExposedError(14007, "invalid token audience")
 	ErrBadTOTPCode          = NewExposedError(14008, "invalid TOTP code")
+	ErrLoginStateMismatch   = NewExposedError(14009, "login state mismatch")
 
 	// Misc errors, prefixed with '15'
 	ErrInvalidServicesKey = NewExposedError(15001, "invalid services key")

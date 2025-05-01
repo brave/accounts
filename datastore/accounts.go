@@ -30,6 +30,8 @@ type Account struct {
 	LastUsedAt time.Time `gorm:"<-:update"`
 	// Timestamp when the account was last verified via email
 	LastEmailVerifiedAt time.Time `gorm:"<-:update"`
+	// TOTPEnabled indicates whether the account has TOTP enabled
+	TOTPEnabled bool `json:"-"`
 	// Timestamp when the account was created
 	CreatedAt time.Time `gorm:"<-:false"`
 }
@@ -169,6 +171,22 @@ func (d *Datastore) UpdateAccountLastEmailVerifiedAt(accountID uuid.UUID) error 
 
 	if result.Error != nil {
 		return fmt.Errorf("error updating account last verification time: %w", result.Error)
+	}
+
+	return nil
+}
+
+func (d *Datastore) EnableTOTP(accountID uuid.UUID) error {
+	result := d.DB.Model(&Account{}).
+		Where("id = ?", accountID).
+		Update("totp_enabled", true)
+
+	if result.Error != nil {
+		return fmt.Errorf("error enabling TOTP for account: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return ErrAccountNotFound
 	}
 
 	return nil

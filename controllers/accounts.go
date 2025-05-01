@@ -18,6 +18,7 @@ import (
 type AccountsController struct {
 	opaqueService *services.OpaqueService
 	jwtService    *services.JWTService
+	twoFAService  *services.TwoFAService
 	ds            *datastore.Datastore
 }
 
@@ -55,6 +56,26 @@ type RegistrationRecord struct {
 	Envelope *string `json:"envelope" validate:"required_without=SerializedRecord"`
 	// Serialized registration record
 	SerializedRecord *string `json:"serializedRecord" validate:"required_without_all=PublicKey MaskingKey Envelope"`
+}
+
+// @Description Request to initialize 2FA setup
+type TwoFAInitRequest struct {
+	// Whether to generate a QR code
+	GenerateQR bool `json:"generateQR"`
+}
+
+// @Description Response for 2FA initialization
+type TwoFAInitResponse struct {
+	// TOTP URL for manual entry
+	URL string `json:"url"`
+	// QR code as base64 encoded PNG (only if requested)
+	QRCode *string `json:"qrCode,omitempty"`
+}
+
+// @Description Request to finalize 2FA setup
+type TwoFAFinalizeRequest struct {
+	// TOTP verification code
+	Code string `json:"code" validate:"required"`
 }
 
 func (req *RegistrationRequest) ToOpaqueRequest(opaqueService *services.OpaqueService) (*opaqueMsg.RegistrationRequest, error) {
@@ -138,10 +159,11 @@ func FromOpaqueRegistrationResponse(opaqueResp *opaqueMsg.RegistrationResponse, 
 	}, nil
 }
 
-func NewAccountsController(opaqueService *services.OpaqueService, jwtService *services.JWTService, ds *datastore.Datastore) *AccountsController {
+func NewAccountsController(opaqueService *services.OpaqueService, jwtService *services.JWTService, twoFAService *services.TwoFAService, ds *datastore.Datastore) *AccountsController {
 	return &AccountsController{
 		opaqueService: opaqueService,
 		jwtService:    jwtService,
+		twoFAService:  twoFAService,
 		ds:            ds,
 	}
 }
@@ -151,6 +173,8 @@ func (ac *AccountsController) Router(verificationMiddleware func(http.Handler) h
 
 	r.With(verificationMiddleware).Post("/password/init", ac.SetupPasswordInit)
 	r.With(verificationMiddleware).Post("/password/finalize", ac.SetupPasswordFinalize)
+	r.With(authMiddleware).Post("/2fa/init", ac.TwoFAInit)
+	r.With(authMiddleware).Post("/2fa/finalize", ac.TwoFAFinalize)
 	if accountDeletionEnabled {
 		r.With(authMiddleware).Delete("/", ac.DeleteAccount)
 	}
@@ -295,6 +319,90 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 	render.JSON(w, r, &PasswordFinalizeResponse{
 		AuthToken: authToken,
 	})
+}
+
+// @Summary Initialize 2FA setup
+// @Description Start the 2FA setup process by generating a TOTP key and URL.
+// @Description Optionally generates a QR code if requested.
+// @Tags Accounts
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer + auth token"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param request body TwoFAInitRequest true "2FA initialization request"
+// @Success 200 {object} TwoFAInitResponse
+// @Failure 400 {object} util.ErrorResponse
+// @Failure 401 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/accounts/2fa/init [post]
+func (ac *AccountsController) TwoFAInit(w http.ResponseWriter, r *http.Request) {
+	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
+
+	var requestData TwoFAInitRequest
+	if !util.DecodeJSONAndValidate(w, r, &requestData) {
+		return
+	}
+
+	key, err := ac.twoFAService.GenerateAndStoreTOTPKey(session.AccountID, session.Email)
+	if err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	response := TwoFAInitResponse{
+		URL: key.URL(),
+	}
+
+	if requestData.GenerateQR {
+		qrCode, err := ac.twoFAService.GenerateTOTPQRCode(key)
+		if err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
+		response.QRCode = &qrCode
+	}
+
+	render.Status(r, http.StatusOK)
+	render.JSON(w, r, response)
+}
+
+// @Summary Finalize 2FA setup
+// @Description Complete the 2FA setup process by validating a TOTP code and enabling 2FA for the account.
+// @Tags Accounts
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer + auth token"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param request body TwoFAFinalizeRequest true "2FA finalization request"
+// @Success 204 "No Content"
+// @Failure 400 {object} util.ErrorResponse
+// @Failure 401 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/accounts/2fa/finalize [post]
+func (ac *AccountsController) TwoFAFinalize(w http.ResponseWriter, r *http.Request) {
+	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
+
+	var requestData TwoFAFinalizeRequest
+	if !util.DecodeJSONAndValidate(w, r, &requestData) {
+		return
+	}
+
+	if err := ac.twoFAService.ValidateTOTPCode(session.AccountID, requestData.Code); err != nil {
+		if errors.Is(err, util.ErrBadTOTPCode) {
+			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+		} else {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		}
+		return
+	}
+
+	if err := ac.ds.EnableTOTP(session.AccountID); err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	render.Status(r, http.StatusNoContent)
+	render.NoContent(w, r)
 }
 
 // @Summary Delete account

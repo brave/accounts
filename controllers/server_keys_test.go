@@ -39,9 +39,11 @@ func (suite *ServerKeysTestSuite) SetupTest() {
 	suite.jwtService, err = services.NewJWTService(suite.ds, true)
 	suite.Require().NoError(err)
 
-	controller := controllers.NewServerKeysController(opaqueService, suite.jwtService)
+	twoFAService := services.NewTwoFAService(suite.ds, true)
 
-	keyServiceMiddleware := middleware.KeyServiceMiddleware()
+	controller := controllers.NewServerKeysController(opaqueService, suite.jwtService, twoFAService)
+
+	keyServiceMiddleware := middleware.KeyServiceMiddleware("test")
 
 	suite.router = chi.NewRouter()
 	suite.router.Mount("/v2/server_keys", controller.Router(keyServiceMiddleware))

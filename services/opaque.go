@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 
 	"github.com/brave/accounts/datastore"
@@ -40,8 +41,7 @@ type OpaqueService struct {
 	publicKey         []byte
 	Config            *opaque.Configuration
 	fakeRecordEnabled bool
-	keyServiceURL     string
-	keyServiceSecret  string
+	keyServiceClient  *util.KeyServiceClient
 	isKeyService      bool
 }
 
@@ -75,12 +75,16 @@ func NewOpaqueService(ds *datastore.Datastore, isKeyService bool) (*OpaqueServic
 	}
 	config.KSF.Salt = opaqueArgon2Salt
 
-	keyServiceURL := os.Getenv(util.KeyServiceURLEnv)
-
+	var keyServiceClient *util.KeyServiceClient
 	var oprfSeeds map[int][]byte
 	var currentSeedID *int
-	keyServiceSecret := os.Getenv(util.KeyServiceSecretEnv)
-	if isKeyService || keyServiceURL == "" {
+
+	// Only create a client if we're not the key service and KEY_SERVICE_URL is set
+	if !isKeyService && os.Getenv(util.KeyServiceURLEnv) != "" {
+		keyServiceClient = util.NewKeyServiceClient()
+	}
+
+	if isKeyService || keyServiceClient == nil {
 		// only create OPRF seeds if we're running the key service
 		// or if a key service is not being used
 		oprfSeeds, err = ds.GetOrCreateOPRFSeeds(config.GenerateOPRFSeed)
@@ -93,13 +97,21 @@ func NewOpaqueService(ds *datastore.Datastore, isKeyService bool) (*OpaqueServic
 				currentSeedID = &k
 			}
 		}
-	} else if keyServiceSecret == "" {
-		return nil, fmt.Errorf("%v must be provided if using key service", util.KeyServiceSecretEnv)
 	}
 
 	fakeRecordEnabled := os.Getenv(opaqueFakeRecordEnv) == "true"
 
-	return &OpaqueService{ds, oprfSeeds, currentSeedID, secretKey, publicKey, config, fakeRecordEnabled, keyServiceURL, keyServiceSecret, isKeyService}, nil
+	return &OpaqueService{
+		ds:                ds,
+		oprfSeeds:         oprfSeeds,
+		currentSeedID:     currentSeedID,
+		secretKey:         secretKey,
+		publicKey:         publicKey,
+		Config:            config,
+		fakeRecordEnabled: fakeRecordEnabled,
+		keyServiceClient:  keyServiceClient,
+		isKeyService:      isKeyService,
+	}, nil
 }
 
 func (o *OpaqueService) DeriveOPRFClientSeed(credentialIdentifier string, oprfSeedID *int) ([]byte, int, error) {
@@ -148,7 +160,7 @@ func (o *OpaqueService) getKeyServiceClientOPRFSeed(credIdentifier string, seedI
 	}
 
 	var response oprfSeedResponse
-	if err := util.MakeKeyServiceRequest(o.keyServiceURL, o.keyServiceSecret, "/v2/server_keys/oprf_seed", reqBody, &response); err != nil {
+	if err := o.keyServiceClient.MakeRequest(http.MethodPost, "/v2/server_keys/oprf_seed", reqBody, &response); err != nil {
 		return nil, 0, err
 	}
 
@@ -168,7 +180,7 @@ func (o *OpaqueService) newOpaqueServer(credIdentifier string, seedID *int) (*op
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to init opaque server: %w", err)
 	}
-	if !o.isKeyService && o.keyServiceURL != "" {
+	if o.keyServiceClient != nil {
 		clientSeed, serverSeedID, err := o.getKeyServiceClientOPRFSeed(credIdentifier, seedID)
 		if err != nil {
 			return nil, 0, err
@@ -226,7 +238,7 @@ func (o *OpaqueService) SetupPasswordFinalize(email string, registration *opaque
 	return account, nil
 }
 
-func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.KE2, *datastore.AKEState, error) {
+func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.KE2, *datastore.LoginState, error) {
 	account, err := o.ds.GetAccount(nil, email)
 	if err != nil {
 		if !errors.Is(err, datastore.ErrAccountNotFound) {
@@ -284,7 +296,7 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 	if !useFakeRecord {
 		accountID = &account.ID
 	}
-	akeState, err := o.ds.CreateAKEState(accountID, email, server.SerializeState(), *seedID)
+	akeState, err := o.ds.CreateLoginState(accountID, email, server.SerializeState(), *seedID, account.TOTPEnabled)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to store AKE state: %w", err)
 	}
@@ -292,18 +304,18 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 	return ke2, akeState, nil
 }
 
-func (o *OpaqueService) LoginFinalize(akeStateID uuid.UUID, ke3 *opaqueMsg.KE3) (*uuid.UUID, error) {
-	akeState, err := o.ds.GetAKEState(akeStateID)
+func (o *OpaqueService) LoginFinalize(loginStateID uuid.UUID, ke3 *opaqueMsg.KE3) (*datastore.LoginState, error) {
+	loginState, err := o.ds.GetLoginState(loginStateID, false)
 	if err != nil {
 		return nil, err
 	}
 
-	server, _, err := o.newOpaqueServer(akeState.Email, &akeState.OprfSeedID)
+	server, _, err := o.newOpaqueServer(loginState.Email, &loginState.OprfSeedID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = server.SetAKEState(akeState.State); err != nil {
+	if err = server.SetAKEState(loginState.State); err != nil {
 		return nil, fmt.Errorf("failed to set AKE state for login finalize: %w", err)
 	}
 
@@ -315,9 +327,17 @@ func (o *OpaqueService) LoginFinalize(akeStateID uuid.UUID, ke3 *opaqueMsg.KE3) 
 		}
 	}
 
-	if akeState.AccountID == nil {
+	if loginState.AccountID == nil {
 		return nil, util.ErrIncorrectCredentials
 	}
 
-	return akeState.AccountID, nil
+	// If 2FA is required, mark the state as awaiting 2FA
+	if loginState.RequiresTwoFA {
+		if err := o.ds.MarkLoginStateAsAwaitingTwoFA(loginState.ID); err != nil {
+			return nil, fmt.Errorf("failed to mark login state as awaiting 2FA: %w", err)
+		}
+		loginState.AwaitingTwoFA = true
+	}
+
+	return loginState, nil
 }

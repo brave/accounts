@@ -53,7 +53,7 @@ func addSwaggerToRouter(r *chi.Mux) {
 	}
 }
 
-func startKeyService(jwtService *services.JWTService, opaqueService *services.OpaqueService, twoFAService *services.TwoFAService) {
+func startKeyService(jwtService *services.JWTService, opaqueService *services.OpaqueService, twoFAService *services.TwoFAService, environment string) {
 	// Initialize controllers
 	serverKeysController := controllers.NewServerKeysController(opaqueService, jwtService, twoFAService)
 
@@ -135,10 +135,10 @@ func main() {
 		log.Panic().Err(err).Msg("Failed to init OPAQUE service")
 	}
 
-	twoFAService := services.NewTwoFAService(datastore)
+	twoFAService := services.NewTwoFAService(datastore, *startKeyServiceFlag)
 
 	if *startKeyServiceFlag {
-		startKeyService(jwtService, opaqueService, twoFAService)
+		startKeyService(jwtService, opaqueService, twoFAService, environment)
 		return
 	}
 
@@ -163,11 +163,11 @@ func main() {
 
 	r := chi.NewRouter()
 
-	authController := controllers.NewAuthController(opaqueService, jwtService, datastore, sesService)
-	accountsController := controllers.NewAccountsController(opaqueService, jwtService, datastore)
+	authController := controllers.NewAuthController(opaqueService, jwtService, twoFAService, datastore, sesService)
 	verificationController := controllers.NewVerificationController(datastore, jwtService, sesService, passwordAuthEnabled, emailAuthEnabled)
 	sessionsController := controllers.NewSessionsController(datastore)
 	userKeysController := controllers.NewUserKeysController(datastore)
+	accountsController := controllers.NewAccountsController(opaqueService, jwtService, twoFAService, datastore)
 
 	r.Use(middleware.LoggerMiddleware(prometheusRegistry))
 	r.Use(cors.Handler(cors.Options{

@@ -32,6 +32,22 @@ definitions:
         description: Token is the signed JWT token string
         type: string
     type: object
+  controllers.LoginFinalize2FARequest:
+    description: Request to finalize login with 2FA
+    properties:
+      code:
+        description: TOTP verification code
+        type: string
+    required:
+    - code
+    type: object
+  controllers.LoginFinalize2FAResponse:
+    description: Response after successful 2FA verification and login
+    properties:
+      authToken:
+        description: Authentication token for future requests
+        type: string
+    type: object
   controllers.LoginFinalizeRequest:
     description: Request to finalize login
     properties:
@@ -47,6 +63,10 @@ definitions:
       authToken:
         description: Authentication token for future requests
         type: string
+      requiresTwoFA:
+        description: Indicates if 2FA verification is required before authentication
+          is complete
+        type: boolean
     type: object
   controllers.LoginInitRequest:
     description: Request for account login
@@ -73,11 +93,11 @@ definitions:
   controllers.LoginInitResponse:
     description: Response for account login
     properties:
-      akeToken:
-        description: Interim authentication token for future login finalization
-        type: string
       evaluatedMessage:
         description: Evaluated message component of KE2
+        type: string
+      loginToken:
+        description: Interim authentication token for future login finalization
         type: string
       maskedResponse:
         description: Server masked response of KE2
@@ -198,6 +218,32 @@ definitions:
     required:
     - accountId
     - code
+    type: object
+  controllers.TwoFAFinalizeRequest:
+    description: Request to finalize 2FA setup
+    properties:
+      code:
+        description: TOTP verification code
+        type: string
+    required:
+    - code
+    type: object
+  controllers.TwoFAInitRequest:
+    description: Request to initialize 2FA setup
+    properties:
+      generateQR:
+        description: Whether to generate a QR code
+        type: boolean
+    type: object
+  controllers.TwoFAInitResponse:
+    description: Response for 2FA initialization
+    properties:
+      qrCode:
+        description: QR code as base64 encoded PNG (only if requested)
+        type: string
+      url:
+        description: TOTP URL for manual entry
+        type: string
     type: object
   controllers.UserKey:
     properties:
@@ -398,6 +444,93 @@ paths:
       summary: Delete account
       tags:
       - Accounts
+  /v2/accounts/2fa/finalize:
+    post:
+      consumes:
+      - application/json
+      description: Complete the 2FA setup process by validating a TOTP code and enabling
+        2FA for the account.
+      parameters:
+      - description: Bearer + auth token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
+        type: string
+      - description: 2FA finalization request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.TwoFAFinalizeRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Finalize 2FA setup
+      tags:
+      - Accounts
+  /v2/accounts/2fa/init:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Start the 2FA setup process by generating a TOTP key and URL.
+        Optionally generates a QR code if requested.
+      parameters:
+      - description: Bearer + auth token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
+        type: string
+      - description: 2FA initialization request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.TwoFAInitRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.TwoFAInitResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Initialize 2FA setup
+      tags:
+      - Accounts
   /v2/accounts/password/finalize:
     post:
       consumes:
@@ -506,9 +639,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Final step of login flow, verifies KE3 message and creates session.
+      description: Final step of login flow, verifies KE3 message and creates session
+        or prompts for 2FA.
       parameters:
-      - description: Bearer + ake token
+      - description: Bearer + login state token
         in: header
         name: Authorization
         required: true
@@ -543,6 +677,50 @@ paths:
           schema:
             $ref: '#/definitions/util.ErrorResponse'
       summary: Finalize login
+      tags:
+      - Auth
+  /v2/auth/login/finalize_2fa:
+    post:
+      consumes:
+      - application/json
+      description: Final step of 2FA login flow, verifies TOTP code and creates a
+        session.
+      parameters:
+      - description: Bearer + login state token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
+        type: string
+      - description: 2FA verification request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.LoginFinalize2FARequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.LoginFinalize2FAResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Finalize login with 2FA
       tags:
       - Auth
   /v2/auth/login/init:
