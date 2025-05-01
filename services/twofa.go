@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"image/png"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -32,10 +33,14 @@ type TwoFAService struct {
 	qrSize int
 	// ds is the datastore instance for persistent storage
 	ds *datastore.Datastore
+	// keyServiceClient is the client used to communicate with the key service
+	keyServiceClient *util.KeyServiceClient
+	// isKeyService indicates whether this instance is the key service
+	isKeyService bool
 }
 
 // NewTwoFAService creates a new TwoFAService instance with configuration from environment
-func NewTwoFAService(ds *datastore.Datastore) *TwoFAService {
+func NewTwoFAService(ds *datastore.Datastore, isKeyService bool) *TwoFAService {
 	issuer := os.Getenv(totpIssuerEnv)
 	if issuer == "" {
 		issuer = defaultIssuer
@@ -50,15 +55,28 @@ func NewTwoFAService(ds *datastore.Datastore) *TwoFAService {
 		qrSize = size
 	}
 
+	// Create a client if we're not the key service and KEY_SERVICE_URL is set
+	var client *util.KeyServiceClient
+	if !isKeyService && os.Getenv(util.KeyServiceURLEnv) != "" {
+		client = util.NewKeyServiceClient()
+	}
+
 	return &TwoFAService{
-		issuer: issuer,
-		qrSize: qrSize,
-		ds:     ds,
+		issuer:           issuer,
+		qrSize:           qrSize,
+		ds:               ds,
+		keyServiceClient: client,
+		isKeyService:     isKeyService,
 	}
 }
 
 // GenerateAndStoreTOTPKey creates and stores a new TOTP key for an account
 func (t *TwoFAService) GenerateAndStoreTOTPKey(accountID uuid.UUID, email string) (*otp.Key, error) {
+	if t.keyServiceClient != nil {
+		return t.makeKeyServiceTOTPGenerateRequest(accountID, email)
+	}
+
+	// Otherwise, generate and store the key locally
 	opts := totp.GenerateOpts{
 		Issuer:      t.issuer,
 		AccountName: email,
@@ -76,8 +94,43 @@ func (t *TwoFAService) GenerateAndStoreTOTPKey(accountID uuid.UUID, email string
 	return key, nil
 }
 
+// makeKeyServiceTOTPGenerateRequest sends a request to the key service to generate and store a TOTP key
+func (t *TwoFAService) makeKeyServiceTOTPGenerateRequest(accountID uuid.UUID, email string) (*otp.Key, error) {
+	type totpGenerateRequest struct {
+		AccountID uuid.UUID `json:"accountId"`
+		Email     string    `json:"email"`
+	}
+
+	type totpGenerateResponse struct {
+		URL string `json:"url"`
+	}
+
+	reqBody := totpGenerateRequest{
+		AccountID: accountID,
+		Email:     email,
+	}
+
+	var response totpGenerateResponse
+	if err := t.keyServiceClient.MakeRequest(http.MethodPost, "/v2/server_keys/totp", reqBody, &response); err != nil {
+		return nil, err
+	}
+
+	// Parse the URL to create an OTP key
+	key, err := otp.NewKeyFromURL(response.URL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse TOTP key URL: %w", err)
+	}
+
+	return key, nil
+}
+
 // ValidateTOTPCode checks if the provided code is valid for the specified account
 func (t *TwoFAService) ValidateTOTPCode(accountID uuid.UUID, code string) error {
+	if t.keyServiceClient != nil {
+		return t.makeKeyServiceValidateRequest(accountID, code)
+	}
+
+	// Otherwise, validate the code locally
 	secret, err := t.ds.GetTOTPKey(accountID)
 	if err != nil {
 		return err
@@ -98,9 +151,39 @@ func (t *TwoFAService) ValidateTOTPCode(accountID uuid.UUID, code string) error 
 	return nil
 }
 
-// DeleteKeys deletes all keys for an account
-func (t *TwoFAService) DeleteKeys(accountID uuid.UUID) error {
+// makeKeyServiceValidateRequest sends a request to the key service to validate a TOTP code
+func (t *TwoFAService) makeKeyServiceValidateRequest(accountID uuid.UUID, code string) error {
+	type totpValidateRequest struct {
+		AccountID uuid.UUID `json:"accountId"`
+		Code      string    `json:"code"`
+	}
+
+	reqBody := totpValidateRequest{
+		AccountID: accountID,
+		Code:      code,
+	}
+
+	var response struct{}
+	return t.keyServiceClient.MakeRequest(http.MethodPost, "/v2/server_keys/totp/validate", reqBody, &response)
+}
+
+// DeleteTOTPKey deletes a TOTP key for an account
+func (t *TwoFAService) DeleteTOTPKey(accountID uuid.UUID) error {
+	if t.keyServiceClient != nil {
+		return t.makeKeyServiceDeleteRequest(accountID)
+	}
+
+	// Otherwise, delete the key locally
 	return t.ds.DeleteTOTPKey(accountID)
+}
+
+// makeKeyServiceDeleteRequest sends a request to the key service to delete a TOTP key
+func (t *TwoFAService) makeKeyServiceDeleteRequest(accountID uuid.UUID) error {
+	return t.keyServiceClient.MakeRequest(
+		http.MethodDelete,
+		fmt.Sprintf("/v2/server_keys/totp/%s", accountID.String()),
+		nil,
+		nil)
 }
 
 // GenerateTOTPQRCode generates a QR code image for a TOTP key and returns it as a base64 encoded PNG string

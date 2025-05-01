@@ -245,7 +245,7 @@ func (sc *ServerKeysController) DeleteTOTPKey(w http.ResponseWriter, r *http.Req
 	}
 
 	// Delete TOTP key for the specified account
-	err = sc.twoFAService.DeleteKeys(accountId)
+	err = sc.twoFAService.DeleteTOTPKey(accountId)
 	if err != nil {
 		if errors.Is(err, util.ErrKeyNotFound) {
 			util.RenderErrorResponse(w, r, http.StatusNotFound, err)

@@ -55,6 +55,133 @@
                 }
             }
         },
+        "/v2/accounts/2fa/finalize": {
+            "post": {
+                "description": "Complete the 2FA setup process by validating a TOTP code and enabling 2FA for the account.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Finalize 2FA setup",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
+                        "description": "2FA finalization request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.TwoFAFinalizeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/accounts/2fa/init": {
+            "post": {
+                "description": "Start the 2FA setup process by generating a TOTP key and URL.\nOptionally generates a QR code if requested.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Initialize 2FA setup",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
+                        "description": "2FA initialization request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.TwoFAInitRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.TwoFAInitResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v2/accounts/password/finalize": {
             "post": {
                 "description": "Complete the password setup process and return auth token.\nEither `publicKey`, `maskingKey` and `envelope` must be provided together,\nor `serializedRecord` must be provided.",
@@ -205,7 +332,7 @@
         },
         "/v2/auth/login/finalize": {
             "post": {
-                "description": "Final step of login flow, verifies KE3 message and creates session.",
+                "description": "Final step of login flow, verifies KE3 message and creates session or prompts for 2FA.",
                 "consumes": [
                     "application/json"
                 ],
@@ -219,7 +346,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Bearer + ake token",
+                        "description": "Bearer + login state token",
                         "name": "Authorization",
                         "in": "header",
                         "required": true
@@ -245,6 +372,71 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/controllers.LoginFinalizeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/auth/login/finalize_2fa": {
+            "post": {
+                "description": "Final step of 2FA login flow, verifies TOTP code and creates a session.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Finalize login with 2FA",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + login state token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
+                        "description": "2FA verification request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.LoginFinalize2FARequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.LoginFinalize2FAResponse"
                         }
                     },
                     "400": {
@@ -1365,6 +1557,29 @@
                 }
             }
         },
+        "controllers.LoginFinalize2FARequest": {
+            "description": "Request to finalize login with 2FA",
+            "type": "object",
+            "required": [
+                "code"
+            ],
+            "properties": {
+                "code": {
+                    "description": "TOTP verification code",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.LoginFinalize2FAResponse": {
+            "description": "Response after successful 2FA verification and login",
+            "type": "object",
+            "properties": {
+                "authToken": {
+                    "description": "Authentication token for future requests",
+                    "type": "string"
+                }
+            }
+        },
         "controllers.LoginFinalizeRequest": {
             "description": "Request to finalize login",
             "type": "object",
@@ -1385,6 +1600,10 @@
                 "authToken": {
                     "description": "Authentication token for future requests",
                     "type": "string"
+                },
+                "requiresTwoFA": {
+                    "description": "Indicates if 2FA verification is required before authentication is complete",
+                    "type": "boolean"
                 }
             }
         },
@@ -1422,12 +1641,12 @@
             "description": "Response for account login",
             "type": "object",
             "properties": {
-                "akeToken": {
-                    "description": "Interim authentication token for future login finalization",
-                    "type": "string"
-                },
                 "evaluatedMessage": {
                     "description": "Evaluated message component of KE2",
+                    "type": "string"
+                },
+                "loginToken": {
+                    "description": "Interim authentication token for future login finalization",
                     "type": "string"
                 },
                 "maskedResponse": {
@@ -1591,6 +1810,43 @@
                 },
                 "code": {
                     "description": "Code is the TOTP code to validate",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.TwoFAFinalizeRequest": {
+            "description": "Request to finalize 2FA setup",
+            "type": "object",
+            "required": [
+                "code"
+            ],
+            "properties": {
+                "code": {
+                    "description": "TOTP verification code",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.TwoFAInitRequest": {
+            "description": "Request to initialize 2FA setup",
+            "type": "object",
+            "properties": {
+                "generateQR": {
+                    "description": "Whether to generate a QR code",
+                    "type": "boolean"
+                }
+            }
+        },
+        "controllers.TwoFAInitResponse": {
+            "description": "Response for 2FA initialization",
+            "type": "object",
+            "properties": {
+                "qrCode": {
+                    "description": "QR code as base64 encoded PNG (only if requested)",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "TOTP URL for manual entry",
                     "type": "string"
                 }
             }

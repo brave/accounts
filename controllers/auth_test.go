@@ -54,7 +54,8 @@ func (suite *AuthTestSuite) SetupTest() {
 	suite.Require().NoError(err)
 	opaqueService, err := services.NewOpaqueService(suite.ds, false)
 	suite.Require().NoError(err)
-	suite.controller = controllers.NewAuthController(opaqueService, suite.jwtService, suite.ds, &MockSESService{})
+	twoFAService := services.NewTwoFAService(suite.ds, false)
+	suite.controller = controllers.NewAuthController(opaqueService, suite.jwtService, twoFAService, suite.ds, &MockSESService{})
 
 	suite.account, err = suite.ds.GetOrCreateAccount("test@example.com")
 	suite.Require().NoError(err)
@@ -182,12 +183,12 @@ func (suite *AuthTestSuite) TestAuthLogin() {
 	var parsedResp controllers.LoginInitResponse
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
 	suite.NotNil(parsedResp.SerializedKE2)
-	suite.NotEmpty(parsedResp.AkeToken)
+	suite.NotEmpty(parsedResp.LoginToken)
 
 	loginFinalReq := suite.createLoginFinalizeRequest(opaqueClient, *parsedResp.SerializedKE2)
 
 	req = util.CreateJSONTestRequest("/v2/auth/login/finalize", loginFinalReq)
-	req.Header.Set("Authorization", "Bearer "+parsedResp.AkeToken)
+	req.Header.Set("Authorization", "Bearer "+parsedResp.LoginToken)
 
 	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusOK, resp.Code)
@@ -197,13 +198,13 @@ func (suite *AuthTestSuite) TestAuthLogin() {
 	suite.NotEmpty(parsedFinalResp.AuthToken)
 
 	req = httptest.NewRequest("GET", "/v2/auth/validate", nil)
-	req.Header.Add("Authorization", "Bearer "+parsedFinalResp.AuthToken)
+	req.Header.Add("Authorization", "Bearer "+*parsedFinalResp.AuthToken)
 
 	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusOK, resp.Code)
 }
 
-func (suite *AuthTestSuite) TestAuthLoginNoAKEToken() {
+func (suite *AuthTestSuite) TestAuthLoginNoLoginState() {
 	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
 	suite.Require().NoError(err)
 
@@ -249,7 +250,7 @@ func (suite *AuthTestSuite) TestAuthLoginNonexistentEmail() {
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrIncorrectEmail.Code)
 }
 
-func (suite *AuthTestSuite) TestAuthLoginExpiredAKEToken() {
+func (suite *AuthTestSuite) TestAuthLoginExpiredLoginState() {
 	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
 	suite.Require().NoError(err)
 
@@ -268,22 +269,22 @@ func (suite *AuthTestSuite) TestAuthLoginExpiredAKEToken() {
 	var parsedResp controllers.LoginInitResponse
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
 	suite.NotNil(parsedResp.SerializedKE2)
-	suite.NotEmpty(parsedResp.AkeToken)
+	suite.NotEmpty(parsedResp.LoginToken)
 
-	akeStateID, err := suite.jwtService.ValidateEphemeralAKEToken(parsedResp.AkeToken)
+	loginStateID, err := suite.jwtService.ValidateEphemeralLoginToken(parsedResp.LoginToken)
 	suite.Require().NoError(err)
 
-	err = suite.ds.DB.Model(&datastore.AKEState{}).Where("id = ?", akeStateID).Update("created_at", time.Now().Add(-30*time.Minute)).Error
+	err = suite.ds.DB.Model(&datastore.LoginState{}).Where("id = ?", loginStateID).Update("created_at", time.Now().Add(-30*time.Minute)).Error
 	suite.Require().NoError(err)
 
 	loginFinalReq := suite.createLoginFinalizeRequest(opaqueClient, *parsedResp.SerializedKE2)
 
 	req = util.CreateJSONTestRequest("/v2/auth/login/finalize", loginFinalReq)
-	req.Header.Set("Authorization", "Bearer "+parsedResp.AkeToken)
+	req.Header.Set("Authorization", "Bearer "+parsedResp.LoginToken)
 
 	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusUnauthorized, resp.Code)
-	util.AssertErrorResponseCode(suite.T(), resp, util.ErrAKEStateExpired.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrLoginStateExpired.Code)
 }
 
 func (suite *AuthTestSuite) TestPasswordAuthEndpointsDisabled() {
