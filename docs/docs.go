@@ -65,9 +65,100 @@ const docTemplate = `{
                 }
             }
         },
-        "/v2/accounts/2fa/finalize": {
+        "/v2/accounts/2fa": {
+            "get": {
+                "description": "Returns the 2FA methods enabled for the authenticated account",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Get 2FA settings",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/datastore.TwoFAOptions"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/accounts/2fa/totp": {
+            "delete": {
+                "description": "Disables TOTP 2FA for the account and deletes the associated TOTP key",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Disable TOTP 2FA",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/accounts/2fa/totp/finalize": {
             "post": {
-                "description": "Complete the 2FA setup process by validating a TOTP code and enabling 2FA for the account.",
+                "description": "Complete the TOTP 2FA setup process by validating a TOTP code and enabling 2FA for the account.",
                 "consumes": [
                     "application/json"
                 ],
@@ -77,7 +168,7 @@ const docTemplate = `{
                 "tags": [
                     "Accounts"
                 ],
-                "summary": "Finalize 2FA setup",
+                "summary": "Finalize TOTP 2FA setup",
                 "parameters": [
                     {
                         "type": "string",
@@ -103,8 +194,11 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "No Content"
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.TwoFAFinalizeResponse"
+                        }
                     },
                     "400": {
                         "description": "Bad Request",
@@ -127,9 +221,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/v2/accounts/2fa/init": {
+        "/v2/accounts/2fa/totp/init": {
             "post": {
-                "description": "Start the 2FA setup process by generating a TOTP key and URL.\nOptionally generates a QR code if requested.",
+                "description": "Start the TOTP 2FA setup process by generating a TOTP key and URL.\nOptionally generates a QR code if requested.",
                 "consumes": [
                     "application/json"
                 ],
@@ -139,7 +233,7 @@ const docTemplate = `{
                 "tags": [
                     "Accounts"
                 ],
-                "summary": "Initialize 2FA setup",
+                "summary": "Initialize TOTP 2FA setup",
                 "parameters": [
                     {
                         "type": "string",
@@ -407,7 +501,7 @@ const docTemplate = `{
         },
         "/v2/auth/login/finalize_2fa": {
             "post": {
-                "description": "Final step of 2FA login flow, verifies TOTP code and creates a session.",
+                "description": "Final step of 2FA login flow, verifies TOTP code or recovery key and creates a session.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1570,12 +1664,13 @@ const docTemplate = `{
         "controllers.LoginFinalize2FARequest": {
             "description": "Request to finalize login with 2FA",
             "type": "object",
-            "required": [
-                "code"
-            ],
             "properties": {
-                "code": {
-                    "description": "TOTP verification code",
+                "recoveryKey": {
+                    "description": "Recovery key for 2FA bypass (optional if TOTP code is provided)",
+                    "type": "string"
+                },
+                "totpCode": {
+                    "description": "TOTP verification code (optional if recovery key is provided)",
                     "type": "string"
                 }
             }
@@ -1837,6 +1932,16 @@ const docTemplate = `{
                 }
             }
         },
+        "controllers.TwoFAFinalizeResponse": {
+            "description": "Response for finalized 2FA setup",
+            "type": "object",
+            "properties": {
+                "recoveryKey": {
+                    "description": "Recovery key for 2FA backup, only present when first enabling 2FA",
+                    "type": "string"
+                }
+            }
+        },
         "controllers.TwoFAInitRequest": {
             "description": "Request to initialize 2FA setup",
             "type": "object",
@@ -2054,6 +2159,15 @@ const docTemplate = `{
                 "userAgent": {
                     "description": "User agent of client",
                     "type": "string"
+                }
+            }
+        },
+        "datastore.TwoFAOptions": {
+            "type": "object",
+            "properties": {
+                "totp": {
+                    "description": "TOTP indicates whether Time-based One-Time Password is enabled",
+                    "type": "boolean"
                 }
             }
         },

@@ -102,8 +102,10 @@ type CreateServiceTokenResponse struct {
 
 // @Description Request to finalize login with 2FA
 type LoginFinalize2FARequest struct {
-	// TOTP verification code
-	Code string `json:"code" validate:"required"`
+	// TOTP verification code (optional if recovery key is provided)
+	TOTPCode *string `json:"totpCode,omitempty" validate:"required_without=RecoveryKey,excluded_with=RecoveryKey"`
+	// Recovery key for 2FA bypass (optional if TOTP code is provided)
+	RecoveryKey *string `json:"recoveryKey,omitempty" validate:"required_without=TOTPCode,excluded_with=TOTPCode"`
 }
 
 // @Description Response after successful 2FA verification and login
@@ -456,7 +458,7 @@ func (ac *AuthController) CreateServiceToken(w http.ResponseWriter, r *http.Requ
 }
 
 // @Summary Finalize login with 2FA
-// @Description Final step of 2FA login flow, verifies TOTP code and creates a session.
+// @Description Final step of 2FA login flow, verifies TOTP code or recovery key and creates a session.
 // @Tags Auth
 // @Accept json
 // @Produce json
@@ -501,14 +503,41 @@ func (ac *AuthController) LoginFinalize2FA(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Verify 2FA code
-	if err := ac.twoFAService.ValidateTOTPCode(*loginState.AccountID, requestData.Code); err != nil {
-		if errors.Is(err, util.ErrBadTOTPCode) {
-			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
-		} else {
+	// Verify either TOTP code or recovery key
+	if requestData.TOTPCode != nil {
+		// Verify TOTP code
+		if err := ac.twoFAService.ValidateTOTPCode(*loginState.AccountID, *requestData.TOTPCode); err != nil {
+			if errors.Is(err, util.ErrBadTOTPCode) {
+				util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
+				return
+			}
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
 		}
-		return
+	} else if requestData.RecoveryKey != nil {
+		// Verify recovery key
+		if err := ac.ds.CheckRecoveryKey(*loginState.AccountID, *requestData.RecoveryKey); err != nil {
+			if errors.Is(err, util.ErrBadRecoveryKey) {
+				util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
+				return
+			}
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
+		if err := ac.ds.SetTOTPSetting(*loginState.AccountID, false); err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		if err := ac.ds.SetRecoveryKey(*loginState.AccountID, nil); err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		if err := ac.twoFAService.DeleteTOTPKey(*loginState.AccountID); err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
 	}
 
 	// Create a session and return an auth token

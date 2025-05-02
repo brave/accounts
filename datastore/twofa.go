@@ -55,8 +55,5 @@ func (d *Datastore) DeleteTOTPKey(accountID uuid.UUID) error {
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete TOTP key: %w", result.Error)
 	}
-	if result.RowsAffected == 0 {
-		return util.ErrKeyNotFound
-	}
 	return nil
 }
