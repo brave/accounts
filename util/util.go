@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -48,6 +49,38 @@ func GenerateRandomString(length int) string {
 		panic(fmt.Errorf("failed to generate random string: %w", err))
 	}
 	return base64.URLEncoding.EncodeToString(b)
+}
+
+// GenerateRecoveryKey generates a 28-character alphanumeric uppercase recovery key
+// and returns both the key and its SHA256 hash
+func GenerateRecoveryKey() (string, error) {
+	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const keyLength = 28
+
+	// Generate random bytes
+	buffer := make([]byte, keyLength)
+	_, err := rand.Read(buffer)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+
+	// Convert to alphanumeric
+	var key strings.Builder
+	for i := 0; i < keyLength; i++ {
+		key.WriteByte(alphabet[buffer[i]%byte(len(alphabet))])
+	}
+
+	recoveryKey := key.String()
+
+	return recoveryKey, nil
+}
+
+func HashRecoveryKey(recoveryKey string) []byte {
+	uppercaseKey := strings.ToUpper(recoveryKey)
+
+	hash := sha256.Sum256([]byte(uppercaseKey))
+
+	return hash[:]
 }
 
 func ExtractAuthToken(r *http.Request) (string, error) {

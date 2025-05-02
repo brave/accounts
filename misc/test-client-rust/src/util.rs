@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Write};
 use reqwest::StatusCode;
 use serde_json::Value;
 
@@ -108,4 +108,12 @@ pub fn display_account_details(args: &CliArgs, auth_token: &str) {
             .as_str()
             .expect("service should be a string")
     );
+}
+
+pub fn prompt_for_input(prompt: &str) -> String {
+    print!("{}", prompt);
+    std::io::stdout().flush().unwrap();
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).unwrap();
+    input.trim().to_string()
 }

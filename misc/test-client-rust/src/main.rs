@@ -8,7 +8,7 @@ use opaque_ke::{
 };
 use rand::rngs::OsRng;
 use serde_json::Value;
-use std::{collections::HashMap, io::Write, thread};
+use std::{collections::HashMap, thread};
 use totp_rs::TOTP;
 use util::*;
 
@@ -90,6 +90,10 @@ struct CliArgs {
     /// TOTP URL for 2FA login
     #[arg(long)]
     totp_url: Option<String>,
+
+    /// Two-factor authentication recovery key
+    #[arg(long)]
+    twofa_recovery_key: Option<String>,
 }
 
 fn verify(args: &CliArgs) -> (String, Option<String>) {
@@ -329,31 +333,29 @@ fn login(args: CliArgs) {
     if resp.get("requiresTwoFA").and_then(|v| v.as_bool()).unwrap_or(false) {
         verbose_log(&args, "Two-factor authentication is required");
         
-        // Try to generate TOTP code if URL is provided
-        let totp_code = if let Some(totp_url) = args.totp_url.as_ref() {
-            let totp = TOTP::from_url(totp_url).expect("Failed to parse TOTP URL");
-            let code = totp.generate_current().expect("Failed to generate TOTP code");
-            verbose_log(&args, format!("Generated TOTP code: {}", code).as_str());
-            code
+        let mut twofa_body: HashMap<&str, Value> = HashMap::new();
+        if let Some(recovery_key) = args.twofa_recovery_key.as_ref() {
+            twofa_body.insert("recoveryKey", recovery_key.as_str().into());
         } else {
-            // Prompt user for code
-            print!("Enter your 6-digit TOTP code: ");
-            std::io::stdout().flush().unwrap();
-            let mut code = String::new();
-            std::io::stdin().read_line(&mut code).expect("Failed to read TOTP code");
-            code.trim().to_string()
-        };
-        
-        // Submit TOTP code
-        let mut totp_body: HashMap<&str, Value> = HashMap::new();
-        totp_body.insert("code", totp_code.into());
+            // Try to generate TOTP code if URL is provided
+            let totp_code = if let Some(totp_url) = args.totp_url.as_ref() {
+                let totp = TOTP::from_url(totp_url).expect("Failed to parse TOTP URL");
+                let code = totp.generate_current().expect("Failed to generate TOTP code");
+                verbose_log(&args, format!("Generated TOTP code: {}", code).as_str());
+                code
+            } else {
+                // Prompt user for code
+                prompt_for_input("Enter your 6-digit TOTP code: ")
+            };
+            twofa_body.insert("totpCode", totp_code.into());
+        }
         
         resp = make_request(
             &args,
             reqwest::Method::POST,
             "/v2/auth/login/finalize_2fa",
             Some(login_token),
-            Some(totp_body),
+            Some(twofa_body),
         );
     }
 
@@ -398,7 +400,7 @@ fn enable_totp(args: &CliArgs) {
     let resp = make_request(
         args,
         reqwest::Method::POST,
-        "/v2/accounts/2fa/init",
+        "/v2/accounts/2fa/totp/init",
         Some(
             args.token
                 .as_ref()
@@ -430,10 +432,10 @@ fn enable_totp(args: &CliArgs) {
     let mut finalize_body: HashMap<&str, Value> = HashMap::new();
     finalize_body.insert("code", code.into());
     
-    make_request(
+    let resp = make_request(
         args,
         reqwest::Method::POST,
-        "/v2/accounts/2fa/finalize",
+        "/v2/accounts/2fa/totp/finalize",
         Some(
             args.token
                 .as_ref()
@@ -441,6 +443,10 @@ fn enable_totp(args: &CliArgs) {
         ),
         Some(finalize_body),
     );
+
+    if let Some(recovery_key) = resp.get("recoveryKey").and_then(|v| v.as_str()) {
+        println!("Recovery key: {}", recovery_key);
+    }
     
     println!("TOTP is now enabled");
 }

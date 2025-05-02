@@ -5,6 +5,7 @@ CREATE TABLE totp_keys (
 );
 
 ALTER TABLE accounts ADD COLUMN totp_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE accounts ADD COLUMN recovery_key_hash BYTEA;
 
 ALTER TABLE ake_states RENAME TO login_states;
 ALTER TABLE login_states ADD COLUMN awaiting_twofa BOOLEAN NOT NULL DEFAULT FALSE;

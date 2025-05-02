@@ -40,6 +40,8 @@ var (
 	ErrInvalidTokenAudience = NewExposedError(14007, "invalid token audience")
 	ErrBadTOTPCode          = NewExposedError(14008, "invalid TOTP code")
 	ErrLoginStateMismatch   = NewExposedError(14009, "login state mismatch")
+	ErrBadRecoveryKey       = NewExposedError(14010, "invalid recovery key")
+	ErrTOTPAlreadyEnabled   = NewExposedError(14011, "TOTP authentication is already enabled for this account")
 
 	// Misc errors, prefixed with '15'
 	ErrInvalidServicesKey = NewExposedError(15001, "invalid services key")

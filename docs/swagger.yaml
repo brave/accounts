@@ -35,11 +35,12 @@ definitions:
   controllers.LoginFinalize2FARequest:
     description: Request to finalize login with 2FA
     properties:
-      code:
-        description: TOTP verification code
+      recoveryKey:
+        description: Recovery key for 2FA bypass (optional if TOTP code is provided)
         type: string
-    required:
-    - code
+      totpCode:
+        description: TOTP verification code (optional if recovery key is provided)
+        type: string
     type: object
   controllers.LoginFinalize2FAResponse:
     description: Response after successful 2FA verification and login
@@ -228,6 +229,14 @@ definitions:
     required:
     - code
     type: object
+  controllers.TwoFAFinalizeResponse:
+    description: Response for finalized 2FA setup
+    properties:
+      recoveryKey:
+        description: Recovery key for 2FA backup, only present when first enabling
+          2FA
+        type: string
+    type: object
   controllers.TwoFAInitRequest:
     description: Request to initialize 2FA setup
     properties:
@@ -391,6 +400,12 @@ definitions:
         description: User agent of client
         type: string
     type: object
+  datastore.TwoFAOptions:
+    properties:
+      totp:
+        description: TOTP indicates whether Time-based One-Time Password is enabled
+        type: boolean
+    type: object
   util.ErrorResponse:
     description: Standard error response
     properties:
@@ -444,12 +459,73 @@ paths:
       summary: Delete account
       tags:
       - Accounts
-  /v2/accounts/2fa/finalize:
+  /v2/accounts/2fa:
+    get:
+      description: Returns the 2FA methods enabled for the authenticated account
+      parameters:
+      - description: Bearer + auth token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/datastore.TwoFAOptions'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Get 2FA settings
+      tags:
+      - Accounts
+  /v2/accounts/2fa/totp:
+    delete:
+      description: Disables TOTP 2FA for the account and deletes the associated TOTP
+        key
+      parameters:
+      - description: Bearer + auth token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Disable TOTP 2FA
+      tags:
+      - Accounts
+  /v2/accounts/2fa/totp/finalize:
     post:
       consumes:
       - application/json
-      description: Complete the 2FA setup process by validating a TOTP code and enabling
-        2FA for the account.
+      description: Complete the TOTP 2FA setup process by validating a TOTP code and
+        enabling 2FA for the account.
       parameters:
       - description: Bearer + auth token
         in: header
@@ -469,8 +545,10 @@ paths:
       produces:
       - application/json
       responses:
-        "204":
-          description: No Content
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.TwoFAFinalizeResponse'
         "400":
           description: Bad Request
           schema:
@@ -483,15 +561,15 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/util.ErrorResponse'
-      summary: Finalize 2FA setup
+      summary: Finalize TOTP 2FA setup
       tags:
       - Accounts
-  /v2/accounts/2fa/init:
+  /v2/accounts/2fa/totp/init:
     post:
       consumes:
       - application/json
       description: |-
-        Start the 2FA setup process by generating a TOTP key and URL.
+        Start the TOTP 2FA setup process by generating a TOTP key and URL.
         Optionally generates a QR code if requested.
       parameters:
       - description: Bearer + auth token
@@ -528,7 +606,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/util.ErrorResponse'
-      summary: Initialize 2FA setup
+      summary: Initialize TOTP 2FA setup
       tags:
       - Accounts
   /v2/accounts/password/finalize:
@@ -683,8 +761,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Final step of 2FA login flow, verifies TOTP code and creates a
-        session.
+      description: Final step of 2FA login flow, verifies TOTP code or recovery key
+        and creates a session.
       parameters:
       - description: Bearer + login state token
         in: header
