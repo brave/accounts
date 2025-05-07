@@ -45,6 +45,10 @@ type TwoFAOptions struct {
 	TOTP bool `json:"totp"`
 }
 
+func (a *Account) IsTwoFAEnabled() bool {
+	return a.TOTPEnabled
+}
+
 func (d *Datastore) GetAccount(tx *gorm.DB, email string) (*Account, error) {
 	var account Account
 	if tx == nil {

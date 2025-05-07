@@ -100,14 +100,6 @@ type CreateServiceTokenResponse struct {
 	AuthToken string `json:"authToken"`
 }
 
-// @Description Request to finalize login with 2FA
-type LoginFinalize2FARequest struct {
-	// TOTP verification code (optional if recovery key is provided)
-	TOTPCode *string `json:"totpCode,omitempty" validate:"required_without=RecoveryKey,excluded_with=RecoveryKey"`
-	// Recovery key for 2FA bypass (optional if TOTP code is provided)
-	RecoveryKey *string `json:"recoveryKey,omitempty" validate:"required_without=TOTPCode,excluded_with=TOTPCode"`
-}
-
 // @Description Response after successful 2FA verification and login
 type LoginFinalize2FAResponse struct {
 	// Authentication token for future requests
@@ -315,7 +307,7 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loginToken, err := ac.jwtService.CreateEphemeralLoginToken(akeState.ID, datastore.LoginStateExpiration)
+	loginToken, err := ac.jwtService.CreateEphemeralLoginToken(akeState.ID, datastore.NormalStateExpiration)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
@@ -388,12 +380,12 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 		if errors.Is(err, util.ErrIncorrectCredentials) ||
 			errors.Is(err, util.ErrIncorrectEmail) ||
 			errors.Is(err, util.ErrIncorrectPassword) ||
-			errors.Is(err, util.ErrLoginStateNotFound) ||
-			errors.Is(err, util.ErrLoginStateExpired) {
+			errors.Is(err, util.ErrInterimPasswordStateNotFound) ||
+			errors.Is(err, util.ErrInterimPasswordStateExpired) {
 			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 			return
 		}
-		if errors.Is(err, util.ErrLoginStateMismatch) {
+		if errors.Is(err, util.ErrInterimPasswordStateMismatch) {
 			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
 			return
 		}
@@ -412,6 +404,82 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		response.AuthToken = &authToken
+	}
+
+	render.Status(r, http.StatusOK)
+	render.JSON(w, r, response)
+}
+
+// @Summary Finalize login with 2FA
+// @Description Final step of 2FA login flow, verifies TOTP code or recovery key and creates a session.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer + login state token"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param request body services.TwoFAAuthRequest true "2FA verification request"
+// @Success 200 {object} LoginFinalize2FAResponse
+// @Failure 400 {object} util.ErrorResponse
+// @Failure 401 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/auth/login/finalize_2fa [post]
+func (ac *AuthController) LoginFinalize2FA(w http.ResponseWriter, r *http.Request) {
+	token, err := util.ExtractAuthToken(r)
+	if err != nil {
+		util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
+		return
+	}
+
+	loginStateID, err := ac.jwtService.ValidateEphemeralLoginToken(token)
+	if err != nil {
+		util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
+		return
+	}
+
+	var requestData services.TwoFAAuthRequest
+	if !util.DecodeJSONAndValidate(w, r, &requestData) {
+		return
+	}
+
+	// Get the account ID from the login state, specifying this is for 2FA
+	loginState, err := ac.ds.GetLoginState(loginStateID, true)
+	if err != nil {
+		if errors.Is(err, util.ErrInterimPasswordStateMismatch) {
+			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+			return
+		}
+		if errors.Is(err, util.ErrInterimPasswordStateNotFound) || errors.Is(err, util.ErrInterimPasswordStateExpired) {
+			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
+			return
+		}
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Process the 2FA authentication request
+	if err := ac.twoFAService.ProcessAuthRequest(loginState, &requestData); err != nil {
+		if errors.Is(err, util.ErrBadTOTPCode) || errors.Is(err, util.ErrBadRecoveryKey) {
+			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
+			return
+		}
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	if err := ac.ds.DeleteInterimPasswordState(loginState.ID); err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Create a session and return an auth token
+	authToken, err := ac.createSessionAndToken(*loginState.AccountID, r.UserAgent())
+	if err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	response := LoginFinalize2FAResponse{
+		AuthToken: authToken,
 	}
 
 	render.Status(r, http.StatusOK)
@@ -455,102 +523,4 @@ func (ac *AuthController) CreateServiceToken(w http.ResponseWriter, r *http.Requ
 
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, CreateServiceTokenResponse{AuthToken: token})
-}
-
-// @Summary Finalize login with 2FA
-// @Description Final step of 2FA login flow, verifies TOTP code or recovery key and creates a session.
-// @Tags Auth
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer + login state token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
-// @Param request body LoginFinalize2FARequest true "2FA verification request"
-// @Success 200 {object} LoginFinalize2FAResponse
-// @Failure 400 {object} util.ErrorResponse
-// @Failure 401 {object} util.ErrorResponse
-// @Failure 500 {object} util.ErrorResponse
-// @Router /v2/auth/login/finalize_2fa [post]
-func (ac *AuthController) LoginFinalize2FA(w http.ResponseWriter, r *http.Request) {
-	token, err := util.ExtractAuthToken(r)
-	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
-		return
-	}
-
-	loginStateID, err := ac.jwtService.ValidateEphemeralLoginToken(token)
-	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
-		return
-	}
-
-	var requestData LoginFinalize2FARequest
-	if !util.DecodeJSONAndValidate(w, r, &requestData) {
-		return
-	}
-
-	// Get the account ID from the login state, specifying this is for 2FA
-	loginState, err := ac.ds.GetLoginState(loginStateID, true)
-	if err != nil {
-		if errors.Is(err, util.ErrLoginStateMismatch) {
-			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
-			return
-		}
-		if errors.Is(err, util.ErrLoginStateNotFound) || errors.Is(err, util.ErrLoginStateExpired) {
-			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
-			return
-		}
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
-
-	// Verify either TOTP code or recovery key
-	if requestData.TOTPCode != nil {
-		// Verify TOTP code
-		if err := ac.twoFAService.ValidateTOTPCode(*loginState.AccountID, *requestData.TOTPCode); err != nil {
-			if errors.Is(err, util.ErrBadTOTPCode) {
-				util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
-				return
-			}
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-	} else if requestData.RecoveryKey != nil {
-		// Verify recovery key
-		if err := ac.ds.CheckRecoveryKey(*loginState.AccountID, *requestData.RecoveryKey); err != nil {
-			if errors.Is(err, util.ErrBadRecoveryKey) {
-				util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
-				return
-			}
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-		if err := ac.ds.SetTOTPSetting(*loginState.AccountID, false); err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-
-		if err := ac.ds.SetRecoveryKey(*loginState.AccountID, nil); err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-
-		if err := ac.twoFAService.DeleteTOTPKey(*loginState.AccountID); err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-	}
-
-	// Create a session and return an auth token
-	authToken, err := ac.createSessionAndToken(*loginState.AccountID, r.UserAgent())
-	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
-
-	response := LoginFinalize2FAResponse{
-		AuthToken: authToken,
-	}
-
-	render.Status(r, http.StatusOK)
-	render.JSON(w, r, response)
 }
