@@ -4,6 +4,9 @@ use serde_json::Value;
 
 use crate::CliArgs;
 
+// Type alias for response data
+pub type Response = HashMap<String, Value>;
+
 pub fn verbose_log(cli_args: &CliArgs, message: &str) {
     if cli_args.verbose {
         println!("{}", message);
@@ -16,7 +19,7 @@ pub fn make_request(
     path: &str,
     bearer_token: Option<&str>,
     body: Option<HashMap<&str, Value>>,
-) -> HashMap<String, Value> {
+) -> Response {
     // add user agent of some sort.
     let client = reqwest::blocking::Client::builder()
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
@@ -53,7 +56,7 @@ pub fn make_request(
     }
 
     let response_fields = response
-        .json::<HashMap<String, Value>>()
+        .json::<Response>()
         .expect("Failed to parse response as HashMap<String, Value>");
 
     verbose_log(&args, format!("response: {:?}", response_fields).as_str());

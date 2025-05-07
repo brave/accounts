@@ -81,19 +81,16 @@ func (d *Datastore) CreateRegistrationState(accountID uuid.UUID, email string, o
 	return nil
 }
 
+func (d *Datastore) UpdateInterimPasswordState(stateID uuid.UUID, state []byte) error {
+	return d.DB.Model(&InterimPasswordState{}).Where("id = ?", stateID).Update("state", state).Error
+}
+
 func (d *Datastore) MarkInterimPasswordStateAsAwaitingTwoFA(stateID uuid.UUID) error {
 	return d.DB.Model(&InterimPasswordState{}).Where("id = ?", stateID).Update("awaiting_twofa", true).Error
 }
 
 func (d *Datastore) DeleteInterimPasswordState(stateID uuid.UUID) error {
-	result := d.DB.Delete(&InterimPasswordState{}, "id = ?", stateID)
-	if result.Error != nil {
-		return fmt.Errorf("failed to delete login state: %w", result.Error)
-	}
-	if result.RowsAffected == 0 {
-		return util.ErrInterimPasswordStateNotFound
-	}
-	return nil
+	return d.DB.Delete(&InterimPasswordState{}, "id = ?", stateID).Error
 }
 
 func (d *Datastore) processInterimPasswordState(state *InterimPasswordState, forTwoFA bool) error {

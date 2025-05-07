@@ -36,4 +36,4 @@ dev:
 	air
 
 dev-key-service:
-	air -- -start-key-service
+	air -- -start-key-service -listen :8081 -prom-listen :9091
