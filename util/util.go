@@ -270,6 +270,18 @@ func (k *KeyServiceClient) MakeRequest(method string, path string, body interfac
 		respBody = resp.Body
 	}
 
+	if status == http.StatusUnauthorized {
+		var exposedError ExposedError
+		if err := json.NewDecoder(respBody).Decode(&exposedError); err != nil {
+			return fmt.Errorf("failed to decode unauthorized response: %w", err)
+		}
+		// This error must be forwarded to the TwoFAService
+		// in order to process the error case correctly
+		if exposedError.Code == ErrBadTOTPCode.Code {
+			return ErrBadTOTPCode
+		}
+	}
+
 	if status != http.StatusOK && status != http.StatusNoContent {
 		return fmt.Errorf("key service returned status %d", status)
 	}

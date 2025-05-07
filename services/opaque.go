@@ -227,12 +227,21 @@ func (o *OpaqueService) SetupPasswordFinalize(email string, registration *opaque
 	}
 
 	if registrationState.RequiresTwoFA {
+		if err = o.ds.UpdateInterimPasswordState(registrationState.ID, registration.Serialize()); err != nil {
+			// nolint:errcheck
+			o.ds.DeleteInterimPasswordState(registrationState.ID)
+			return nil, err
+		}
 		if err = o.ds.MarkInterimPasswordStateAsAwaitingTwoFA(registrationState.ID); err != nil {
+			// nolint:errcheck
+			o.ds.DeleteInterimPasswordState(registrationState.ID)
 			return nil, err
 		}
 	} else {
 		err = o.ds.UpdateOpaqueRegistration(*registrationState.AccountID, registrationState.OprfSeedID, registration.Serialize())
 		if err != nil {
+			// nolint:errcheck
+			o.ds.DeleteInterimPasswordState(registrationState.ID)
 			return nil, err
 		}
 	}
@@ -297,10 +306,12 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 	}
 
 	var accountID *uuid.UUID
+	isTwoFAEnabled := false
 	if !useFakeRecord {
 		accountID = &account.ID
+		isTwoFAEnabled = account.IsTwoFAEnabled()
 	}
-	akeState, err := o.ds.CreateLoginState(accountID, email, server.SerializeState(), *seedID, account.IsTwoFAEnabled())
+	akeState, err := o.ds.CreateLoginState(accountID, email, server.SerializeState(), *seedID, isTwoFAEnabled)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to store AKE state: %w", err)
 	}
@@ -316,14 +327,20 @@ func (o *OpaqueService) LoginFinalize(loginStateID uuid.UUID, ke3 *opaqueMsg.KE3
 
 	server, _, err := o.newOpaqueServer(loginState.Email, &loginState.OprfSeedID)
 	if err != nil {
+		// nolint:errcheck
+		o.ds.DeleteInterimPasswordState(loginState.ID)
 		return nil, err
 	}
 
 	if err = server.SetAKEState(loginState.State); err != nil {
+		// nolint:errcheck
+		o.ds.DeleteInterimPasswordState(loginState.ID)
 		return nil, fmt.Errorf("failed to set AKE state for login finalize: %w", err)
 	}
 
 	if err = server.LoginFinish(ke3); err != nil {
+		// nolint:errcheck
+		o.ds.DeleteInterimPasswordState(loginState.ID)
 		if o.fakeRecordEnabled {
 			return nil, util.ErrIncorrectCredentials
 		} else {
@@ -332,12 +349,16 @@ func (o *OpaqueService) LoginFinalize(loginStateID uuid.UUID, ke3 *opaqueMsg.KE3
 	}
 
 	if loginState.AccountID == nil {
+		// nolint:errcheck
+		o.ds.DeleteInterimPasswordState(loginState.ID)
 		return nil, util.ErrIncorrectCredentials
 	}
 
 	// If 2FA is required, mark the state as awaiting 2FA
 	if loginState.RequiresTwoFA {
 		if err := o.ds.MarkInterimPasswordStateAsAwaitingTwoFA(loginState.ID); err != nil {
+			// nolint:errcheck
+			o.ds.DeleteInterimPasswordState(loginState.ID)
 			return nil, fmt.Errorf("failed to mark login state as awaiting 2FA: %w", err)
 		}
 		loginState.AwaitingTwoFA = true

@@ -214,7 +214,7 @@ func (sc *ServerKeysController) ValidateTOTPCode(w http.ResponseWriter, r *http.
 		if errors.Is(err, util.ErrKeyNotFound) {
 			util.RenderErrorResponse(w, r, http.StatusNotFound, err)
 		} else if errors.Is(err, util.ErrBadTOTPCode) {
-			util.RenderErrorResponse(w, r, http.StatusForbidden, err)
+			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 		} else {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		}

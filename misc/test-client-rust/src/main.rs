@@ -96,6 +96,40 @@ struct CliArgs {
     twofa_recovery_key: Option<String>,
 }
 
+fn maybe_handle_twofa(args: &CliArgs, resp: Response, token: &str, endpoint: &str) -> Response {
+    // If 2FA not required, just return the original response
+    if !resp.get("requiresTwoFA").and_then(|v| v.as_bool()).unwrap_or(false) {
+        return resp;
+    }
+    
+    verbose_log(&args, "Two-factor authentication is required");
+    
+    let mut twofa_body: HashMap<&str, Value> = HashMap::new();
+    if let Some(recovery_key) = args.twofa_recovery_key.as_ref() {
+        twofa_body.insert("recoveryKey", recovery_key.as_str().into());
+    } else {
+        // Try to generate TOTP code if URL is provided
+        let totp_code = if let Some(totp_url) = args.totp_url.as_ref() {
+            let totp = TOTP::from_url(totp_url).expect("Failed to parse TOTP URL");
+            let code = totp.generate_current().expect("Failed to generate TOTP code");
+            verbose_log(&args, format!("Generated TOTP code: {}", code).as_str());
+            code
+        } else {
+            // Prompt user for code
+            prompt_for_input("Enter your 6-digit TOTP code: ")
+        };
+        twofa_body.insert("totpCode", totp_code.into());
+    }
+    
+    make_request(
+        args,
+        reqwest::Method::POST,
+        endpoint,
+        Some(token),
+        Some(twofa_body),
+    )
+}
+
 fn verify(args: &CliArgs) -> (String, Option<String>) {
     let mut body = HashMap::new();
     body.insert(
@@ -248,13 +282,16 @@ fn set_password(args: CliArgs) {
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("serializedRecord", record_hex.into());
 
-    let resp = make_request(
+    let mut resp = make_request(
         &args,
         reqwest::Method::POST,
         "/v2/accounts/password/finalize",
         Some(&token),
         Some(body),
     );
+    
+    // Handle 2FA if required
+    resp = maybe_handle_twofa(&args, resp, &token, "/v2/accounts/password/finalize_2fa");
 
     display_account_details(&args, resp.get("authToken").unwrap().as_str().unwrap());
 }
@@ -319,6 +356,7 @@ fn login(args: CliArgs) {
         .get("loginToken")
         .and_then(|v| v.as_str())
         .expect("Missing loginToken field");
+    
     let mut resp = make_request(
         &args,
         reqwest::Method::POST,
@@ -329,35 +367,8 @@ fn login(args: CliArgs) {
 
     verbose_log(&args, format!("intermediate login token: {}", login_token).as_str());
 
-    // Check if 2FA is required
-    if resp.get("requiresTwoFA").and_then(|v| v.as_bool()).unwrap_or(false) {
-        verbose_log(&args, "Two-factor authentication is required");
-        
-        let mut twofa_body: HashMap<&str, Value> = HashMap::new();
-        if let Some(recovery_key) = args.twofa_recovery_key.as_ref() {
-            twofa_body.insert("recoveryKey", recovery_key.as_str().into());
-        } else {
-            // Try to generate TOTP code if URL is provided
-            let totp_code = if let Some(totp_url) = args.totp_url.as_ref() {
-                let totp = TOTP::from_url(totp_url).expect("Failed to parse TOTP URL");
-                let code = totp.generate_current().expect("Failed to generate TOTP code");
-                verbose_log(&args, format!("Generated TOTP code: {}", code).as_str());
-                code
-            } else {
-                // Prompt user for code
-                prompt_for_input("Enter your 6-digit TOTP code: ")
-            };
-            twofa_body.insert("totpCode", totp_code.into());
-        }
-        
-        resp = make_request(
-            &args,
-            reqwest::Method::POST,
-            "/v2/auth/login/finalize_2fa",
-            Some(login_token),
-            Some(twofa_body),
-        );
-    }
+    // Handle 2FA if required
+    resp = maybe_handle_twofa(&args, resp, login_token, "/v2/auth/login/finalize_2fa");
 
     display_account_details(&args, resp.get("authToken").unwrap().as_str().unwrap());
 }

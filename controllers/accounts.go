@@ -339,12 +339,6 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 			return
 		}
-	} else {
-		// For 2FA flow, we'll delete verification here but handle session creation later
-		if err := ac.ds.DeleteVerification(verification.ID); err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
 	}
 
 	render.Status(r, http.StatusOK)
@@ -403,6 +397,11 @@ func (ac *AccountsController) SetupPasswordFinalize2FA(w http.ResponseWriter, r 
 	}
 
 	if err := ac.ds.DeleteInterimPasswordState(registrationState.ID); err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	if err := ac.ds.UpdateOpaqueRegistration(*registrationState.AccountID, registrationState.OprfSeedID, registrationState.State); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}

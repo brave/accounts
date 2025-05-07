@@ -307,7 +307,7 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loginToken, err := ac.jwtService.CreateEphemeralLoginToken(akeState.ID, datastore.NormalStateExpiration)
+	loginToken, err := ac.jwtService.CreateEphemeralLoginToken(akeState.ID, datastore.TwoFAStateExpiration)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
