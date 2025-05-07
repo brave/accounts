@@ -25,6 +25,14 @@ const (
 	defaultQRSize = 256
 )
 
+// TwoFAAuthRequest represents a request to authenticate with 2FA
+type TwoFAAuthRequest struct {
+	// TOTP verification code (optional if recovery key is provided)
+	TOTPCode *string `json:"totpCode,omitempty" validate:"required_without=RecoveryKey,excluded_with=RecoveryKey"`
+	// Recovery key for 2FA bypass (optional if TOTP code is provided)
+	RecoveryKey *string `json:"recoveryKey,omitempty" validate:"required_without=TOTPCode,excluded_with=TOTPCode"`
+}
+
 // TwoFAService provides methods for managing two-factor authentication
 type TwoFAService struct {
 	// issuer is the name of the issuer for TOTP keys
@@ -68,6 +76,44 @@ func NewTwoFAService(ds *datastore.Datastore, isKeyService bool) *TwoFAService {
 		keyServiceClient: client,
 		isKeyService:     isKeyService,
 	}
+}
+
+// DisableTwoFA disables two-factor authentication for an account
+func (t *TwoFAService) DisableTwoFA(accountID uuid.UUID) error {
+	if err := t.ds.SetTOTPSetting(accountID, false); err != nil {
+		return err
+	}
+
+	if err := t.DeleteTOTPKey(accountID); err != nil {
+		return err
+	}
+
+	if err := t.ds.SetRecoveryKey(accountID, nil); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ProcessAuthRequest verifies either TOTP code or recovery key for an account
+func (t *TwoFAService) ProcessAuthRequest(loginState *datastore.InterimPasswordState, req *TwoFAAuthRequest) error {
+	// Verify either TOTP code or recovery key
+	if req.TOTPCode != nil {
+		// Verify TOTP code
+		if err := t.ValidateTOTPCode(*loginState.AccountID, *req.TOTPCode); err != nil {
+			return err
+		}
+	} else if req.RecoveryKey != nil {
+		// Verify recovery key
+		if err := t.ds.CheckRecoveryKey(*loginState.AccountID, *req.RecoveryKey); err != nil {
+			return err
+		}
+		if err := t.DisableTwoFA(*loginState.AccountID); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // GenerateAndStoreTOTPKey creates and stores a new TOTP key for an account

@@ -353,6 +353,71 @@
                 }
             }
         },
+        "/v2/accounts/password/finalize_2fa": {
+            "post": {
+                "description": "Complete the password setup process after 2FA verification.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Finalize password setup with 2FA",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + verification token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
+                        "description": "2FA verification request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/services.TwoFAAuthRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.LoginFinalize2FAResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v2/accounts/password/init": {
             "post": {
                 "description": "Start the password setup process using OPAQUE protocol.\nIf `serializeResponse` is set to true, the `serializedResponse` field will be populated\nin the response, with other fields omitted.",
@@ -522,7 +587,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/controllers.LoginFinalize2FARequest"
+                            "$ref": "#/definitions/services.TwoFAAuthRequest"
                         }
                     }
                 ],
@@ -1651,20 +1716,6 @@
                 }
             }
         },
-        "controllers.LoginFinalize2FARequest": {
-            "description": "Request to finalize login with 2FA",
-            "type": "object",
-            "properties": {
-                "recoveryKey": {
-                    "description": "Recovery key for 2FA bypass (optional if TOTP code is provided)",
-                    "type": "string"
-                },
-                "totpCode": {
-                    "description": "TOTP verification code (optional if recovery key is provided)",
-                    "type": "string"
-                }
-            }
-        },
         "controllers.LoginFinalize2FAResponse": {
             "description": "Response after successful 2FA verification and login",
             "type": "object",
@@ -1806,6 +1857,10 @@
                 "authToken": {
                     "description": "Authentication token",
                     "type": "string"
+                },
+                "requiresTwoFA": {
+                    "description": "Indicates if 2FA verification is required before password setup is complete",
+                    "type": "boolean"
                 }
             }
         },
@@ -2158,6 +2213,19 @@
                 "totp": {
                     "description": "TOTP indicates whether Time-based One-Time Password is enabled",
                     "type": "boolean"
+                }
+            }
+        },
+        "services.TwoFAAuthRequest": {
+            "type": "object",
+            "properties": {
+                "recoveryKey": {
+                    "description": "Recovery key for 2FA bypass (optional if TOTP code is provided)",
+                    "type": "string"
+                },
+                "totpCode": {
+                    "description": "TOTP verification code (optional if recovery key is provided)",
+                    "type": "string"
                 }
             }
         },

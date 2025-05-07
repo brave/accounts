@@ -13,6 +13,7 @@ import (
 	opaqueMsg "github.com/bytemare/opaque/message"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
+	"github.com/google/uuid"
 )
 
 type AccountsController struct {
@@ -26,6 +27,8 @@ type AccountsController struct {
 type PasswordFinalizeResponse struct {
 	// Authentication token
 	AuthToken string `json:"authToken"`
+	// Indicates if 2FA verification is required before password setup is complete
+	RequiresTwoFA bool `json:"requiresTwoFA"`
 }
 
 // @Description Request to register a new account
@@ -179,6 +182,7 @@ func (ac *AccountsController) Router(verificationMiddleware func(http.Handler) h
 
 	r.With(verificationMiddleware).Post("/password/init", ac.SetupPasswordInit)
 	r.With(verificationMiddleware).Post("/password/finalize", ac.SetupPasswordFinalize)
+	r.With(verificationMiddleware).Post("/password/finalize_2fa", ac.SetupPasswordFinalize2FA)
 	r.With(authMiddleware).Get("/2fa", ac.GetTwoFASettings)
 	r.With(authMiddleware).Post("/2fa/totp/init", ac.SetupTOTPInit)
 	r.With(authMiddleware).Post("/2fa/totp/finalize", ac.SetupTOTPFinalize)
@@ -253,6 +257,28 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 	render.JSON(w, r, response)
 }
 
+func (ac *AccountsController) createSessionAfterPasswordSetup(accountID uuid.UUID, userAgent string, verificationID uuid.UUID) (string, error) {
+	if err := ac.ds.DeleteAllSessions(accountID); err != nil {
+		return "", fmt.Errorf("failed to delete existing sessions: %w", err)
+	}
+
+	session, err := ac.ds.CreateSession(accountID, datastore.PasswordAuthSessionVersion, userAgent)
+	if err != nil {
+		return "", fmt.Errorf("failed to create session: %w", err)
+	}
+
+	authToken, err := ac.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
+	if err != nil {
+		return "", fmt.Errorf("failed to create auth token: %w", err)
+	}
+
+	if err := ac.ds.DeleteVerification(verificationID); err != nil {
+		return "", fmt.Errorf("failed to delete verification: %w", err)
+	}
+
+	return authToken, nil
+}
+
 // @Summary Finalize password setup
 // @Description Complete the password setup process and return auth token.
 // @Description Either `publicKey`, `maskingKey` and `envelope` must be provided together,
@@ -288,12 +314,12 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 		return
 	}
 
-	account, err := ac.opaqueService.SetupPasswordFinalize(verification.Email, opaqueRecord)
+	registrationState, err := ac.opaqueService.SetupPasswordFinalize(verification.Email, opaqueRecord)
 	if err != nil {
 		switch {
-		case errors.Is(err, util.ErrRegistrationStateNotFound):
+		case errors.Is(err, util.ErrInterimPasswordStateNotFound):
 			util.RenderErrorResponse(w, r, http.StatusNotFound, err)
-		case errors.Is(err, util.ErrRegistrationStateExpired):
+		case errors.Is(err, util.ErrInterimPasswordStateExpired):
 			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
 		default:
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
@@ -301,30 +327,94 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if err = ac.ds.UpdateAccountLastEmailVerifiedAt(account.ID); err != nil {
+	if err = ac.ds.UpdateAccountLastEmailVerifiedAt(*registrationState.AccountID); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
 
-	session, err := ac.ds.CreateSession(account.ID, datastore.PasswordAuthSessionVersion, r.UserAgent())
+	var authToken string
+	if !registrationState.RequiresTwoFA {
+		authToken, err = ac.createSessionAfterPasswordSetup(*registrationState.AccountID, r.UserAgent(), verification.ID)
+		if err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
+	} else {
+		// For 2FA flow, we'll delete verification here but handle session creation later
+		if err := ac.ds.DeleteVerification(verification.ID); err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
+	}
+
+	render.Status(r, http.StatusOK)
+	render.JSON(w, r, &PasswordFinalizeResponse{
+		AuthToken:     authToken,
+		RequiresTwoFA: registrationState.RequiresTwoFA,
+	})
+}
+
+// @Summary Finalize password setup with 2FA
+// @Description Complete the password setup process after 2FA verification.
+// @Tags Accounts
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer + verification token"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param request body services.TwoFAAuthRequest true "2FA verification request"
+// @Success 200 {object} LoginFinalize2FAResponse
+// @Failure 400 {object} util.ErrorResponse
+// @Failure 401 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/accounts/password/finalize_2fa [post]
+func (ac *AccountsController) SetupPasswordFinalize2FA(w http.ResponseWriter, r *http.Request) {
+	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
+
+	if !checkVerificationStatusAndIntent(w, r, verification) {
+		return
+	}
+
+	var requestData services.TwoFAAuthRequest
+	if !util.DecodeJSONAndValidate(w, r, &requestData) {
+		return
+	}
+
+	registrationState, err := ac.ds.GetRegistrationState(verification.Email, true)
 	if err != nil {
+		if errors.Is(err, util.ErrInterimPasswordStateMismatch) {
+			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+			return
+		}
+		if errors.Is(err, util.ErrInterimPasswordStateNotFound) || errors.Is(err, util.ErrInterimPasswordStateExpired) {
+			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
+			return
+		}
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
 
-	authToken, err := ac.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
+	if err := ac.twoFAService.ProcessAuthRequest(registrationState, &requestData); err != nil {
+		if errors.Is(err, util.ErrBadTOTPCode) || errors.Is(err, util.ErrBadRecoveryKey) {
+			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
+			return
+		}
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	if err := ac.ds.DeleteInterimPasswordState(registrationState.ID); err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	authToken, err := ac.createSessionAfterPasswordSetup(*registrationState.AccountID, r.UserAgent(), verification.ID)
 	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
-
-	if err := ac.ds.DeleteVerification(verification.ID); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
 
 	render.Status(r, http.StatusOK)
-	render.JSON(w, r, &PasswordFinalizeResponse{
+	render.JSON(w, r, &LoginFinalize2FAResponse{
 		AuthToken: authToken,
 	})
 }
@@ -522,17 +612,7 @@ func (ac *AccountsController) GetTwoFASettings(w http.ResponseWriter, r *http.Re
 func (ac *AccountsController) DisableTOTP(w http.ResponseWriter, r *http.Request) {
 	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
 
-	if err := ac.ds.SetTOTPSetting(session.AccountID, false); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
-
-	if err := ac.ds.SetRecoveryKey(session.AccountID, nil); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
-
-	if err := ac.twoFAService.DeleteTOTPKey(session.AccountID); err != nil {
+	if err := ac.twoFAService.DisableTwoFA(session.AccountID); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}

@@ -274,7 +274,7 @@ func (suite *AuthTestSuite) TestAuthLoginExpiredLoginState() {
 	loginStateID, err := suite.jwtService.ValidateEphemeralLoginToken(parsedResp.LoginToken)
 	suite.Require().NoError(err)
 
-	err = suite.ds.DB.Model(&datastore.LoginState{}).Where("id = ?", loginStateID).Update("created_at", time.Now().Add(-30*time.Minute)).Error
+	err = suite.ds.DB.Model(&datastore.InterimPasswordState{}).Where("id = ?", loginStateID).Update("created_at", time.Now().Add(-30*time.Minute)).Error
 	suite.Require().NoError(err)
 
 	loginFinalReq := suite.createLoginFinalizeRequest(opaqueClient, *parsedResp.SerializedKE2)
@@ -284,7 +284,7 @@ func (suite *AuthTestSuite) TestAuthLoginExpiredLoginState() {
 
 	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusUnauthorized, resp.Code)
-	util.AssertErrorResponseCode(suite.T(), resp, util.ErrLoginStateExpired.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrInterimPasswordStateExpired.Code)
 }
 
 func (suite *AuthTestSuite) TestPasswordAuthEndpointsDisabled() {

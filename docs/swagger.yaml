@@ -32,16 +32,6 @@ definitions:
         description: Token is the signed JWT token string
         type: string
     type: object
-  controllers.LoginFinalize2FARequest:
-    description: Request to finalize login with 2FA
-    properties:
-      recoveryKey:
-        description: Recovery key for 2FA bypass (optional if TOTP code is provided)
-        type: string
-      totpCode:
-        description: TOTP verification code (optional if recovery key is provided)
-        type: string
-    type: object
   controllers.LoginFinalize2FAResponse:
     description: Response after successful 2FA verification and login
     properties:
@@ -147,6 +137,10 @@ definitions:
       authToken:
         description: Authentication token
         type: string
+      requiresTwoFA:
+        description: Indicates if 2FA verification is required before password setup
+          is complete
+        type: boolean
     type: object
   controllers.RegistrationRecord:
     description: OPAQUE registration record for a new account
@@ -406,6 +400,15 @@ definitions:
         description: TOTP indicates whether Time-based One-Time Password is enabled
         type: boolean
     type: object
+  services.TwoFAAuthRequest:
+    properties:
+      recoveryKey:
+        description: Recovery key for 2FA bypass (optional if TOTP code is provided)
+        type: string
+      totpCode:
+        description: TOTP verification code (optional if recovery key is provided)
+        type: string
+    type: object
   util.ErrorResponse:
     description: Standard error response
     properties:
@@ -663,6 +666,49 @@ paths:
       summary: Finalize password setup
       tags:
       - Accounts
+  /v2/accounts/password/finalize_2fa:
+    post:
+      consumes:
+      - application/json
+      description: Complete the password setup process after 2FA verification.
+      parameters:
+      - description: Bearer + verification token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Brave services key (if one is configured)
+        in: header
+        name: Brave-Key
+        type: string
+      - description: 2FA verification request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/services.TwoFAAuthRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.LoginFinalize2FAResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/util.ErrorResponse'
+      summary: Finalize password setup with 2FA
+      tags:
+      - Accounts
   /v2/accounts/password/init:
     post:
       consumes:
@@ -778,7 +824,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/controllers.LoginFinalize2FARequest'
+          $ref: '#/definitions/services.TwoFAAuthRequest'
       produces:
       - application/json
       responses:
