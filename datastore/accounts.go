@@ -1,7 +1,6 @@
 package datastore
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"time"
@@ -33,16 +32,24 @@ type Account struct {
 	LastEmailVerifiedAt time.Time `gorm:"<-:update"`
 	// TOTPEnabled indicates whether the account has TOTP enabled
 	TOTPEnabled bool `json:"-"`
+	// Timestamp when TOTP was enabled
+	TOTPEnabledAt *time.Time `json:"-"`
 	// Recovery key hash
 	RecoveryKeyHash []byte `json:"-"`
+	// Timestamp when the recovery key was created
+	RecoveryKeyCreatedAt *time.Time `json:"-"`
 	// Timestamp when the account was created
 	CreatedAt time.Time `gorm:"<-:false"`
 }
 
-// TwoFAOptions represents the 2FA methods enabled for an account
-type TwoFAOptions struct {
+// TwoFADetails represents the 2FA methods enabled for an account and related timestamps
+type TwoFADetails struct {
 	// TOTP indicates whether Time-based One-Time Password is enabled
 	TOTP bool `json:"totp"`
+	// TOTPEnabledAt indicates when TOTP was enabled
+	TOTPEnabledAt *time.Time `json:"totpEnabledAt,omitempty"`
+	// RecoveryKeyCreatedAt indicates when the recovery key was created
+	RecoveryKeyCreatedAt *time.Time `json:"recoveryKeyCreatedAt,omitempty"`
 }
 
 func (a *Account) IsTwoFAEnabled() bool {
@@ -190,9 +197,19 @@ func (d *Datastore) UpdateAccountLastEmailVerifiedAt(accountID uuid.UUID) error 
 }
 
 func (d *Datastore) SetTOTPSetting(accountID uuid.UUID, enabled bool) error {
+	var enabledAt *time.Time
+
+	if enabled {
+		now := time.Now().UTC()
+		enabledAt = &now
+	}
+
 	result := d.DB.Model(&Account{}).
 		Where("id = ?", accountID).
-		Update("totp_enabled", enabled)
+		Updates(map[string]interface{}{
+			"totp_enabled":    enabled,
+			"totp_enabled_at": enabledAt,
+		})
 
 	if result.Error != nil {
 		return fmt.Errorf("error updating TOTP setting for account: %w", result.Error)
@@ -207,12 +224,24 @@ func (d *Datastore) SetTOTPSetting(accountID uuid.UUID, enabled bool) error {
 
 func (d *Datastore) SetRecoveryKey(accountID uuid.UUID, recoveryKey *string) error {
 	var recoveryKeyHash []byte
+	var createdAt *time.Time
+	var err error
+
 	if recoveryKey != nil {
-		recoveryKeyHash = util.HashRecoveryKey(*recoveryKey)
+		recoveryKeyHash, err = util.HashRecoveryKey(*recoveryKey)
+		if err != nil {
+			return fmt.Errorf("error hashing recovery key: %w", err)
+		}
+		now := time.Now().UTC()
+		createdAt = &now
 	}
+
 	result := d.DB.Model(&Account{}).
 		Where("id = ?", accountID).
-		Update("recovery_key_hash", recoveryKeyHash)
+		Updates(map[string]interface{}{
+			"recovery_key_hash":       recoveryKeyHash,
+			"recovery_key_created_at": createdAt,
+		})
 
 	if result.Error != nil {
 		return fmt.Errorf("error updating recovery key hash for account: %w", result.Error)
@@ -237,7 +266,7 @@ func (d *Datastore) CheckRecoveryKey(accountID uuid.UUID, recoveryKey string) er
 		return fmt.Errorf("error fetching recovery key hash: %w", result.Error)
 	}
 
-	if account.RecoveryKeyHash == nil || !bytes.Equal(util.HashRecoveryKey(recoveryKey), account.RecoveryKeyHash) {
+	if account.RecoveryKeyHash == nil || !util.VerifyRecoveryKeyHash(recoveryKey, account.RecoveryKeyHash) {
 		return util.ErrBadRecoveryKey
 	}
 
@@ -258,16 +287,19 @@ func (d *Datastore) HasRecoveryKey(accountID uuid.UUID) (bool, error) {
 	return exists, nil
 }
 
-func (d *Datastore) GetEnabledTwoFAOptions(accountID uuid.UUID) (*TwoFAOptions, error) {
-	var options TwoFAOptions
+func (d *Datastore) GetTwoFADetails(accountID uuid.UUID) (*TwoFADetails, error) {
+	var details TwoFADetails
 	result := d.DB.Model(&Account{}).
-		Select("totp_enabled as totp").
+		Select("totp_enabled as totp, totp_enabled_at, recovery_key_created_at").
 		Where("id = ?", accountID).
-		First(&options)
+		First(&details)
 
 	if result.Error != nil {
-		return nil, fmt.Errorf("error fetching 2FA options: %w", result.Error)
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, ErrAccountNotFound
+		}
+		return nil, fmt.Errorf("error fetching 2FA details: %w", result.Error)
 	}
 
-	return &options, nil
+	return &details, nil
 }

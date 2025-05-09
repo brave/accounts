@@ -85,6 +85,14 @@ type TwoFAFinalizeRequest struct {
 type TwoFAFinalizeResponse struct {
 	// Recovery key for 2FA backup, only present when first enabling 2FA
 	RecoveryKey *string `json:"recoveryKey"`
+	// Indicates if 2FA was disabled as a result of using a recovery key
+	TwoFADisabled bool `json:"twoFADisabled"`
+}
+
+// @Description Response for recovery key operations
+type RecoveryKeyResponse struct {
+	// Recovery key for 2FA backup
+	RecoveryKey string `json:"recoveryKey"`
 }
 
 func (req *RegistrationRequest) ToOpaqueRequest(opaqueService *services.OpaqueService) (*opaqueMsg.RegistrationRequest, error) {
@@ -187,6 +195,8 @@ func (ac *AccountsController) Router(verificationMiddleware func(http.Handler) h
 	r.With(authMiddleware).Post("/2fa/totp/init", ac.SetupTOTPInit)
 	r.With(authMiddleware).Post("/2fa/totp/finalize", ac.SetupTOTPFinalize)
 	r.With(authMiddleware).Delete("/2fa/totp", ac.DisableTOTP)
+	r.With(authMiddleware).Post("/2fa/recovery", ac.RegenerateRecoveryKey)
+	r.With(authMiddleware).Delete("/2fa/recovery", ac.DeleteRecoveryKey)
 	if accountDeletionEnabled {
 		r.With(authMiddleware).Delete("/", ac.DeleteAccount)
 	}
@@ -349,7 +359,7 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 }
 
 // @Summary Finalize password setup with 2FA
-// @Description Complete the password setup process after 2FA verification.
+// @Description Complete the password setup process after 2FA verification. If a recovery key is used, 2FA will be disabled.
 // @Tags Accounts
 // @Accept json
 // @Produce json
@@ -414,7 +424,8 @@ func (ac *AccountsController) SetupPasswordFinalize2FA(w http.ResponseWriter, r 
 
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, &LoginFinalize2FAResponse{
-		AuthToken: authToken,
+		AuthToken:     authToken,
+		TwoFADisabled: requestData.RecoveryKey != nil,
 	})
 }
 
@@ -441,13 +452,13 @@ func (ac *AccountsController) SetupTOTPInit(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Check if TOTP is already enabled
-	twoFAOptions, err := ac.ds.GetEnabledTwoFAOptions(session.AccountID)
+	twoFADetails, err := ac.ds.GetTwoFADetails(session.AccountID)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
 
-	if twoFAOptions.TOTP {
+	if twoFADetails.TOTP {
 		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrTOTPAlreadyEnabled)
 		return
 	}
@@ -521,20 +532,15 @@ func (ac *AccountsController) SetupTOTPFinalize(w http.ResponseWriter, r *http.R
 
 	// Only generate a recovery key if one doesn't exist
 	if !hasRecoveryKey {
-		// Generate a recovery key
-		recoveryKey, err := util.GenerateRecoveryKey()
+		// Generate and store a recovery key
+		recoveryKey, err := ac.twoFAService.GenerateAndStoreRecoveryKey(session.AccountID)
 		if err != nil {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 			return
 		}
 
-		// Store the recovery key hash
-		if err := ac.ds.SetRecoveryKey(session.AccountID, &recoveryKey); err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-
 		response.RecoveryKey = &recoveryKey
+		response.TwoFADisabled = true
 	}
 
 	render.Status(r, http.StatusOK)
@@ -576,26 +582,26 @@ func (ac *AccountsController) DeleteAccount(w http.ResponseWriter, r *http.Reque
 }
 
 // @Summary Get 2FA settings
-// @Description Returns the 2FA methods enabled for the authenticated account
+// @Description Returns the 2FA methods enabled for the authenticated account and related timestamps
 // @Tags Accounts
 // @Produce json
 // @Param Authorization header string true "Bearer + auth token"
 // @Param Brave-Key header string false "Brave services key (if one is configured)"
-// @Success 200 {object} datastore.TwoFAOptions
+// @Success 200 {object} datastore.TwoFADetails
 // @Failure 401 {object} util.ErrorResponse
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/accounts/2fa [get]
 func (ac *AccountsController) GetTwoFASettings(w http.ResponseWriter, r *http.Request) {
 	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
 
-	twoFAOptions, err := ac.ds.GetEnabledTwoFAOptions(session.AccountID)
+	twoFADetails, err := ac.ds.GetTwoFADetails(session.AccountID)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
 
 	render.Status(r, http.StatusOK)
-	render.JSON(w, r, twoFAOptions)
+	render.JSON(w, r, twoFADetails)
 }
 
 // @Summary Disable TOTP 2FA
@@ -612,6 +618,55 @@ func (ac *AccountsController) DisableTOTP(w http.ResponseWriter, r *http.Request
 	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
 
 	if err := ac.twoFAService.DisableTwoFA(session.AccountID); err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	render.Status(r, http.StatusNoContent)
+	render.NoContent(w, r)
+}
+
+// @Summary Regenerate 2FA recovery key
+// @Description Generates a new 2FA recovery key for the account, replacing any existing key
+// @Tags Accounts
+// @Produce json
+// @Param Authorization header string true "Bearer + auth token"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Success 200 {object} RecoveryKeyResponse
+// @Failure 401 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/accounts/2fa/recovery [post]
+func (ac *AccountsController) RegenerateRecoveryKey(w http.ResponseWriter, r *http.Request) {
+	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
+
+	// Generate and store a new recovery key
+	recoveryKey, err := ac.twoFAService.GenerateAndStoreRecoveryKey(session.AccountID)
+	if err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	render.Status(r, http.StatusOK)
+	render.JSON(w, r, &RecoveryKeyResponse{
+		RecoveryKey: recoveryKey,
+	})
+}
+
+// @Summary Delete 2FA recovery key
+// @Description Deletes the 2FA recovery key for the account
+// @Tags Accounts
+// @Produce json
+// @Param Authorization header string true "Bearer + auth token"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Success 204 "No Content"
+// @Failure 401 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/accounts/2fa/recovery [delete]
+func (ac *AccountsController) DeleteRecoveryKey(w http.ResponseWriter, r *http.Request) {
+	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
+
+	// Delete the recovery key
+	if err := ac.ds.SetRecoveryKey(session.AccountID, nil); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}

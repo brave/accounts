@@ -1,7 +1,9 @@
 DROP TABLE IF EXISTS totp_keys; 
 
 ALTER TABLE accounts DROP COLUMN totp_enabled;
+ALTER TABLE accounts DROP COLUMN totp_enabled_at;
 ALTER TABLE accounts DROP COLUMN recovery_key_hash;
+ALTER TABLE accounts DROP COLUMN recovery_key_created_at;
 
 -- Drop columns from interim_password_states table
 ALTER TABLE interim_password_states DROP COLUMN requires_twofa;

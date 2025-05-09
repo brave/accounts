@@ -456,6 +456,7 @@ func (suite *AuthTestSuite) TestAuth2FAWithTOTPCode() {
 	var parsedTwoFAResp controllers.LoginFinalize2FAResponse
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedTwoFAResp)
 	suite.NotEmpty(parsedTwoFAResp.AuthToken)
+	suite.False(parsedTwoFAResp.TwoFADisabled)
 
 	// Verify the auth token works
 	validateReq := httptest.NewRequest("GET", "/v2/auth/validate", nil)
@@ -519,6 +520,7 @@ func (suite *AuthTestSuite) TestAuth2FAWithRecoveryKey() {
 	var parsedRecoveryResp controllers.LoginFinalize2FAResponse
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedRecoveryResp)
 	suite.NotEmpty(parsedRecoveryResp.AuthToken)
+	suite.True(parsedRecoveryResp.TwoFADisabled)
 
 	// Verify the auth token works
 	validateReq := httptest.NewRequest("GET", "/v2/auth/validate", nil)

@@ -2,12 +2,14 @@ package services
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"image/png"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/brave/accounts/datastore"
@@ -249,4 +251,33 @@ func (t *TwoFAService) GenerateTOTPQRCode(key *otp.Key) (string, error) {
 	// Convert to base64
 	encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
 	return "data:image/png;base64," + encoded, nil
+}
+
+// GenerateAndStoreRecoveryKey generates a 28-character alphanumeric uppercase recovery key
+// and stores its hash in the database for the specified account
+func (t *TwoFAService) GenerateAndStoreRecoveryKey(accountID uuid.UUID) (string, error) {
+	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const keyLength = 28
+
+	// Generate random bytes
+	buffer := make([]byte, keyLength)
+	_, err := rand.Read(buffer)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+
+	// Convert to alphanumeric
+	var key strings.Builder
+	for i := 0; i < keyLength; i++ {
+		key.WriteByte(alphabet[buffer[i]%byte(len(alphabet))])
+	}
+
+	recoveryKey := key.String()
+
+	// Store the recovery key hash
+	if err := t.ds.SetRecoveryKey(accountID, &recoveryKey); err != nil {
+		return "", fmt.Errorf("failed to store recovery key: %w", err)
+	}
+
+	return recoveryKey, nil
 }

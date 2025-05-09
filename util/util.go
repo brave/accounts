@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -22,6 +21,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/crypto/argon2"
 )
 
 var (
@@ -41,6 +41,13 @@ const (
 	KeyServiceSecretEnv    = "KEY_SERVICE_SECRET"
 	KeyServiceSecretHeader = "key-service-secret"
 	KeyServiceURLEnv       = "KEY_SERVICE_URL"
+
+	recoveryKeyArgonTime       = 1
+	recoveryKeyArgonMemory     = 64 * 1024
+	recoveryKeyArgonThreads    = 4
+	recoveryKeyArgonKeyLength  = 32
+	recoveryKeyArgonSaltLength = 16
+	recoveryKeyFullHashLength  = recoveryKeyArgonKeyLength + recoveryKeyArgonSaltLength
 )
 
 func GenerateRandomString(length int) string {
@@ -51,36 +58,47 @@ func GenerateRandomString(length int) string {
 	return base64.URLEncoding.EncodeToString(b)
 }
 
-// GenerateRecoveryKey generates a 28-character alphanumeric uppercase recovery key
-// and returns both the key and its SHA256 hash
-func GenerateRecoveryKey() (string, error) {
-	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	const keyLength = 28
-
-	// Generate random bytes
-	buffer := make([]byte, keyLength)
-	_, err := rand.Read(buffer)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate random bytes: %w", err)
-	}
-
-	// Convert to alphanumeric
-	var key strings.Builder
-	for i := 0; i < keyLength; i++ {
-		key.WriteByte(alphabet[buffer[i]%byte(len(alphabet))])
-	}
-
-	recoveryKey := key.String()
-
-	return recoveryKey, nil
+func generateRecoveryKeyHash(recoveryKey string, salt []byte) []byte {
+	uppercaseKey := strings.TrimSpace(strings.ToUpper(recoveryKey))
+	return argon2.IDKey(
+		[]byte(uppercaseKey),
+		salt,
+		recoveryKeyArgonTime,
+		recoveryKeyArgonMemory,
+		recoveryKeyArgonThreads,
+		recoveryKeyArgonKeyLength,
+	)
 }
 
-func HashRecoveryKey(recoveryKey string) []byte {
-	uppercaseKey := strings.ToUpper(recoveryKey)
+func HashRecoveryKey(recoveryKey string) ([]byte, error) {
+	// Create random salt
+	salt := make([]byte, recoveryKeyArgonSaltLength)
+	if _, err := rand.Read(salt); err != nil {
+		return nil, fmt.Errorf("failed to generate salt: %w", err)
+	}
 
-	hash := sha256.Sum256([]byte(uppercaseKey))
+	hash := generateRecoveryKeyHash(recoveryKey, salt)
 
-	return hash[:]
+	// Combine salt and hash
+	result := make([]byte, recoveryKeyFullHashLength)
+	copy(result, salt)
+	copy(result[recoveryKeyArgonSaltLength:], hash)
+
+	return result, nil
+}
+
+func VerifyRecoveryKeyHash(recoveryKey string, storedHash []byte) bool {
+	if len(storedHash) != recoveryKeyFullHashLength {
+		// Invalid stored hash format
+		return false
+	}
+
+	salt := storedHash[:recoveryKeyArgonSaltLength]
+	expectedHash := storedHash[recoveryKeyArgonSaltLength:]
+
+	computedHash := generateRecoveryKeyHash(recoveryKey, salt)
+
+	return bytes.Equal(computedHash, expectedHash)
 }
 
 func ExtractAuthToken(r *http.Request) (string, error) {
