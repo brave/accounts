@@ -34,3 +34,6 @@ test:
 # Run `go install github.com/air-verse/air@latest` to use this
 dev:
 	air
+
+dev-key-service:
+	air -- -start-key-service -listen :8081 -prom-listen :9091

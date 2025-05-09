@@ -220,8 +220,8 @@ func login() {
 	finalizeFields := map[string]interface{}{
 		"clientMac": hex.EncodeToString(ke3.ClientMac),
 	}
-	akeToken := resp["akeToken"].(string)
-	resp = postReq(finalizeFields, "http://localhost:8080/v2/auth/login/finalize", &akeToken)
+	loginToken := resp["loginToken"].(string)
+	resp = postReq(finalizeFields, "http://localhost:8080/v2/auth/login/finalize", &loginToken)
 
 	log.Printf("auth token: %v", resp["authToken"])
 }
