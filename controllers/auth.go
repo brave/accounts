@@ -104,6 +104,8 @@ type CreateServiceTokenResponse struct {
 type LoginFinalize2FAResponse struct {
 	// Authentication token for future requests
 	AuthToken string `json:"authToken"`
+	// Indicates if 2FA was disabled as a result of using a recovery key
+	TwoFADisabled bool `json:"twoFADisabled"`
 }
 
 func (req *LoginInitRequest) ToOpaqueKE1(opaqueService *services.OpaqueService) (*opaqueMsg.KE1, error) {
@@ -411,7 +413,7 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 }
 
 // @Summary Finalize login with 2FA
-// @Description Final step of 2FA login flow, verifies TOTP code or recovery key and creates a session.
+// @Description Final step of 2FA login flow, verifies TOTP code or recovery key and creates a session. If a recovery key is used, 2FA will be disabled.
 // @Tags Auth
 // @Accept json
 // @Produce json
@@ -479,7 +481,8 @@ func (ac *AuthController) LoginFinalize2FA(w http.ResponseWriter, r *http.Reques
 	}
 
 	response := LoginFinalize2FAResponse{
-		AuthToken: authToken,
+		AuthToken:     authToken,
+		TwoFADisabled: requestData.RecoveryKey != nil,
 	}
 
 	render.Status(r, http.StatusOK)

@@ -277,9 +277,11 @@ func (suite *AccountsTestSuite) TestGet2FASettings() {
 	resp := util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusOK, resp.Code)
 
-	var twoFAOptions datastore.TwoFAOptions
-	util.DecodeJSONTestResponse(suite.T(), resp.Body, &twoFAOptions)
-	suite.False(twoFAOptions.TOTP)
+	var settings datastore.TwoFADetails
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &settings)
+	suite.False(settings.TOTP)
+	suite.Nil(settings.TOTPEnabledAt)
+	suite.Nil(settings.RecoveryKeyCreatedAt)
 
 	// Enable 2FA
 	err := suite.ds.SetTOTPSetting(account.ID, true)
@@ -291,8 +293,10 @@ func (suite *AccountsTestSuite) TestGet2FASettings() {
 	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusOK, resp.Code)
 
-	util.DecodeJSONTestResponse(suite.T(), resp.Body, &twoFAOptions)
-	suite.True(twoFAOptions.TOTP)
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &settings)
+	suite.True(settings.TOTP)
+	suite.NotNil(settings.TOTPEnabledAt)
+	suite.Nil(settings.RecoveryKeyCreatedAt)
 }
 
 func (suite *AccountsTestSuite) TestTOTPSetupAndFinalize() {
@@ -372,6 +376,12 @@ func (suite *AccountsTestSuite) TestDisableTOTP() {
 	err = suite.ds.SetRecoveryKey(account.ID, &recoveryKey)
 	suite.Require().NoError(err)
 
+	// Verify timestamps are set
+	details, err := suite.ds.GetTwoFADetails(account.ID)
+	suite.Require().NoError(err)
+	suite.NotNil(details.TOTPEnabledAt)
+	suite.NotNil(details.RecoveryKeyCreatedAt)
+
 	// Test disabling TOTP
 	disableReq := httptest.NewRequest("DELETE", "/v2/accounts/2fa/totp", nil)
 	disableReq.Header.Set("Authorization", "Bearer "+token)
@@ -383,6 +393,55 @@ func (suite *AccountsTestSuite) TestDisableTOTP() {
 	suite.Require().NoError(err)
 	suite.False(updatedAccount.IsTwoFAEnabled())
 	suite.Nil(updatedAccount.RecoveryKeyHash)
+
+	// Verify timestamps are cleared
+	details, err = suite.ds.GetTwoFADetails(account.ID)
+	suite.Require().NoError(err)
+	suite.Nil(details.TOTPEnabledAt)
+	suite.Nil(details.RecoveryKeyCreatedAt)
+}
+
+func (suite *AccountsTestSuite) TestRecoveryKeyEndpoints() {
+	token, account := suite.createAuthSession()
+
+	// Test regenerate recovery key
+	req := util.CreateJSONTestRequest("/v2/accounts/2fa/recovery", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+
+	// Verify response contains a recovery key
+	var keyResp controllers.RecoveryKeyResponse
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &keyResp)
+	suite.NotEmpty(keyResp.RecoveryKey)
+
+	// Verify recovery key was stored
+	hasKey, err := suite.ds.HasRecoveryKey(account.ID)
+	suite.Require().NoError(err)
+	suite.True(hasKey)
+
+	// Verify timestamp was set
+	details, err := suite.ds.GetTwoFADetails(account.ID)
+	suite.Require().NoError(err)
+	suite.NotNil(details.RecoveryKeyCreatedAt)
+
+	// Test delete recovery key
+	req = httptest.NewRequest("DELETE", "/v2/accounts/2fa/recovery", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusNoContent, resp.Code)
+
+	// Verify recovery key was deleted
+	hasKey, err = suite.ds.HasRecoveryKey(account.ID)
+	suite.Require().NoError(err)
+	suite.False(hasKey)
+
+	// Verify timestamp was cleared
+	details, err = suite.ds.GetTwoFADetails(account.ID)
+	suite.Require().NoError(err)
+	suite.Nil(details.RecoveryKeyCreatedAt)
 }
 
 func TestAccountsTestSuite(t *testing.T) {

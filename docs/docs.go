@@ -67,7 +67,7 @@ const docTemplate = `{
         },
         "/v2/accounts/2fa": {
             "get": {
-                "description": "Returns the 2FA methods enabled for the authenticated account",
+                "description": "Returns the 2FA methods enabled for the authenticated account and related timestamps",
                 "produces": [
                     "application/json"
                 ],
@@ -94,8 +94,97 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/datastore.TwoFAOptions"
+                            "$ref": "#/definitions/datastore.TwoFADetails"
                         }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/accounts/2fa/recovery": {
+            "post": {
+                "description": "Generates a new 2FA recovery key for the account, replacing any existing key",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Regenerate 2FA recovery key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.RecoveryKeyResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Deletes the 2FA recovery key for the account",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Delete 2FA recovery key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
                     },
                     "401": {
                         "description": "Unauthorized",
@@ -365,7 +454,7 @@ const docTemplate = `{
         },
         "/v2/accounts/password/finalize_2fa": {
             "post": {
-                "description": "Complete the password setup process after 2FA verification.",
+                "description": "Complete the password setup process after 2FA verification. If a recovery key is used, 2FA will be disabled.",
                 "consumes": [
                     "application/json"
                 ],
@@ -566,7 +655,7 @@ const docTemplate = `{
         },
         "/v2/auth/login/finalize_2fa": {
             "post": {
-                "description": "Final step of 2FA login flow, verifies TOTP code or recovery key and creates a session.",
+                "description": "Final step of 2FA login flow, verifies TOTP code or recovery key and creates a session. If a recovery key is used, 2FA will be disabled.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1733,6 +1822,10 @@ const docTemplate = `{
                 "authToken": {
                     "description": "Authentication token for future requests",
                     "type": "string"
+                },
+                "twoFADisabled": {
+                    "description": "Indicates if 2FA was disabled as a result of using a recovery key",
+                    "type": "boolean"
                 }
             }
         },
@@ -1874,6 +1967,16 @@ const docTemplate = `{
                 }
             }
         },
+        "controllers.RecoveryKeyResponse": {
+            "description": "Response for recovery key operations",
+            "type": "object",
+            "properties": {
+                "recoveryKey": {
+                    "description": "Recovery key for 2FA backup",
+                    "type": "string"
+                }
+            }
+        },
         "controllers.RegistrationRecord": {
             "description": "OPAQUE registration record for a new account",
             "type": "object",
@@ -1994,6 +2097,10 @@ const docTemplate = `{
                 "recoveryKey": {
                     "description": "Recovery key for 2FA backup, only present when first enabling 2FA",
                     "type": "string"
+                },
+                "twoFADisabled": {
+                    "description": "Indicates if 2FA was disabled as a result of using a recovery key",
+                    "type": "boolean"
                 }
             }
         },
@@ -2217,12 +2324,20 @@ const docTemplate = `{
                 }
             }
         },
-        "datastore.TwoFAOptions": {
+        "datastore.TwoFADetails": {
             "type": "object",
             "properties": {
+                "recoveryKeyCreatedAt": {
+                    "description": "RecoveryKeyCreatedAt indicates when the recovery key was created",
+                    "type": "string"
+                },
                 "totp": {
                     "description": "TOTP indicates whether Time-based One-Time Password is enabled",
                     "type": "boolean"
+                },
+                "totpEnabledAt": {
+                    "description": "TOTPEnabledAt indicates when TOTP was enabled",
+                    "type": "string"
                 }
             }
         },
