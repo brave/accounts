@@ -21,14 +21,9 @@ const (
 	opaqueSecretKeyEnv  = "OPAQUE_SECRET_KEY"
 	opaquePublicKeyEnv  = "OPAQUE_PUBLIC_KEY"
 	opaqueFakeRecordEnv = "OPAQUE_FAKE_RECORD"
-
-	opaqueArgon2TimeParam     = 2
-	opaqueArgon2ParallelParam = 1
-	opaqueArgon2MemoryParam   = 19456
 )
 
 var (
-	opaqueArgon2Salt        = make([]byte, 16)
 	ErrOPRFSeedNotAvailable = errors.New("OPRF seed not available")
 )
 
@@ -67,13 +62,6 @@ func NewOpaqueService(ds *datastore.Datastore, isKeyService bool) (*OpaqueServic
 	}
 
 	config := opaque.DefaultConfiguration()
-
-	config.KSF.Parameters = []int{
-		opaqueArgon2TimeParam,
-		opaqueArgon2MemoryParam,
-		opaqueArgon2ParallelParam,
-	}
-	config.KSF.Salt = opaqueArgon2Salt
 
 	keyServiceURL := os.Getenv(util.KeyServiceURLEnv)
 
