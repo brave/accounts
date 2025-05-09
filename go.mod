@@ -1,8 +1,8 @@
 module github.com/brave/accounts
 
-go 1.24.0
+go 1.24.2
 
-toolchain go1.24.1
+toolchain go1.24.3
 
 require (
 	github.com/BurntSushi/toml v1.4.0
@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/rds/auth v1.4.24
 	github.com/aws/aws-sdk-go-v2/service/sts v1.32.2
 	github.com/aws/smithy-go v1.22.1
-	github.com/bytemare/ecc v0.8.3
+	github.com/bytemare/ecc v0.9.0
 	github.com/bytemare/opaque v0.0.0
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-chi/cors v1.2.1
@@ -42,10 +42,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.24.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bytemare/hash v0.5.0 // indirect
-	github.com/bytemare/hash2curve v0.5.1 // indirect
-	github.com/bytemare/ksf v0.2.0 // indirect
-	github.com/bytemare/secp256k1 v0.2.0 // indirect
+	github.com/bytemare/hash v0.5.2 // indirect
+	github.com/bytemare/hash2curve v0.5.4 // indirect
+	github.com/bytemare/ksf v0.3.0 // indirect
+	github.com/bytemare/secp256k1 v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
@@ -100,4 +100,4 @@ require (
 	gorm.io/driver/postgres v1.5.9
 )
 
-replace github.com/bytemare/opaque v0.0.0 => github.com/brave-experiments/opaque v0.0.0-20250429210303-c2ce323b78e0
+replace github.com/bytemare/opaque v0.0.0 => github.com/brave-experiments/opaque v0.0.0-20250509213350-9e222393c642
