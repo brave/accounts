@@ -20,6 +20,13 @@ type TOTPKey struct {
 	CreatedAt time.Time `json:"createdAt" gorm:"<-:false"`
 }
 
+// TOTPUsedCode represents a used TOTP code in the database
+type TOTPUsedCode struct {
+	AccountID uuid.UUID `gorm:"primaryKey"`
+	Code      string    `gorm:"primaryKey"`
+	CreatedAt time.Time `gorm:"<-:false"`
+}
+
 // StoreTOTPKey stores a TOTP key for an account
 func (d *Datastore) StoreTOTPKey(accountID uuid.UUID, key *otp.Key) error {
 	totpKey := &TOTPKey{
@@ -55,5 +62,30 @@ func (d *Datastore) DeleteTOTPKey(accountID uuid.UUID) error {
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete TOTP key: %w", result.Error)
 	}
+	return nil
+}
+
+// CheckAndStoreTOTPCodeUsed atomically checks if a TOTP code has been used and stores it if not
+func (d *Datastore) CheckAndStoreTOTPCodeUsed(accountID uuid.UUID, code string) error {
+	// Check if code has been used
+	result := d.DB.Select("1").Where("account_id = ? AND code = ?", accountID, code).Limit(1).Find(&TOTPUsedCode{})
+	if result.RowsAffected > 0 {
+		return util.ErrTOTPCodeAlreadyUsed
+	}
+	if result.Error != nil {
+		return fmt.Errorf("failed to check TOTP code: %w", result.Error)
+	}
+
+	// Code hasn't been used, store it
+	usedCode := &TOTPUsedCode{
+		AccountID: accountID,
+		Code:      code,
+	}
+
+	result = d.DB.Create(usedCode)
+	if result.Error != nil {
+		return fmt.Errorf("failed to store used TOTP code: %w", result.Error)
+	}
+
 	return nil
 }

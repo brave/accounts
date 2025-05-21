@@ -16,3 +16,10 @@ ALTER TABLE interim_password_states ALTER COLUMN state DROP NOT NULL;
 ALTER TABLE interim_password_states ADD COLUMN is_registration BOOLEAN NOT NULL DEFAULT FALSE;
 
 DROP TABLE registration_states;
+
+CREATE TABLE totp_used_codes (
+    account_id UUID NOT NULL,
+    code TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (account_id, code)
+);

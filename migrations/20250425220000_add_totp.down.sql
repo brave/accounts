@@ -18,3 +18,5 @@ CREATE TABLE registration_states (
     oprf_seed_id INT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+DROP TABLE totp_used_codes;

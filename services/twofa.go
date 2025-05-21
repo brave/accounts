@@ -23,7 +23,7 @@ import (
 const (
 	totpIssuerEnv = "TOTP_ISSUER"
 	totpQRSizeEnv = "TOTP_QR_SIZE"
-	defaultIssuer = "Brave"
+	defaultIssuer = "Brave Account"
 	defaultQRSize = 256
 )
 
@@ -175,27 +175,37 @@ func (t *TwoFAService) makeKeyServiceTOTPGenerateRequest(accountID uuid.UUID, em
 // ValidateTOTPCode checks if the provided code is valid for the specified account
 func (t *TwoFAService) ValidateTOTPCode(accountID uuid.UUID, code string) error {
 	if t.keyServiceClient != nil {
-		return t.makeKeyServiceValidateRequest(accountID, code)
+		if err := t.makeKeyServiceValidateRequest(accountID, code); err != nil {
+			return err
+		}
+	} else {
+		// Otherwise, validate the code locally
+		secret, err := t.ds.GetTOTPKey(accountID)
+		if err != nil {
+			return err
+		}
+
+		// Standard validation with one period of time drift in either direction
+		opts := totp.ValidateOpts{
+			Skew:   1,
+			Digits: otp.DigitsSix,
+		}
+		valid, err := totp.ValidateCustom(code, secret, time.Now().UTC(), opts)
+		if err != nil {
+			return fmt.Errorf("failed to validate TOTP code: %w", err)
+		}
+		if !valid {
+			return util.ErrBadTOTPCode
+		}
 	}
 
-	// Otherwise, validate the code locally
-	secret, err := t.ds.GetTOTPKey(accountID)
-	if err != nil {
-		return err
+	if !t.isKeyService {
+		// Check if code was already used and store it if not
+		if err := t.ds.CheckAndStoreTOTPCodeUsed(accountID, code); err != nil {
+			return err
+		}
 	}
 
-	// Standard validation with one period of time drift in either direction
-	opts := totp.ValidateOpts{
-		Skew:   1,
-		Digits: otp.DigitsSix,
-	}
-	valid, err := totp.ValidateCustom(code, secret, time.Now().UTC(), opts)
-	if err != nil {
-		return fmt.Errorf("failed to validate TOTP code: %w", err)
-	}
-	if !valid {
-		return util.ErrBadTOTPCode
-	}
 	return nil
 }
 

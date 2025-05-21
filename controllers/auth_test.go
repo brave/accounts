@@ -458,6 +458,20 @@ func (suite *AuthTestSuite) TestAuth2FAWithTOTPCode() {
 	suite.NotEmpty(parsedTwoFAResp.AuthToken)
 	suite.False(parsedTwoFAResp.TwoFADisabled)
 
+	// Perform login steps again to get a new login state
+	finalizeResp, loginToken = suite.performLoginSteps()
+	suite.True(finalizeResp.RequiresTwoFA)
+	suite.Nil(finalizeResp.AuthToken)
+
+	// Try to reuse the same code with the new login state
+	req = util.CreateJSONTestRequest("/v2/auth/login/finalize_2fa", twoFAReq)
+	req.Header.Set("Authorization", "Bearer "+loginToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
+
+	// Should get unauthorized with reused code
+	suite.Equal(http.StatusUnauthorized, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrTOTPCodeAlreadyUsed.Code)
+
 	// Verify the auth token works
 	validateReq := httptest.NewRequest("GET", "/v2/auth/validate", nil)
 	validateReq.Header.Add("Authorization", "Bearer "+parsedTwoFAResp.AuthToken)

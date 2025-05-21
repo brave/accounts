@@ -460,7 +460,7 @@ func (ac *AuthController) LoginFinalize2FA(w http.ResponseWriter, r *http.Reques
 
 	// Process the 2FA authentication request
 	if err := ac.twoFAService.ProcessAuthRequest(loginState, &requestData); err != nil {
-		if errors.Is(err, util.ErrBadTOTPCode) || errors.Is(err, util.ErrBadRecoveryKey) {
+		if errors.Is(err, util.ErrBadTOTPCode) || errors.Is(err, util.ErrBadRecoveryKey) || errors.Is(err, util.ErrTOTPCodeAlreadyUsed) {
 			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 			return
 		}

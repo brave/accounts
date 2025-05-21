@@ -5,3 +5,5 @@ SELECT cron.schedule('remove-old-interim-password-states', '0 0 * * *', $$DELETE
 SELECT cron.schedule('clean-job-history', '0 0 * * *', $$DELETE 
     FROM cron.job_run_details 
     WHERE end_time < now() - interval '7 days'$$);
+
+SELECT cron.schedule('remove-old-totp-used-codes', '0 0 * * *', $$DELETE FROM totp_used_codes WHERE created_at < CURRENT_TIMESTAMP - interval '1 hours'$$);

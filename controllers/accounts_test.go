@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -319,8 +320,9 @@ func (suite *AccountsTestSuite) TestTOTPSetupAndFinalize() {
 	// Parse the TOTP URL to extract the secret
 	key, err := otp.NewKeyFromURL(initParsedResp.URL)
 	suite.Require().NoError(err)
-	suite.Equal("Brave", key.Issuer())
+	suite.Equal("Brave Account", key.Issuer())
 	suite.Equal("test@example.com", key.AccountName())
+	suite.True(strings.HasPrefix(initParsedResp.URL, "otpauth://totp/Brave%20Account"))
 
 	// Test finalizing TOTP setup with invalid code
 	invalidCode := "000000"
