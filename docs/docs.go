@@ -65,6 +65,316 @@ const docTemplate = `{
                 }
             }
         },
+        "/v2/accounts/2fa": {
+            "get": {
+                "description": "Returns the 2FA methods enabled for the authenticated account and related timestamps",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Get 2FA settings",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/datastore.TwoFADetails"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/accounts/2fa/recovery": {
+            "post": {
+                "description": "Generates a new 2FA recovery key for the account, replacing any existing key",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Regenerate 2FA recovery key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.RecoveryKeyResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Deletes the 2FA recovery key for the account",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Delete 2FA recovery key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/accounts/2fa/totp": {
+            "delete": {
+                "description": "Disables TOTP 2FA for the account and deletes the associated TOTP key",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Disable TOTP 2FA",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/accounts/2fa/totp/finalize": {
+            "post": {
+                "description": "Complete the TOTP 2FA setup process by validating a TOTP code and enabling 2FA for the account.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Finalize TOTP 2FA setup",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
+                        "description": "2FA finalization request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.TwoFAFinalizeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.TwoFAFinalizeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/accounts/2fa/totp/init": {
+            "post": {
+                "description": "Start the TOTP 2FA setup process by generating a TOTP key and URL.\nOptionally generates a QR code if requested.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Initialize TOTP 2FA setup",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + auth token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
+                        "description": "2FA initialization request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.TwoFAInitRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.TwoFAInitResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v2/accounts/password/finalize": {
             "post": {
                 "description": "Complete the password setup process and return auth token.\nEither ` + "`" + `publicKey` + "`" + `, ` + "`" + `maskingKey` + "`" + ` and ` + "`" + `envelope` + "`" + ` must be provided together,\nor ` + "`" + `serializedRecord` + "`" + ` must be provided.",
@@ -129,6 +439,71 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/accounts/password/finalize_2fa": {
+            "post": {
+                "description": "Complete the password setup process after 2FA verification. If a recovery key is used, 2FA will be disabled.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Finalize password setup with 2FA",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + verification token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
+                        "description": "2FA verification request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/services.TwoFAAuthRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.LoginFinalize2FAResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/util.ErrorResponse"
                         }
@@ -215,7 +590,7 @@ const docTemplate = `{
         },
         "/v2/auth/login/finalize": {
             "post": {
-                "description": "Final step of login flow, verifies KE3 message and creates session.",
+                "description": "Final step of login flow, verifies KE3 message and creates session or prompts for 2FA.",
                 "consumes": [
                     "application/json"
                 ],
@@ -229,7 +604,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Bearer + ake token",
+                        "description": "Bearer + login state token",
                         "name": "Authorization",
                         "in": "header",
                         "required": true
@@ -255,6 +630,71 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/controllers.LoginFinalizeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/auth/login/finalize_2fa": {
+            "post": {
+                "description": "Final step of 2FA login flow, verifies TOTP code or recovery key and creates a session. If a recovery key is used, 2FA will be disabled.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Finalize login with 2FA",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer + login state token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brave services key (if one is configured)",
+                        "name": "Brave-Key",
+                        "in": "header"
+                    },
+                    {
+                        "description": "2FA verification request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/services.TwoFAAuthRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.LoginFinalize2FAResponse"
                         }
                     },
                     "400": {
@@ -666,8 +1106,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Key service secret",
                         "name": "Key-Service-Secret",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "description": "JWT claims",
@@ -725,8 +1164,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Key service secret",
                         "name": "Key-Service-Secret",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "description": "OPRF key derivation info",
@@ -753,6 +1191,190 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/server_keys/totp": {
+            "post": {
+                "description": "Creates a TOTP key for an account using secure random generation",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Server Keys (server-side use only)"
+                ],
+                "summary": "Create TOTP Key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Key service secret",
+                        "name": "Key-Service-Secret",
+                        "in": "header"
+                    },
+                    {
+                        "description": "TOTP key generation request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.TOTPGenerateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.TOTPGenerateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/server_keys/totp/validate": {
+            "post": {
+                "description": "Validates a TOTP code for an account",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Server Keys (server-side use only)"
+                ],
+                "summary": "Validate TOTP Code",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Key service secret",
+                        "name": "Key-Service-Secret",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Validation request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.TOTPValidateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Success"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/server_keys/totp/{accountId}": {
+            "delete": {
+                "description": "Deletes a TOTP key for an account",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Server Keys (server-side use only)"
+                ],
+                "summary": "Delete TOTP Key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Key service secret",
+                        "name": "Key-Service-Secret",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Account ID",
+                        "name": "accountId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Success"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/util.ErrorResponse"
                         }
@@ -1193,6 +1815,20 @@ const docTemplate = `{
                 }
             }
         },
+        "controllers.LoginFinalize2FAResponse": {
+            "description": "Response after successful 2FA verification and login",
+            "type": "object",
+            "properties": {
+                "authToken": {
+                    "description": "Authentication token for future requests",
+                    "type": "string"
+                },
+                "twoFADisabled": {
+                    "description": "Indicates if 2FA was disabled as a result of using a recovery key",
+                    "type": "boolean"
+                }
+            }
+        },
         "controllers.LoginFinalizeRequest": {
             "description": "Request to finalize login",
             "type": "object",
@@ -1213,6 +1849,10 @@ const docTemplate = `{
                 "authToken": {
                     "description": "Authentication token for future requests",
                     "type": "string"
+                },
+                "requiresTwoFA": {
+                    "description": "Indicates if 2FA verification is required before authentication is complete",
+                    "type": "boolean"
                 }
             }
         },
@@ -1250,12 +1890,12 @@ const docTemplate = `{
             "description": "Response for account login",
             "type": "object",
             "properties": {
-                "akeToken": {
-                    "description": "Interim authentication token for future login finalization",
-                    "type": "string"
-                },
                 "evaluatedMessage": {
                     "description": "Evaluated message component of KE2",
+                    "type": "string"
+                },
+                "loginToken": {
+                    "description": "Interim authentication token for future login finalization",
                     "type": "string"
                 },
                 "maskedResponse": {
@@ -1320,6 +1960,20 @@ const docTemplate = `{
                 "authToken": {
                     "description": "Authentication token",
                     "type": "string"
+                },
+                "requiresTwoFA": {
+                    "description": "Indicates if 2FA verification is required before password setup is complete",
+                    "type": "boolean"
+                }
+            }
+        },
+        "controllers.RecoveryKeyResponse": {
+            "description": "Response for recovery key operations",
+            "type": "object",
+            "properties": {
+                "recoveryKey": {
+                    "description": "Recovery key for 2FA backup",
+                    "type": "string"
                 }
             }
         },
@@ -1376,6 +2030,100 @@ const docTemplate = `{
                 },
                 "serializedResponse": {
                     "description": "Serialized OPAQUE registration response",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.TOTPGenerateRequest": {
+            "type": "object",
+            "required": [
+                "accountId",
+                "email"
+            ],
+            "properties": {
+                "accountId": {
+                    "description": "AccountID is the UUID of the account for which to generate/delete a TOTP key",
+                    "type": "string"
+                },
+                "email": {
+                    "description": "Email is the email address for the account (used for TOTP generation)",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.TOTPGenerateResponse": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "description": "URL is the URL of the TOTP key QR code",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.TOTPValidateRequest": {
+            "type": "object",
+            "required": [
+                "accountId",
+                "code"
+            ],
+            "properties": {
+                "accountId": {
+                    "description": "AccountID is the UUID of the account to validate against",
+                    "type": "string"
+                },
+                "code": {
+                    "description": "Code is the TOTP code to validate",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.TwoFAFinalizeRequest": {
+            "description": "Request to finalize 2FA setup",
+            "type": "object",
+            "required": [
+                "code"
+            ],
+            "properties": {
+                "code": {
+                    "description": "TOTP verification code",
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.TwoFAFinalizeResponse": {
+            "description": "Response for finalized 2FA setup",
+            "type": "object",
+            "properties": {
+                "recoveryKey": {
+                    "description": "Recovery key for 2FA backup, only present when first enabling 2FA",
+                    "type": "string"
+                },
+                "twoFADisabled": {
+                    "description": "Indicates if 2FA was disabled as a result of using a recovery key",
+                    "type": "boolean"
+                }
+            }
+        },
+        "controllers.TwoFAInitRequest": {
+            "description": "Request to initialize 2FA setup",
+            "type": "object",
+            "properties": {
+                "generateQR": {
+                    "description": "Whether to generate a QR code",
+                    "type": "boolean"
+                }
+            }
+        },
+        "controllers.TwoFAInitResponse": {
+            "description": "Response for 2FA initialization",
+            "type": "object",
+            "properties": {
+                "qrCode": {
+                    "description": "QR code as base64 encoded PNG (only if requested)",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "TOTP URL for manual entry",
                     "type": "string"
                 }
             }
@@ -1572,6 +2320,36 @@ const docTemplate = `{
                 },
                 "userAgent": {
                     "description": "User agent of client",
+                    "type": "string"
+                }
+            }
+        },
+        "datastore.TwoFADetails": {
+            "type": "object",
+            "properties": {
+                "recoveryKeyCreatedAt": {
+                    "description": "RecoveryKeyCreatedAt indicates when the recovery key was created",
+                    "type": "string"
+                },
+                "totp": {
+                    "description": "TOTP indicates whether Time-based One-Time Password is enabled",
+                    "type": "boolean"
+                },
+                "totpEnabledAt": {
+                    "description": "TOTPEnabledAt indicates when TOTP was enabled",
+                    "type": "string"
+                }
+            }
+        },
+        "services.TwoFAAuthRequest": {
+            "type": "object",
+            "properties": {
+                "recoveryKey": {
+                    "description": "Recovery key for 2FA bypass (optional if TOTP code is provided)",
+                    "type": "string"
+                },
+                "totpCode": {
+                    "description": "TOTP verification code (optional if recovery key is provided)",
                     "type": "string"
                 }
             }
