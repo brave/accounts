@@ -33,6 +33,13 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           path: accounts
+      - name: Setup golang
+        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version: '1.24'
+      - name: Generate swagger
+        run: go install github.com/swaggo/swag/cmd/swag@latest && swag init
+        working-directory: ./accounts
       - name: Checkout swagger-ui repo
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
