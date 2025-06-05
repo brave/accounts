@@ -87,9 +87,9 @@ struct CliArgs {
     #[arg(long)]
     enable_totp: bool,
 
-    /// TOTP URL for 2FA login
+    /// TOTP URI for 2FA login
     #[arg(long)]
-    totp_url: Option<String>,
+    totp_uri: Option<String>,
 
     /// Two-factor authentication recovery key
     #[arg(long)]
@@ -98,20 +98,26 @@ struct CliArgs {
 
 fn maybe_handle_twofa(args: &CliArgs, resp: Response, token: &str, endpoint: &str) -> Response {
     // If 2FA not required, just return the original response
-    if !resp.get("requiresTwoFA").and_then(|v| v.as_bool()).unwrap_or(false) {
+    if !resp
+        .get("requiresTwoFA")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
         return resp;
     }
-    
+
     verbose_log(&args, "Two-factor authentication is required");
-    
+
     let mut twofa_body: HashMap<&str, Value> = HashMap::new();
     if let Some(recovery_key) = args.twofa_recovery_key.as_ref() {
         twofa_body.insert("recoveryKey", recovery_key.as_str().into());
     } else {
-        // Try to generate TOTP code if URL is provided
-        let totp_code = if let Some(totp_url) = args.totp_url.as_ref() {
-            let totp = TOTP::from_url(totp_url).expect("Failed to parse TOTP URL");
-            let code = totp.generate_current().expect("Failed to generate TOTP code");
+        // Try to generate TOTP code if URI is provided
+        let totp_code = if let Some(totp_uri) = args.totp_uri.as_ref() {
+            let totp = TOTP::from_url(totp_uri).expect("Failed to parse TOTP URL");
+            let code = totp
+                .generate_current()
+                .expect("Failed to generate TOTP code");
             verbose_log(&args, format!("Generated TOTP code: {}", code).as_str());
             code
         } else {
@@ -120,7 +126,7 @@ fn maybe_handle_twofa(args: &CliArgs, resp: Response, token: &str, endpoint: &st
         };
         twofa_body.insert("totpCode", totp_code.into());
     }
-    
+
     make_request(
         args,
         reqwest::Method::POST,
@@ -289,7 +295,7 @@ fn set_password(args: CliArgs) {
         Some(&token),
         Some(body),
     );
-    
+
     // Handle 2FA if required
     resp = maybe_handle_twofa(&args, resp, &token, "/v2/accounts/password/finalize_2fa");
 
@@ -356,7 +362,7 @@ fn login(args: CliArgs) {
         .get("loginToken")
         .and_then(|v| v.as_str())
         .expect("Missing loginToken field");
-    
+
     let mut resp = make_request(
         &args,
         reqwest::Method::POST,
@@ -365,7 +371,10 @@ fn login(args: CliArgs) {
         Some(body),
     );
 
-    verbose_log(&args, format!("intermediate login token: {}", login_token).as_str());
+    verbose_log(
+        &args,
+        format!("intermediate login token: {}", login_token).as_str(),
+    );
 
     // Handle 2FA if required
     resp = maybe_handle_twofa(&args, resp, login_token, "/v2/auth/login/finalize_2fa");
@@ -403,11 +412,11 @@ fn get_service_token(args: &CliArgs) {
 
 fn enable_totp(args: &CliArgs) {
     println!("Enabling TOTP...");
-    
+
     // Initialize 2FA
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("generateQR", true.into());
-    
+
     let resp = make_request(
         args,
         reqwest::Method::POST,
@@ -419,30 +428,39 @@ fn enable_totp(args: &CliArgs) {
         ),
         Some(body),
     );
-    
-    let totp_url = resp.get("url").and_then(|v| v.as_str()).expect("Failed to get TOTP URL");
-    let qr_code = resp.get("qrCode").and_then(|v| v.as_str()).expect("Failed to get QR code").to_string();
-    
-    println!("TOTP URL: {}", totp_url);
-    
+
+    let totp_uri = resp
+        .get("uri")
+        .and_then(|v| v.as_str())
+        .expect("Failed to get TOTP URL");
+    let qr_code = resp
+        .get("qrCode")
+        .and_then(|v| v.as_str())
+        .expect("Failed to get QR code")
+        .to_string();
+
+    println!("TOTP URL: {}", totp_uri);
+
     // Open QR code in browser in a separate thread
     thread::spawn(move || {
         if let Err(e) = open::that(qr_code) {
             eprintln!("Failed to open QR code: {}", e);
         }
     });
-    
+
     // Parse TOTP URL directly with the library
-    let totp = TOTP::from_url(totp_url).expect("Failed to parse TOTP URL");
-    
+    let totp = TOTP::from_url(totp_uri).expect("Failed to parse TOTP URL");
+
     // Generate TOTP code
-    let code = totp.generate_current().expect("Failed to generate TOTP code");
+    let code = totp
+        .generate_current()
+        .expect("Failed to generate TOTP code");
     verbose_log(&args, format!("Generated TOTP code: {}", code).as_str());
-    
+
     // Finalize 2FA setup
     let mut finalize_body: HashMap<&str, Value> = HashMap::new();
     finalize_body.insert("code", code.into());
-    
+
     let resp = make_request(
         args,
         reqwest::Method::POST,
@@ -458,7 +476,7 @@ fn enable_totp(args: &CliArgs) {
     if let Some(recovery_key) = resp.get("recoveryKey").and_then(|v| v.as_str()) {
         println!("Recovery key: {}", recovery_key);
     }
-    
+
     println!("TOTP is now enabled");
 }
 
