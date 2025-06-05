@@ -1,3 +1,5 @@
+mod util;
+
 use argon2::Argon2;
 use clap::{CommandFactory, Parser};
 use opaque_ke::{
@@ -6,7 +8,9 @@ use opaque_ke::{
 };
 use rand::rngs::OsRng;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::{collections::HashMap, thread};
+use totp_rs::TOTP;
+use util::*;
 
 #[allow(dead_code)]
 struct DefaultCipherSuite;
@@ -74,97 +78,56 @@ struct CliArgs {
     /// Service token flag
     #[arg(short = 't', long)]
     create_service_token: bool,
+
+    /// Verbose flag
+    #[arg(short, long)]
+    verbose: bool,
+
+    /// Enable TOTP flag
+    #[arg(long)]
+    enable_totp: bool,
+
+    /// TOTP URL for 2FA login
+    #[arg(long)]
+    totp_url: Option<String>,
+
+    /// Two-factor authentication recovery key
+    #[arg(long)]
+    twofa_recovery_key: Option<String>,
 }
 
-fn make_request(
-    args: &CliArgs,
-    method: reqwest::Method,
-    path: &str,
-    bearer_token: Option<&str>,
-    body: Option<HashMap<&str, Value>>,
-) -> HashMap<String, Value> {
-    // add user agent of some sort.
-    let client = reqwest::blocking::Client::builder()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-        .build()
-        .expect("Failed to create HTTP client");
-    let mut request_builder = client.request(method, args.base_url.clone() + path);
-
-    if let Some(body) = body {
-        request_builder = request_builder.json(&body);
+fn maybe_handle_twofa(args: &CliArgs, resp: Response, token: &str, endpoint: &str) -> Response {
+    // If 2FA not required, just return the original response
+    if !resp.get("requiresTwoFA").and_then(|v| v.as_bool()).unwrap_or(false) {
+        return resp;
     }
-
-    // Add authorization header if bearer token is provided
-    if let Some(token) = bearer_token {
-        request_builder = request_builder.header("Authorization", format!("Bearer {}", token));
+    
+    verbose_log(&args, "Two-factor authentication is required");
+    
+    let mut twofa_body: HashMap<&str, Value> = HashMap::new();
+    if let Some(recovery_key) = args.twofa_recovery_key.as_ref() {
+        twofa_body.insert("recoveryKey", recovery_key.as_str().into());
+    } else {
+        // Try to generate TOTP code if URL is provided
+        let totp_code = if let Some(totp_url) = args.totp_url.as_ref() {
+            let totp = TOTP::from_url(totp_url).expect("Failed to parse TOTP URL");
+            let code = totp.generate_current().expect("Failed to generate TOTP code");
+            verbose_log(&args, format!("Generated TOTP code: {}", code).as_str());
+            code
+        } else {
+            // Prompt user for code
+            prompt_for_input("Enter your 6-digit TOTP code: ")
+        };
+        twofa_body.insert("totpCode", totp_code.into());
     }
-    if let Some(key) = args.services_key.as_ref() {
-        request_builder = request_builder.header("brave-key", key)
-    }
-
-    let response = request_builder.send().expect("Failed to send request");
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let error_body = response.text().unwrap();
-        panic!(
-            "Request failed with status: {}, body: {}",
-            status, error_body
-        );
-    }
-
-    response
-        .json::<HashMap<String, Value>>()
-        .expect("Failed to parse response as HashMap<String, Value>")
-}
-
-fn display_account_details(args: &CliArgs, auth_token: &str) {
-    // Call validate endpoint
-    let response = make_request(
+    
+    make_request(
         args,
-        reqwest::Method::GET,
-        "/v2/auth/validate",
-        Some(auth_token),
-        None,
-    );
-
-    println!("auth token: {}", auth_token);
-    // Print accountId and sessionId
-    println!(
-        "account id: {}",
-        response
-            .get("accountId")
-            .expect("account id should be in validate response")
-            .as_str()
-            .expect("account id should be a string")
-    );
-
-    println!(
-        "session id: {}",
-        response
-            .get("sessionId")
-            .expect("session id should be in validate response")
-            .as_str()
-            .expect("session id should be a string")
-    );
-
-    println!(
-        "email: {}",
-        response
-            .get("email")
-            .expect("email should be in validate response")
-            .as_str()
-            .expect("email should be a string")
-    );
-
-    println!(
-        "service: {}",
-        response
-            .get("service")
-            .expect("service should be in validate response")
-            .as_str()
-            .expect("service should be a string")
-    );
+        reqwest::Method::POST,
+        endpoint,
+        Some(token),
+        Some(twofa_body),
+    )
 }
 
 fn verify(args: &CliArgs) -> (String, Option<String>) {
@@ -319,13 +282,16 @@ fn set_password(args: CliArgs) {
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("serializedRecord", record_hex.into());
 
-    let resp = make_request(
+    let mut resp = make_request(
         &args,
         reqwest::Method::POST,
         "/v2/accounts/password/finalize",
         Some(&token),
         Some(body),
     );
+    
+    // Handle 2FA if required
+    resp = maybe_handle_twofa(&args, resp, &token, "/v2/accounts/password/finalize_2fa");
 
     display_account_details(&args, resp.get("authToken").unwrap().as_str().unwrap());
 }
@@ -386,17 +352,23 @@ fn login(args: CliArgs) {
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("clientMac", credential_finalization_hex.into());
 
-    let resp = make_request(
+    let login_token = resp
+        .get("loginToken")
+        .and_then(|v| v.as_str())
+        .expect("Missing loginToken field");
+    
+    let mut resp = make_request(
         &args,
         reqwest::Method::POST,
         "/v2/auth/login/finalize",
-        Some(
-            resp.get("akeToken")
-                .and_then(|v| v.as_str())
-                .expect("Missing akeToken field"),
-        ),
+        Some(login_token),
         Some(body),
     );
+
+    verbose_log(&args, format!("intermediate login token: {}", login_token).as_str());
+
+    // Handle 2FA if required
+    resp = maybe_handle_twofa(&args, resp, login_token, "/v2/auth/login/finalize_2fa");
 
     display_account_details(&args, resp.get("authToken").unwrap().as_str().unwrap());
 }
@@ -429,6 +401,67 @@ fn get_service_token(args: &CliArgs) {
     display_account_details(&args, resp.get("authToken").unwrap().as_str().unwrap());
 }
 
+fn enable_totp(args: &CliArgs) {
+    println!("Enabling TOTP...");
+    
+    // Initialize 2FA
+    let mut body: HashMap<&str, Value> = HashMap::new();
+    body.insert("generateQR", true.into());
+    
+    let resp = make_request(
+        args,
+        reqwest::Method::POST,
+        "/v2/accounts/2fa/totp/init",
+        Some(
+            args.token
+                .as_ref()
+                .expect("auth token is required for enabling TOTP"),
+        ),
+        Some(body),
+    );
+    
+    let totp_url = resp.get("url").and_then(|v| v.as_str()).expect("Failed to get TOTP URL");
+    let qr_code = resp.get("qrCode").and_then(|v| v.as_str()).expect("Failed to get QR code").to_string();
+    
+    println!("TOTP URL: {}", totp_url);
+    
+    // Open QR code in browser in a separate thread
+    thread::spawn(move || {
+        if let Err(e) = open::that(qr_code) {
+            eprintln!("Failed to open QR code: {}", e);
+        }
+    });
+    
+    // Parse TOTP URL directly with the library
+    let totp = TOTP::from_url(totp_url).expect("Failed to parse TOTP URL");
+    
+    // Generate TOTP code
+    let code = totp.generate_current().expect("Failed to generate TOTP code");
+    verbose_log(&args, format!("Generated TOTP code: {}", code).as_str());
+    
+    // Finalize 2FA setup
+    let mut finalize_body: HashMap<&str, Value> = HashMap::new();
+    finalize_body.insert("code", code.into());
+    
+    let resp = make_request(
+        args,
+        reqwest::Method::POST,
+        "/v2/accounts/2fa/totp/finalize",
+        Some(
+            args.token
+                .as_ref()
+                .expect("auth token is required for enabling TOTP"),
+        ),
+        Some(finalize_body),
+    );
+
+    if let Some(recovery_key) = resp.get("recoveryKey").and_then(|v| v.as_str()) {
+        println!("Recovery key: {}", recovery_key);
+    }
+    
+    println!("TOTP is now enabled");
+}
+
 fn main() {
     let args = CliArgs::parse();
 
@@ -443,11 +476,13 @@ fn main() {
         login(args);
     } else if args.register || args.set_password {
         set_password(args);
+    } else if args.enable_totp {
+        enable_totp(&args);
     } else {
         CliArgs::command()
             .print_help()
             .expect("Failed to display help message");
-        eprintln!("Must supply -l, -r, -s, -e, -t or --email-verify");
+        eprintln!("Must supply -l, -r, -s, -e, -t, --email-verify, or --enable-totp");
         std::process::exit(1);
     }
 }

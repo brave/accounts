@@ -31,8 +31,9 @@ func initKeyServiceForTest(t *testing.T, keyServiceDs **datastore.Datastore, ds 
 	require.NoError(t, err)
 	keyServiceOpaqueService, err := services.NewOpaqueService(*keyServiceDs, true)
 	require.NoError(t, err)
-	serverKeysController := controllers.NewServerKeysController(keyServiceOpaqueService, keyServiceJwtService)
+	keyServiceTwoFAService := services.NewTwoFAService(*keyServiceDs, true)
+	serverKeysController := controllers.NewServerKeysController(keyServiceOpaqueService, keyServiceJwtService, keyServiceTwoFAService)
 
 	util.TestKeyServiceRouter = chi.NewRouter()
-	util.TestKeyServiceRouter.Mount("/v2/server_keys", serverKeysController.Router(middleware.KeyServiceMiddleware()))
+	util.TestKeyServiceRouter.Mount("/v2/server_keys", serverKeysController.Router(middleware.KeyServiceMiddleware("test")))
 }

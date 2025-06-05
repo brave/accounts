@@ -21,3 +21,5 @@ go.work
 go.work.sum
 
 misc/test-client-rust/target
+/.vscode
+/docs

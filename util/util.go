@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"regexp"
 	"strings"
 
@@ -20,6 +22,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/crypto/argon2"
 )
 
 var (
@@ -39,6 +42,13 @@ const (
 	KeyServiceSecretEnv    = "KEY_SERVICE_SECRET"
 	KeyServiceSecretHeader = "key-service-secret"
 	KeyServiceURLEnv       = "KEY_SERVICE_URL"
+
+	recoveryKeyArgonTime       = 1
+	recoveryKeyArgonMemory     = 64 * 1024
+	recoveryKeyArgonThreads    = 4
+	recoveryKeyArgonKeyLength  = 32
+	recoveryKeyArgonSaltLength = 16
+	recoveryKeyFullHashLength  = recoveryKeyArgonKeyLength + recoveryKeyArgonSaltLength
 )
 
 func GenerateRandomString(length int) string {
@@ -47,6 +57,49 @@ func GenerateRandomString(length int) string {
 		panic(fmt.Errorf("failed to generate random string: %w", err))
 	}
 	return base64.URLEncoding.EncodeToString(b)
+}
+
+func generateRecoveryKeyHash(recoveryKey string, salt []byte) []byte {
+	uppercaseKey := strings.TrimSpace(strings.ToUpper(recoveryKey))
+	return argon2.IDKey(
+		[]byte(uppercaseKey),
+		salt,
+		recoveryKeyArgonTime,
+		recoveryKeyArgonMemory,
+		recoveryKeyArgonThreads,
+		recoveryKeyArgonKeyLength,
+	)
+}
+
+func HashRecoveryKey(recoveryKey string) ([]byte, error) {
+	// Create random salt
+	salt := make([]byte, recoveryKeyArgonSaltLength)
+	if _, err := rand.Read(salt); err != nil {
+		return nil, fmt.Errorf("failed to generate salt: %w", err)
+	}
+
+	hash := generateRecoveryKeyHash(recoveryKey, salt)
+
+	// Combine salt and hash
+	result := make([]byte, recoveryKeyFullHashLength)
+	copy(result, salt)
+	copy(result[recoveryKeyArgonSaltLength:], hash)
+
+	return result, nil
+}
+
+func VerifyRecoveryKeyHash(recoveryKey string, storedHash []byte) bool {
+	if len(storedHash) != recoveryKeyFullHashLength {
+		// Invalid stored hash format
+		return false
+	}
+
+	salt := storedHash[:recoveryKeyArgonSaltLength]
+	expectedHash := storedHash[recoveryKeyArgonSaltLength:]
+
+	computedHash := generateRecoveryKeyHash(recoveryKey, salt)
+
+	return subtle.ConstantTimeCompare(computedHash, expectedHash) == 1
 }
 
 func ExtractAuthToken(r *http.Request) (string, error) {
@@ -172,32 +225,55 @@ func StartPrometheusServer(registry *prometheus.Registry, listen string) {
 	}()
 }
 
-func MakeKeyServiceRequest(keyServiceURL string, keyServiceSecret string, path string, body interface{}, response interface{}) error {
+// KeyServiceClient is used to communicate with the key service
+type KeyServiceClient struct {
+	url    string
+	secret string
+}
+
+// NewKeyServiceClient creates a new client for interacting with the key service
+func NewKeyServiceClient() *KeyServiceClient {
+	secret := os.Getenv(KeyServiceSecretEnv)
+	if secret == "" {
+		log.Panic().Msgf("%v must be provided if using key service", KeyServiceSecretEnv)
+	}
+	return &KeyServiceClient{
+		url:    os.Getenv(KeyServiceURLEnv),
+		secret: secret,
+	}
+}
+
+// MakeRequest sends a request to the key service with the given path and body,
+// unmarshaling the response into the provided response interface
+func (k *KeyServiceClient) MakeRequest(method string, path string, body interface{}, response interface{}) error {
 	// Marshal request body
-	jsonBody, err := json.Marshal(body)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
+	var jsonBody []byte
+	var err error
+	if body != nil {
+		jsonBody, err = json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("failed to marshal request: %w", err)
+		}
 	}
 
 	// Create HTTP request
-	req, err := http.NewRequest(http.MethodPost, keyServiceURL+path, bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequest(method, k.url+path, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	// Add key service secret header
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set(KeyServiceSecretHeader, keyServiceSecret)
+	req.Header.Set(KeyServiceSecretHeader, k.secret)
 
 	// Make request
 	var respBody io.Reader
+	var status int
 	if TestKeyServiceRouter != nil {
 		resp := httptest.NewRecorder()
 		TestKeyServiceRouter.ServeHTTP(resp, req)
 
-		if resp.Code != http.StatusOK {
-			return fmt.Errorf("key service returned status %d", resp.Code)
-		}
+		status = resp.Code
 
 		respBody = resp.Body
 	} else {
@@ -208,12 +284,32 @@ func MakeKeyServiceRequest(keyServiceURL string, keyServiceSecret string, path s
 		}
 		defer resp.Body.Close() //nolint:errcheck
 
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("key service returned status %d", resp.StatusCode)
-		}
+		status = resp.StatusCode
 
 		respBody = resp.Body
 	}
+
+	if status == http.StatusUnauthorized {
+		var exposedError ExposedError
+		if err := json.NewDecoder(respBody).Decode(&exposedError); err != nil {
+			return fmt.Errorf("failed to decode unauthorized response: %w", err)
+		}
+		// This error must be forwarded to the TwoFAService
+		// in order to process the error case correctly
+		if exposedError.Code == ErrBadTOTPCode.Code {
+			return ErrBadTOTPCode
+		}
+	}
+
+	if status != http.StatusOK && status != http.StatusNoContent {
+		return fmt.Errorf("key service returned status %d", status)
+	}
+
+	// No need to decode if response is nil or status is NoContent
+	if response == nil || status == http.StatusNoContent {
+		return nil
+	}
+
 	if err := json.NewDecoder(respBody).Decode(&response); err != nil {
 		return fmt.Errorf("failed to decode response: %w", err)
 	}

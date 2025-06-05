@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 
 	"github.com/brave/accounts/datastore"
@@ -35,8 +36,7 @@ type OpaqueService struct {
 	publicKey         []byte
 	Config            *opaque.Configuration
 	fakeRecordEnabled bool
-	keyServiceURL     string
-	keyServiceSecret  string
+	keyServiceClient  *util.KeyServiceClient
 	isKeyService      bool
 }
 
@@ -63,12 +63,16 @@ func NewOpaqueService(ds *datastore.Datastore, isKeyService bool) (*OpaqueServic
 
 	config := opaque.DefaultConfiguration()
 
-	keyServiceURL := os.Getenv(util.KeyServiceURLEnv)
-
+	var keyServiceClient *util.KeyServiceClient
 	var oprfSeeds map[int][]byte
 	var currentSeedID *int
-	keyServiceSecret := os.Getenv(util.KeyServiceSecretEnv)
-	if isKeyService || keyServiceURL == "" {
+
+	// Only create a client if we're not the key service and KEY_SERVICE_URL is set
+	if !isKeyService && os.Getenv(util.KeyServiceURLEnv) != "" {
+		keyServiceClient = util.NewKeyServiceClient()
+	}
+
+	if isKeyService || keyServiceClient == nil {
 		// only create OPRF seeds if we're running the key service
 		// or if a key service is not being used
 		oprfSeeds, err = ds.GetOrCreateOPRFSeeds(config.GenerateOPRFSeed)
@@ -81,13 +85,21 @@ func NewOpaqueService(ds *datastore.Datastore, isKeyService bool) (*OpaqueServic
 				currentSeedID = &k
 			}
 		}
-	} else if keyServiceSecret == "" {
-		return nil, fmt.Errorf("%v must be provided if using key service", util.KeyServiceSecretEnv)
 	}
 
 	fakeRecordEnabled := os.Getenv(opaqueFakeRecordEnv) == "true"
 
-	return &OpaqueService{ds, oprfSeeds, currentSeedID, secretKey, publicKey, config, fakeRecordEnabled, keyServiceURL, keyServiceSecret, isKeyService}, nil
+	return &OpaqueService{
+		ds:                ds,
+		oprfSeeds:         oprfSeeds,
+		currentSeedID:     currentSeedID,
+		secretKey:         secretKey,
+		publicKey:         publicKey,
+		Config:            config,
+		fakeRecordEnabled: fakeRecordEnabled,
+		keyServiceClient:  keyServiceClient,
+		isKeyService:      isKeyService,
+	}, nil
 }
 
 func (o *OpaqueService) DeriveOPRFClientSeed(credentialIdentifier string, oprfSeedID *int) ([]byte, int, error) {
@@ -136,7 +148,7 @@ func (o *OpaqueService) getKeyServiceClientOPRFSeed(credIdentifier string, seedI
 	}
 
 	var response oprfSeedResponse
-	if err := util.MakeKeyServiceRequest(o.keyServiceURL, o.keyServiceSecret, "/v2/server_keys/oprf_seed", reqBody, &response); err != nil {
+	if err := o.keyServiceClient.MakeRequest(http.MethodPost, "/v2/server_keys/oprf_seed", reqBody, &response); err != nil {
 		return nil, 0, err
 	}
 
@@ -156,7 +168,7 @@ func (o *OpaqueService) newOpaqueServer(credIdentifier string, seedID *int) (*op
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to init opaque server: %w", err)
 	}
-	if !o.isKeyService && o.keyServiceURL != "" {
+	if o.keyServiceClient != nil {
 		clientSeed, serverSeedID, err := o.getKeyServiceClientOPRFSeed(credIdentifier, seedID)
 		if err != nil {
 			return nil, 0, err
@@ -184,37 +196,48 @@ func (o *OpaqueService) SetupPasswordInit(email string, request *opaqueMsg.Regis
 		return nil, fmt.Errorf("failed to decode public key during password init: %w", err)
 	}
 
-	if err = o.ds.UpsertRegistrationState(email, seedID); err != nil {
+	account, err := o.ds.GetOrCreateAccount(email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account when setting password: %w", err)
+	}
+
+	if err = o.ds.CreateRegistrationState(account.ID, account.Email, seedID, account.IsTwoFAEnabled()); err != nil {
 		return nil, err
 	}
 
 	return server.RegistrationResponse(request, []byte(email))
 }
 
-func (o *OpaqueService) SetupPasswordFinalize(email string, registration *opaqueMsg.RegistrationRecord) (*datastore.Account, error) {
-	seedID, err := o.ds.GetRegistrationStateSeedID(email)
+func (o *OpaqueService) SetupPasswordFinalize(email string, registration *opaqueMsg.RegistrationRecord) (*datastore.InterimPasswordState, error) {
+	registrationState, err := o.ds.GetRegistrationState(email, false)
 	if err != nil {
 		return nil, err
 	}
 
-	account, err := o.ds.GetOrCreateAccount(email)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get account when setting password: %w", err)
+	if registrationState.RequiresTwoFA {
+		if err = o.ds.UpdateInterimPasswordState(registrationState.ID, registration.Serialize()); err != nil {
+			// nolint:errcheck
+			o.ds.DeleteInterimPasswordState(registrationState.ID)
+			return nil, err
+		}
+		if err = o.ds.MarkInterimPasswordStateAsAwaitingTwoFA(registrationState.ID); err != nil {
+			// nolint:errcheck
+			o.ds.DeleteInterimPasswordState(registrationState.ID)
+			return nil, err
+		}
+	} else {
+		err = o.ds.UpdateOpaqueRegistration(*registrationState.AccountID, registrationState.OprfSeedID, registration.Serialize())
+		if err != nil {
+			// nolint:errcheck
+			o.ds.DeleteInterimPasswordState(registrationState.ID)
+			return nil, err
+		}
 	}
 
-	if err := o.ds.DeleteAllSessions(account.ID); err != nil {
-		return nil, err
-	}
-
-	err = o.ds.UpdateOpaqueRegistration(account.ID, seedID, registration.Serialize())
-	if err != nil {
-		return nil, err
-	}
-
-	return account, nil
+	return registrationState, nil
 }
 
-func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.KE2, *datastore.AKEState, error) {
+func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.KE2, *datastore.InterimPasswordState, error) {
 	account, err := o.ds.GetAccount(nil, email)
 	if err != nil {
 		if !errors.Is(err, datastore.ErrAccountNotFound) {
@@ -225,6 +248,8 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 	if account == nil && !o.fakeRecordEnabled {
 		return nil, nil, util.ErrIncorrectEmail
 	}
+
+	email = util.CanonicalizeEmail(email)
 
 	useFakeRecord := account == nil || account.OpaqueRegistration == nil || account.OprfSeedID == nil
 
@@ -269,10 +294,12 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 	}
 
 	var accountID *uuid.UUID
+	isTwoFAEnabled := false
 	if !useFakeRecord {
 		accountID = &account.ID
+		isTwoFAEnabled = account.IsTwoFAEnabled()
 	}
-	akeState, err := o.ds.CreateAKEState(accountID, email, server.SerializeState(), *seedID)
+	akeState, err := o.ds.CreateLoginState(accountID, email, server.SerializeState(), *seedID, isTwoFAEnabled)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to store AKE state: %w", err)
 	}
@@ -280,22 +307,28 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 	return ke2, akeState, nil
 }
 
-func (o *OpaqueService) LoginFinalize(akeStateID uuid.UUID, ke3 *opaqueMsg.KE3) (*uuid.UUID, error) {
-	akeState, err := o.ds.GetAKEState(akeStateID)
+func (o *OpaqueService) LoginFinalize(loginStateID uuid.UUID, ke3 *opaqueMsg.KE3) (*datastore.InterimPasswordState, error) {
+	loginState, err := o.ds.GetLoginState(loginStateID, false)
 	if err != nil {
 		return nil, err
 	}
 
-	server, _, err := o.newOpaqueServer(akeState.Email, &akeState.OprfSeedID)
+	server, _, err := o.newOpaqueServer(loginState.Email, &loginState.OprfSeedID)
 	if err != nil {
+		// nolint:errcheck
+		o.ds.DeleteInterimPasswordState(loginState.ID)
 		return nil, err
 	}
 
-	if err = server.SetAKEState(akeState.State); err != nil {
+	if err = server.SetAKEState(loginState.State); err != nil {
+		// nolint:errcheck
+		o.ds.DeleteInterimPasswordState(loginState.ID)
 		return nil, fmt.Errorf("failed to set AKE state for login finalize: %w", err)
 	}
 
 	if err = server.LoginFinish(ke3); err != nil {
+		// nolint:errcheck
+		o.ds.DeleteInterimPasswordState(loginState.ID)
 		if o.fakeRecordEnabled {
 			return nil, util.ErrIncorrectCredentials
 		} else {
@@ -303,9 +336,21 @@ func (o *OpaqueService) LoginFinalize(akeStateID uuid.UUID, ke3 *opaqueMsg.KE3) 
 		}
 	}
 
-	if akeState.AccountID == nil {
+	if loginState.AccountID == nil {
+		// nolint:errcheck
+		o.ds.DeleteInterimPasswordState(loginState.ID)
 		return nil, util.ErrIncorrectCredentials
 	}
 
-	return akeState.AccountID, nil
+	// If 2FA is required, mark the state as awaiting 2FA
+	if loginState.RequiresTwoFA {
+		if err := o.ds.MarkInterimPasswordStateAsAwaitingTwoFA(loginState.ID); err != nil {
+			// nolint:errcheck
+			o.ds.DeleteInterimPasswordState(loginState.ID)
+			return nil, fmt.Errorf("failed to mark login state as awaiting 2FA: %w", err)
+		}
+		loginState.AwaitingTwoFA = true
+	}
+
+	return loginState, nil
 }

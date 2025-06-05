@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 const (
 	sessionIdClaim      = "session_id"
 	verificationIdClaim = "verification_id"
-	akeStateIdClaim     = "ake_state_id"
+	loginStateIdClaim   = "login_state_id"
 
 	audClaim = "aud" // Audience
 	expClaim = "exp" // Expiration time
@@ -26,36 +27,36 @@ type JWTService struct {
 	ds               *datastore.Datastore
 	keys             map[int]*datastore.JWTKey
 	currentKeyID     int
-	keyServiceURL    string
-	keyServiceSecret string
+	keyServiceClient *util.KeyServiceClient
 	isKeyService     bool
 }
 
 func NewJWTService(ds *datastore.Datastore, isKeyService bool) (*JWTService, error) {
-	keyServiceURL := os.Getenv(util.KeyServiceURLEnv)
-	keyServiceSecret := os.Getenv(util.KeyServiceSecretEnv)
+	var keyServiceClient *util.KeyServiceClient
 
-	if keyServiceURL != "" && keyServiceSecret == "" {
-		return nil, fmt.Errorf("%v must be provided if using key service", util.KeyServiceSecretEnv)
+	// Only create a client if we're not the key service and KEY_SERVICE_URL is set
+	if !isKeyService && os.Getenv(util.KeyServiceURLEnv) != "" {
+		keyServiceClient = util.NewKeyServiceClient()
 	}
 
-	keys, err := ds.GetOrCreateJWTKeys(isKeyService || keyServiceURL != "", isKeyService || keyServiceURL == "")
+	keys, err := ds.GetOrCreateJWTKeys(isKeyService || keyServiceClient != nil, isKeyService || keyServiceClient == nil)
 	if err != nil {
 		return nil, err
 	}
+
 	currentKeyID := 0
 	for id := range keys {
 		if id > currentKeyID {
 			currentKeyID = id
 		}
 	}
+
 	return &JWTService{
-		ds,
-		keys,
-		currentKeyID,
-		keyServiceURL,
-		keyServiceSecret,
-		isKeyService,
+		ds:               ds,
+		keys:             keys,
+		currentKeyID:     currentKeyID,
+		keyServiceClient: keyServiceClient,
+		isKeyService:     isKeyService,
 	}, nil
 }
 
@@ -73,7 +74,7 @@ func (j *JWTService) getKeyServiceJWTToken(claims jwt.MapClaims) (string, error)
 	}
 
 	var response jwtCreateResponse
-	if err := util.MakeKeyServiceRequest(j.keyServiceURL, j.keyServiceSecret, "/v2/server_keys/jwt", reqBody, &response); err != nil {
+	if err := j.keyServiceClient.MakeRequest(http.MethodPost, "/v2/server_keys/jwt", reqBody, &response); err != nil {
 		return "", err
 	}
 
@@ -81,7 +82,7 @@ func (j *JWTService) getKeyServiceJWTToken(claims jwt.MapClaims) (string, error)
 }
 
 func (j *JWTService) CreateToken(claims jwt.MapClaims) (string, error) {
-	if j.keyServiceURL != "" && !j.isKeyService {
+	if j.keyServiceClient != nil {
 		return j.getKeyServiceJWTToken(claims)
 	}
 	var method jwt.SigningMethod
@@ -123,18 +124,18 @@ func (j *JWTService) CreateAuthToken(sessionID uuid.UUID, expiration *time.Durat
 	return j.CreateToken(claims)
 }
 
-func (j *JWTService) CreateEphemeralAKEToken(akeStateID uuid.UUID, expiration time.Duration) (string, error) {
+func (j *JWTService) CreateEphemeralLoginToken(loginStateID uuid.UUID, expiration time.Duration) (string, error) {
 	now := time.Now()
 	return j.CreateToken(jwt.MapClaims{
-		akeStateIdClaim: akeStateID.String(),
-		expClaim:        now.Add(expiration).Unix(),
-		iatClaim:        now.Unix(),
+		loginStateIdClaim: loginStateID.String(),
+		expClaim:          now.Add(expiration).Unix(),
+		iatClaim:          now.Unix(),
 	})
 }
 
 func (j *JWTService) parseToken(tokenString string, claimKey string) (uuid.UUID, string, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if j.isKeyService || j.keyServiceURL != "" {
+		if j.isKeyService || j.keyServiceClient != nil {
 			if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
@@ -195,7 +196,7 @@ func (j *JWTService) ValidateAuthToken(tokenString string) (uuid.UUID, string, e
 	return j.parseToken(tokenString, sessionIdClaim)
 }
 
-func (j *JWTService) ValidateEphemeralAKEToken(tokenString string) (uuid.UUID, error) {
-	akeStateID, _, err := j.parseToken(tokenString, akeStateIdClaim)
-	return akeStateID, err
+func (j *JWTService) ValidateEphemeralLoginToken(tokenString string) (uuid.UUID, error) {
+	loginStateID, _, err := j.parseToken(tokenString, loginStateIdClaim)
+	return loginStateID, err
 }
