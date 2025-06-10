@@ -333,7 +333,7 @@ fn login(args: CliArgs) {
     )
     .expect("Failed to decode hex");
 
-    let client_login_finish_result = match client_login_start_result
+    let client_login_finish_result = client_login_start_result
         .state
         .finish(
             password,
@@ -350,14 +350,12 @@ fn login(args: CliArgs) {
                 },
                 ..Default::default()
             },
-        ) {
-            Ok(result) => result,
-            Err(protocol_err) => match protocol_err {
-                ProtocolError::InvalidLoginError => panic!("Invalid credentials"),
-                ProtocolError::LibraryError(_) => panic!("Internal opaque_ke error"),
-                _ => panic!("Invalid result returned from server"),
-            }
-        };
+        ).map_err(|e| match e {
+            ProtocolError::InvalidLoginError => panic!("Invalid credentials"),
+            ProtocolError::LibraryError(_) => panic!("Internal opaque_ke error"),
+            _ => panic!("Invalid result returned from server"),
+        })
+        .unwrap();
 
     let credential_finalization_hex = hex::encode(client_login_finish_result.message.serialize());
 
