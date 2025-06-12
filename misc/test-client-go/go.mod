@@ -2,7 +2,7 @@ module github.com/brave/accounts/misc/test-client-go
 
 go 1.24.0
 
-toolchain go1.24.1
+toolchain go1.24.4
 
 require github.com/bytemare/opaque v0.0.0
 
