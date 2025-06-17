@@ -153,6 +153,7 @@ func main() {
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to init SES util")
 	}
+	verificationService := services.NewVerificationService(datastore, jwtService, sesService, passwordAuthEnabled, emailAuthEnabled)
 
 	prometheusRegistry := prometheus.NewRegistry()
 
@@ -164,10 +165,10 @@ func main() {
 	r := chi.NewRouter()
 
 	authController := controllers.NewAuthController(opaqueService, jwtService, twoFAService, datastore, sesService)
-	verificationController := controllers.NewVerificationController(datastore, jwtService, sesService, passwordAuthEnabled, emailAuthEnabled)
+	verificationController := controllers.NewVerificationController(datastore, verificationService)
 	sessionsController := controllers.NewSessionsController(datastore)
 	userKeysController := controllers.NewUserKeysController(datastore)
-	accountsController := controllers.NewAccountsController(opaqueService, jwtService, twoFAService, datastore)
+	accountsController := controllers.NewAccountsController(opaqueService, jwtService, twoFAService, datastore, verificationService)
 
 	r.Use(middleware.LoggerMiddleware(prometheusRegistry))
 	r.Use(cors.Handler(cors.Options{
