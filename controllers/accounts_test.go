@@ -151,6 +151,7 @@ func (suite *AccountsTestSuite) TestSetPassword() {
 	suite.Require().NoError(err)
 	suite.NotNil(account.OprfSeedID)
 	suite.NotEmpty(account.OpaqueRegistration)
+	suite.Nil(account.LastEmailVerifiedAt)
 
 	// Should not be able to set password again
 	req = util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
@@ -372,6 +373,7 @@ func (suite *AccountsTestSuite) TestTOTPSetupAndFinalize() {
 	suite.True(updatedAccount.IsTwoFAEnabled())
 	suite.NotNil(updatedAccount.RecoveryKeyHash)
 	suite.True(util.VerifyRecoveryKeyHash(*finalizeParsedResp.RecoveryKey, updatedAccount.RecoveryKeyHash))
+	suite.Nil(updatedAccount.LastEmailVerifiedAt)
 
 	// Test initializing TOTP when it's already enabled
 	initReq = util.CreateJSONTestRequest("/v2/accounts/2fa/totp/init", controllers.TwoFAInitRequest{

@@ -29,7 +29,7 @@ type Account struct {
 	// Timestamp when the account was last used (with a MOE of 30 minutes)
 	LastUsedAt time.Time `gorm:"<-:update"`
 	// Timestamp when the account was last verified via email
-	LastEmailVerifiedAt time.Time `gorm:"<-:update"`
+	LastEmailVerifiedAt *time.Time `gorm:"<-:update"`
 	// TOTPEnabled indicates whether the account has TOTP enabled
 	TOTPEnabled bool `json:"-"`
 	// Timestamp when TOTP was enabled

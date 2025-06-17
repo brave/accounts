@@ -83,6 +83,9 @@ func (suite *AuthTestSuite) SetupTest() {
 	_, err = opaqueService.SetupPasswordFinalize(suite.account.Email, registrationRec)
 	suite.Require().NoError(err)
 
+	err = suite.ds.UpdateAccountLastEmailVerifiedAt(suite.account.ID)
+	suite.Require().NoError(err)
+
 	suite.SetupRouter(true)
 }
 
@@ -262,6 +265,27 @@ func (suite *AuthTestSuite) TestAuthLoginNonexistentEmail() {
 	resp := util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusUnauthorized, resp.Code)
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrIncorrectEmail.Code)
+}
+
+func (suite *AuthTestSuite) TestAuthLoginEmailNotVerified() {
+	suite.Require().NoError(suite.ds.DB.Model(&datastore.Account{}).Where("id = ?", suite.account.ID).Update("last_email_verified_at", nil).Error)
+
+	// Attempt to login
+	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
+	suite.Require().NoError(err)
+	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
+	serializedKE1 := hex.EncodeToString(ke1.Serialize())
+	loginReq := controllers.LoginInitRequest{
+		Email:         suite.account.Email,
+		SerializedKE1: &serializedKE1,
+	}
+
+	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
+	resp := util.ExecuteTestRequest(req, suite.router)
+
+	// Should return 401 with email verification required error
+	suite.Equal(http.StatusUnauthorized, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailVerificationRequired.Code)
 }
 
 func (suite *AuthTestSuite) TestAuthLoginExpiredLoginState() {

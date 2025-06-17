@@ -130,6 +130,17 @@ func (vs *VerificationService) CompleteVerification(id uuid.UUID, code string) (
 		return nil, err
 	}
 
+	account, err := vs.datastore.GetAccount(nil, verification.Email)
+	if err != nil && err != datastore.ErrAccountNotFound {
+		return nil, err
+	}
+
+	if account != nil {
+		if err = vs.datastore.UpdateAccountLastEmailVerifiedAt(account.ID); err != nil {
+			return nil, err
+		}
+	}
+
 	// Create verification token if needed
 	verificationToken, err := vs.maybeCreateVerificationToken(verification, true)
 	if err != nil {

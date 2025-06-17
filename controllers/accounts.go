@@ -337,11 +337,6 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if err = ac.ds.UpdateAccountLastEmailVerifiedAt(*registrationState.AccountID); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
-
 	var authToken string
 	if !registrationState.RequiresTwoFA {
 		authToken, err = ac.createSessionAfterPasswordSetup(*registrationState.AccountID, r.UserAgent(), verification.ID)
