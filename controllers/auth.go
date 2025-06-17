@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/brave/accounts/datastore"
 	"github.com/brave/accounts/middleware"
@@ -17,8 +16,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
-
-const childAuthTokenExpirationTime = time.Hour * 24 * 14
 
 type AuthController struct {
 	opaqueService *services.OpaqueService
@@ -513,7 +510,7 @@ func (ac *AuthController) CreateServiceToken(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	expirationDuration := childAuthTokenExpirationTime
+	expirationDuration := services.ChildAuthTokenExpirationTime
 	token, err := ac.jwtService.CreateAuthToken(session.ID, &expirationDuration, req.Service)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
