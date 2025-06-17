@@ -71,11 +71,16 @@ func AuthMiddleware(jwtService *services.JWTService, ds *datastore.Datastore, mi
 	}
 }
 
-func VerificationAuthMiddleware(jwtService *services.JWTService, ds *datastore.Datastore) func(http.Handler) http.Handler {
+func VerificationAuthMiddleware(jwtService *services.JWTService, ds *datastore.Datastore, required bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token, err := util.ExtractAuthToken(r)
 			if err != nil {
+				if !required {
+					// In permissive mode, continue without verification context
+					next.ServeHTTP(w, r)
+					return
+				}
 				util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 				return
 			}

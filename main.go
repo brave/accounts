@@ -160,7 +160,8 @@ func main() {
 	servicesKeyMiddleware := middleware.ServicesKeyMiddleware(environment)
 	authMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion, true)
 	permissiveAuthMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion, false)
-	verificationMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore)
+	verificationMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore, true)
+	permissiveVerificationMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore, false)
 
 	r := chi.NewRouter()
 
@@ -185,7 +186,7 @@ func main() {
 	r.Route("/v2", func(r chi.Router) {
 		r.With(servicesKeyMiddleware).Mount("/auth", authController.Router(authMiddleware, permissiveAuthMiddleware, passwordAuthEnabled))
 		if passwordAuthEnabled {
-			r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware, authMiddleware, accountDeletionEnabled))
+			r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware, permissiveVerificationMiddleware, authMiddleware, accountDeletionEnabled))
 		}
 		r.Mount("/verify", verificationController.Router(verificationMiddleware, servicesKeyMiddleware, devEndpointsEnabled))
 		r.With(servicesKeyMiddleware).Mount("/sessions", sessionsController.Router(authMiddleware))
