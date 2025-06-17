@@ -111,7 +111,6 @@ func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Ha
 // @Description One of the following intents must be provided with the request:
 // @Description - `auth_token`: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the "query result" endpoint.
 // @Description - `verification`: After verification, do not create an account, but indicate that the email was verified in the "query result" response. Do not allow registration after verification.
-// @Description - `registration`: After verification, indicate that the email was verified in the "query result" response. An account may be created by setting a password.
 // @Description - `set_password`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
 // @Description
 // @Description One of the following service names must be provided with the request: `email-aliases`, `accounts`, `premium`.

@@ -27,8 +27,8 @@ type AccountsController struct {
 
 // @Description Response for password setup or change
 type PasswordFinalizeResponse struct {
-	// Authentication token
-	AuthToken string `json:"authToken"`
+	// Authentication token (only present if resetting/changing password)
+	AuthToken *string `json:"authToken"`
 	// Indicates to the client whether 2FA verification will be required before password setup is complete
 	RequiresTwoFA bool `json:"requiresTwoFA"`
 	// Indicates to the client whether email verification will be required before password setup is complete
@@ -230,7 +230,7 @@ func checkVerificationStatusAndIntent(w http.ResponseWriter, r *http.Request, ve
 // @Description Start the password setup process using OPAQUE protocol.
 // @Description If `serializeResponse` is set to true, the `serializedResponse` field will be populated
 // @Description in the response, with other fields omitted.
-// @Description Either provide a verification token OR include `newAccountEmail` for new account creation.
+// @Description Either provide a verification token for resetting/changing password OR include `newAccountEmail` for new account creation.
 // @Tags Accounts
 // @Accept json
 // @Produce json
@@ -382,13 +382,14 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 		return
 	}
 
-	var authToken string
+	var authToken *string
 	if !registrationState.RequiresTwoFA && verification.Intent != datastore.RegistrationIntent {
-		authToken, err = ac.createSessionAfterPasswordSetup(*registrationState.AccountID, r.UserAgent(), verification.ID)
+		newAuthToken, err := ac.createSessionAfterPasswordSetup(*registrationState.AccountID, r.UserAgent(), verification.ID)
 		if err != nil {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 			return
 		}
+		authToken = &newAuthToken
 	}
 
 	// Send verification email if this is a registration intent

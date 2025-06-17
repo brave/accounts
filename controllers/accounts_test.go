@@ -1,6 +1,7 @@
 package controllers_test
 
 import (
+	"context"
 	"encoding/base32"
 	"encoding/hex"
 	"net/http"
@@ -18,18 +19,21 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
 
 type AccountsTestSuite struct {
 	suite.Suite
-	useKeyService bool
-	ds            *datastore.Datastore
-	keyServiceDs  *datastore.Datastore
-	jwtService    *services.JWTService
-	router        *chi.Mux
-	opaqueClient  *opaque.Client
-	controller    *controllers.AccountsController
+	useKeyService       bool
+	ds                  *datastore.Datastore
+	keyServiceDs        *datastore.Datastore
+	jwtService          *services.JWTService
+	sesMock             *MockSESService
+	verificationService *services.VerificationService
+	router              *chi.Mux
+	opaqueClient        *opaque.Client
+	controller          *controllers.AccountsController
 }
 
 func NewAccountsTestSuite(useKeyService bool) *AccountsTestSuite {
@@ -55,8 +59,9 @@ func (suite *AccountsTestSuite) SetupTest() {
 	opaqueService, err := services.NewOpaqueService(suite.ds, false)
 	suite.Require().NoError(err)
 	twoFAService := services.NewTwoFAService(suite.ds, false)
-	verificationService := services.NewVerificationService(suite.ds, suite.jwtService, nil, true, true)
-	suite.controller = controllers.NewAccountsController(opaqueService, suite.jwtService, twoFAService, suite.ds, verificationService)
+	suite.sesMock = &MockSESService{}
+	suite.verificationService = services.NewVerificationService(suite.ds, suite.jwtService, suite.sesMock, true, true)
+	suite.controller = controllers.NewAccountsController(opaqueService, suite.jwtService, twoFAService, suite.ds, suite.verificationService)
 
 	suite.opaqueClient, err = opaque.NewClient(opaqueService.Config)
 	suite.Require().NoError(err)
@@ -75,9 +80,10 @@ func (suite *AccountsTestSuite) TearDownTest() {
 
 func (suite *AccountsTestSuite) SetupRouter(accountDeletionEnabled bool) {
 	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion, true)
-	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds)
+	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds, true)
+	permissiveVerificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds, false)
 	suite.router = chi.NewRouter()
-	suite.router.Mount("/v2/accounts", suite.controller.Router(verificationAuthMiddleware, authMiddleware, accountDeletionEnabled))
+	suite.router.Mount("/v2/accounts", suite.controller.Router(verificationAuthMiddleware, permissiveVerificationAuthMiddleware, authMiddleware, accountDeletionEnabled))
 }
 
 func (suite *AccountsTestSuite) createAuthSession() (string, *datastore.Account) {
@@ -94,8 +100,8 @@ func (suite *AccountsTestSuite) createAuthSession() (string, *datastore.Account)
 }
 
 func (suite *AccountsTestSuite) TestSetPassword() {
-	// Create verification
-	verification, err := suite.ds.CreateVerification("test@example.com", "accounts", "registration")
+	// Create verification with set_password intent
+	verification, err := suite.ds.CreateVerification("test@example.com", "accounts", "set_password")
 	suite.Require().NoError(err)
 	_, err = suite.ds.UpdateAndGetVerificationStatus(verification.ID, verification.Code)
 	suite.Require().NoError(err)
@@ -119,6 +125,7 @@ func (suite *AccountsTestSuite) TestSetPassword() {
 	var parsedResp controllers.RegistrationResponse
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
 	suite.NotNil(parsedResp.SerializedResponse)
+	suite.Nil(parsedResp.VerificationToken) // No verification token for set_password intent
 	serializedRegistationResp, err := hex.DecodeString(*parsedResp.SerializedResponse)
 	suite.Require().NoError(err)
 	registrationResp, err := suite.opaqueClient.Deserialize.RegistrationResponse(serializedRegistationResp)
@@ -140,10 +147,10 @@ func (suite *AccountsTestSuite) TestSetPassword() {
 
 	var parsedFinalizeResp controllers.PasswordFinalizeResponse
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedFinalizeResp)
-	suite.NotEmpty(parsedFinalizeResp.AuthToken)
+	suite.NotNil(parsedFinalizeResp.AuthToken)
 
 	// Validate auth token
-	sessionID, _, err := suite.jwtService.ValidateAuthToken(parsedFinalizeResp.AuthToken)
+	sessionID, _, err := suite.jwtService.ValidateAuthToken(*parsedFinalizeResp.AuthToken)
 	suite.NoError(err)
 	suite.NotNil(sessionID)
 
@@ -162,6 +169,145 @@ func (suite *AccountsTestSuite) TestSetPassword() {
 
 	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusNotFound, resp.Code)
+}
+
+func (suite *AccountsTestSuite) TestRegistration() {
+	// Email with 'strict' TLD should be allowed for registration
+	email := "newuser@example.ru"
+	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+
+	// Test password init with newAccountEmail (no verification token)
+	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
+		BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse: true,
+		NewAccountEmail:   &email,
+	})
+	// No Authorization header for registration
+
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+
+	var parsedResp controllers.RegistrationResponse
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
+	suite.NotNil(parsedResp.SerializedResponse)
+	suite.NotNil(parsedResp.VerificationToken) // Verification token should be present for registration
+	suite.NotEmpty(*parsedResp.VerificationToken)
+
+	// Validate the verification token
+	verificationID, err := suite.jwtService.ValidateVerificationToken(*parsedResp.VerificationToken)
+	suite.NoError(err)
+	suite.NotNil(verificationID)
+
+	// Check that verification was created with registration intent
+	verification, err := suite.ds.GetVerificationStatus(verificationID)
+	suite.Require().NoError(err)
+	suite.Equal(email, verification.Email)
+	suite.Equal("accounts", verification.Service)
+	suite.Equal(datastore.RegistrationIntent, verification.Intent)
+
+	serializedRegistationResp, err := hex.DecodeString(*parsedResp.SerializedResponse)
+	suite.Require().NoError(err)
+	registrationResp, err := suite.opaqueClient.Deserialize.RegistrationResponse(serializedRegistationResp)
+	suite.Require().NoError(err)
+
+	registrationRecord, _ := suite.opaqueClient.RegistrationFinalize(registrationResp, opaque.ClientRegistrationFinalizeOptions{
+		ClientIdentity: []byte(email),
+	})
+	serializedRecord := hex.EncodeToString(registrationRecord.Serialize())
+
+	suite.sesMock.On("SendVerificationEmail", mock.Anything, email, mock.Anything, "").Return(nil).Once()
+
+	// Test password finalize with verification token
+	req = util.CreateJSONTestRequest("/v2/accounts/password/finalize", controllers.RegistrationRecord{
+		SerializedRecord: &serializedRecord,
+	})
+	req.Header.Set("Authorization", "Bearer "+*parsedResp.VerificationToken)
+
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+
+	var parsedFinalizeResp controllers.PasswordFinalizeResponse
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedFinalizeResp)
+	suite.Nil(parsedFinalizeResp.AuthToken) // No auth token until email is verified
+	suite.True(parsedFinalizeResp.RequiresEmailVerification)
+	suite.False(parsedFinalizeResp.RequiresTwoFA)
+
+	// Verify account was created but not verified
+	account, err := suite.ds.GetAccount(nil, email)
+	suite.Require().NoError(err)
+	suite.NotNil(account.OprfSeedID)
+	suite.NotEmpty(account.OpaqueRegistration)
+	suite.Nil(account.LastEmailVerifiedAt) // Email not verified yet
+
+	// Simulate email verification using verification service
+	_, err = suite.verificationService.CompleteVerification(verification.ID, verification.Code)
+	suite.Require().NoError(err)
+
+	// Check that account is now verified
+	account, err = suite.ds.GetAccount(nil, email)
+	suite.Require().NoError(err)
+	suite.NotNil(account.LastEmailVerifiedAt) // Email should now be verified
+
+	// Get verification result to trigger session creation (simulates the verification result endpoint)
+	verification, err = suite.ds.GetVerificationStatus(verification.ID)
+	suite.Require().NoError(err)
+	verificationResult, err := suite.verificationService.GetVerificationResult(context.Background(), verification, false, "test-user-agent")
+	suite.Require().NoError(err)
+	suite.True(verificationResult.Verified)
+	suite.NotNil(verificationResult.AuthToken)
+
+	// Check that the session created has the correct version (PasswordAuthSessionVersion)
+	sessionID, _, err := suite.jwtService.ValidateAuthToken(*verificationResult.AuthToken)
+	suite.Require().NoError(err)
+
+	session, err := suite.ds.GetSession(sessionID)
+	suite.Require().NoError(err)
+	suite.Equal(datastore.PasswordAuthSessionVersion, session.Version)
+
+	// Ensure verification is deleted
+	_, err = suite.ds.GetVerificationStatus(verification.ID)
+	suite.Require().Error(err)
+
+	suite.sesMock.AssertExpectations(suite.T())
+}
+
+func (suite *AccountsTestSuite) TestRegistrationAccountAlreadyExists() {
+	email := "existing@example.com"
+
+	// Create an existing account
+	_, err := suite.ds.GetOrCreateAccount(email)
+	suite.Require().NoError(err)
+
+	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+
+	// Test password init with newAccountEmail for existing account
+	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
+		BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse: true,
+		NewAccountEmail:   &email,
+	})
+	// No Authorization header for registration
+
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrAccountExists.Code)
+}
+
+func (suite *AccountsTestSuite) TestRegistrationUnsupportedEmail() {
+	email := "test@example.kp" // .kp domain should be unsupported
+	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+
+	// Test password init with unsupported email domain
+	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
+		BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse: true,
+		NewAccountEmail:   &email,
+	})
+	// No Authorization header for registration
+
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
 }
 
 func (suite *AccountsTestSuite) TestSetPasswordBadIntents() {
@@ -192,7 +338,7 @@ func (suite *AccountsTestSuite) TestSetPasswordBadIntents() {
 
 func (suite *AccountsTestSuite) TestSetPasswordUnverifiedEmail() {
 	// Create unverified verification
-	verification, err := suite.ds.CreateVerification("test@example.com", "accounts", "password_setup")
+	verification, err := suite.ds.CreateVerification("test@example.com", "accounts", "set_password")
 	suite.Require().NoError(err)
 
 	// Get verification token

@@ -138,14 +138,12 @@ func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
 	return account, nil
 }
 
-// split into two methods for seed id and registration. use the struct for updates!
 func (d *Datastore) UpdateOpaqueRegistration(accountID uuid.UUID, oprfSeedID int, opaqueRegistration []byte) error {
 	result := d.DB.Model(&Account{}).
 		Where("id = ?", accountID).
 		Updates(Account{
 			OprfSeedID:         &oprfSeedID,
 			OpaqueRegistration: opaqueRegistration,
-			CreatedAt:          time.Now(),
 		})
 
 	if result.Error != nil {
