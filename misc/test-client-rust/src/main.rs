@@ -136,6 +136,48 @@ fn maybe_handle_twofa(args: &CliArgs, resp: Response, token: &str, endpoint: &st
     )
 }
 
+fn wait_for_verification(args: &CliArgs, verification_token: &str) -> Option<String> {
+    println!("Click on the verification link...");
+
+    loop {
+        let mut result_body = HashMap::new();
+        result_body.insert("wait", true.into());
+
+        let result = make_request(
+            args,
+            reqwest::Method::POST,
+            "/v2/verify/result",
+            Some(verification_token),
+            Some(result_body),
+        );
+
+        if result
+            .get("verified")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
+            let auth_token = result
+                .get("authToken")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let email = result
+                .get("email")
+                .expect("email should be in result response")
+                .as_str()
+                .expect("email should be a string");
+            let service_name = result
+                .get("service")
+                .expect("service should be in result response")
+                .as_str()
+                .expect("service should be a string");
+            println!("verification token: {}", verification_token);
+            println!("email: {}", email);
+            println!("service: {}", service_name);
+            return auth_token;
+        }
+    }
+}
+
 fn verify(args: &CliArgs) -> (String, Option<String>) {
     let mut body = HashMap::new();
     body.insert(
@@ -186,51 +228,22 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
         .and_then(|v| v.as_str())
         .expect("Failed to get verification token");
 
-    println!("Click on the verification link...");
-
-    loop {
-        let mut result_body = HashMap::new();
-        result_body.insert("wait", true.into());
-
-        let result = make_request(
-            args,
-            reqwest::Method::POST,
-            "/v2/verify/result",
-            Some(verification_token),
-            Some(result_body),
-        );
-
-        if result
-            .get("verified")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false)
-        {
-            let auth_token = result
-                .get("authToken")
-                .and_then(|v| v.as_str())
-                .map(String::from);
-            let email = result
-                .get("email")
-                .expect("email should be in result response")
-                .as_str()
-                .expect("email should be a string");
-            let service_name = result
-                .get("service")
-                .expect("service should be in result response")
-                .as_str()
-                .expect("service should be a string");
-            println!("verification token: {}", verification_token);
-            println!("email: {}", email);
-            println!("service: {}", service_name);
-            return (verification_token.to_string(), auth_token);
-        }
-    }
+    let auth_token = wait_for_verification(args, verification_token);
+    (verification_token.to_string(), auth_token)
 }
 
 fn set_password(args: CliArgs) {
-    let token = match &args.token {
-        Some(t) => t.trim().to_string(),
-        None => verify(&args).0,
+    let token = if args.register {
+        // For registration, don't verify upfront, pass newAccountEmail instead
+        None
+    } else {
+        match &args.token {
+            Some(t) => Some(t.trim().to_string()),
+            None => {
+                let (token, _) = verify(&args);
+                Some(token)
+            }
+        }
     };
 
     let mut client_rng = OsRng;
@@ -248,13 +261,31 @@ fn set_password(args: CliArgs) {
     body.insert("blindedMessage", registration_request_hex.into());
     body.insert("serializeResponse", true.into());
 
+    // If registering, add newAccountEmail instead of using verification token
+    if args.register {
+        body.insert(
+            "newAccountEmail",
+            args.email.as_ref().expect("email must be provided").clone().into(),
+        );
+    }
+
     let resp = make_request(
         &args,
         reqwest::Method::POST,
         "/v2/accounts/password/init",
-        Some(&token),
+        token.as_deref(),
         Some(body),
     );
+
+    // Extract verification token if this was a registration
+    let token = if args.register {
+        resp.get("verificationToken")
+            .and_then(|v| v.as_str())
+            .expect("Missing verificationToken for registration")
+            .to_string()
+    } else {
+        token.unwrap()
+    };
 
     let resp_bin = hex::decode(
         resp.get("serializedResponse")
@@ -299,7 +330,15 @@ fn set_password(args: CliArgs) {
     // Handle 2FA if required
     resp = maybe_handle_twofa(&args, resp, &token, "/v2/accounts/password/finalize_2fa");
 
-    display_account_details(&args, resp.get("authToken").unwrap().as_str().unwrap());
+    // If this was a registration, wait for email verification after password setup
+    let auth_token = if args.register {
+        wait_for_verification(&args, &token)
+            .expect("Failed to get auth token after verification")
+    } else {
+        resp.get("authToken").unwrap().as_str().unwrap().to_string()
+    };
+
+    display_account_details(&args, &auth_token);
 }
 
 fn login(args: CliArgs) {

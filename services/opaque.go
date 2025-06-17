@@ -249,6 +249,10 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 		return nil, nil, util.ErrIncorrectEmail
 	}
 
+	if account != nil && account.LastEmailVerifiedAt == nil {
+		return nil, nil, util.ErrEmailVerificationRequired
+	}
+
 	email = util.CanonicalizeEmail(email)
 
 	useFakeRecord := account == nil || account.OpaqueRegistration == nil || account.OprfSeedID == nil

@@ -52,7 +52,7 @@ func (suite *VerificationTestSuite) SetupController(passwordAuthEnabled bool, em
 	verificationService := services.NewVerificationService(suite.ds, suite.jwtService, suite.sesMock, passwordAuthEnabled, emailAuthEnabled)
 	controller := controllers.NewVerificationController(suite.ds, verificationService)
 
-	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds)
+	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds, true)
 	servicesKeyMiddleware := middleware.ServicesKeyMiddleware(util.DevelopmentEnv)
 
 	suite.router = chi.NewRouter()
@@ -158,13 +158,6 @@ func (suite *VerificationTestSuite) TestVerifyInitUnsupportedEmail() {
 	suite.Equal(http.StatusBadRequest, resp.Code)
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
 
-	registerBody := body
-	registerBody.Intent = "registration"
-	registerBody.Service = "accounts"
-	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", registerBody), suite.router)
-	suite.Equal(http.StatusBadRequest, resp.Code)
-	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
-
 	// Test 'strict' TLDs for email-aliases service
 	body.Email = "test@example.ru"
 	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
@@ -175,19 +168,6 @@ func (suite *VerificationTestSuite) TestVerifyInitUnsupportedEmail() {
 	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
 	suite.Equal(http.StatusBadRequest, resp.Code)
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
-
-	// Test North Korea TLD for accounts registration
-	body.Intent = "registration"
-	body.Service = "accounts"
-	body.Email = "test@example.kp"
-	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
-	suite.Equal(http.StatusBadRequest, resp.Code)
-	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
-
-	// Email with 'strict' TLD should be allowed for registration
-	body.Email = "test@example.ru"
-	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
-	suite.Equal(http.StatusOK, resp.Code)
 }
 
 func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
@@ -200,21 +180,6 @@ func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
 			intent:              "auth_token",
 			service:             "email-aliases",
 			passwordAuthEnabled: true,
-		},
-		{
-			intent:              "registration",
-			service:             "premium",
-			passwordAuthEnabled: true,
-		},
-		{
-			intent:              "registration",
-			service:             "email-aliases",
-			passwordAuthEnabled: true,
-		},
-		{
-			intent:              "registration",
-			service:             "accounts",
-			passwordAuthEnabled: false,
 		},
 		{
 			intent:              "set_password",
@@ -239,6 +204,22 @@ func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
 	}
 }
 
+func (suite *VerificationTestSuite) TestVerifyInitBadIntent() {
+	suite.SetupController(true, false)
+
+	// Test registration intent - should fail because registration intent
+	// should only be used internally by the accounts service, not via direct verification init
+	body := controllers.VerifyInitRequest{
+		Email:   "test@example.com",
+		Intent:  "registration",
+		Service: "accounts",
+		Locale:  "en-US",
+	}
+
+	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+}
+
 func (suite *VerificationTestSuite) TestVerifyValidCheck() {
 	suite.SetupController(true, false)
 
@@ -247,7 +228,7 @@ func (suite *VerificationTestSuite) TestVerifyValidCheck() {
 	// Initialize verification
 	initBody := controllers.VerifyInitRequest{
 		Email:   "test@example.com",
-		Intent:  "registration",
+		Intent:  "verification",
 		Service: "accounts",
 		Locale:  "en-US",
 	}
@@ -311,7 +292,7 @@ func (suite *VerificationTestSuite) TestVerifyComplete() {
 
 	initBody := controllers.VerifyInitRequest{
 		Email:   "test@example.com",
-		Intent:  "registration",
+		Intent:  "verification",
 		Service: "accounts",
 		Locale:  "en-US",
 	}
