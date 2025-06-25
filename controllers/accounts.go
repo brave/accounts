@@ -17,10 +17,11 @@ import (
 )
 
 type AccountsController struct {
-	opaqueService *services.OpaqueService
-	jwtService    *services.JWTService
-	twoFAService  *services.TwoFAService
-	ds            *datastore.Datastore
+	opaqueService       *services.OpaqueService
+	jwtService          *services.JWTService
+	twoFAService        *services.TwoFAService
+	ds                  *datastore.Datastore
+	verificationService *services.VerificationService
 }
 
 // @Description Response for password setup or change
@@ -174,12 +175,13 @@ func FromOpaqueRegistrationResponse(opaqueResp *opaqueMsg.RegistrationResponse, 
 	}, nil
 }
 
-func NewAccountsController(opaqueService *services.OpaqueService, jwtService *services.JWTService, twoFAService *services.TwoFAService, ds *datastore.Datastore) *AccountsController {
+func NewAccountsController(opaqueService *services.OpaqueService, jwtService *services.JWTService, twoFAService *services.TwoFAService, ds *datastore.Datastore, verificationService *services.VerificationService) *AccountsController {
 	return &AccountsController{
-		opaqueService: opaqueService,
-		jwtService:    jwtService,
-		twoFAService:  twoFAService,
-		ds:            ds,
+		opaqueService:       opaqueService,
+		jwtService:          jwtService,
+		twoFAService:        twoFAService,
+		ds:                  ds,
+		verificationService: verificationService,
 	}
 }
 

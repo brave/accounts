@@ -55,7 +55,8 @@ func (suite *AccountsTestSuite) SetupTest() {
 	opaqueService, err := services.NewOpaqueService(suite.ds, false)
 	suite.Require().NoError(err)
 	twoFAService := services.NewTwoFAService(suite.ds, false)
-	suite.controller = controllers.NewAccountsController(opaqueService, suite.jwtService, twoFAService, suite.ds)
+	verificationService := services.NewVerificationService(suite.ds, suite.jwtService, nil, true, true)
+	suite.controller = controllers.NewAccountsController(opaqueService, suite.jwtService, twoFAService, suite.ds, verificationService)
 
 	suite.opaqueClient, err = opaque.NewClient(opaqueService.Config)
 	suite.Require().NoError(err)
