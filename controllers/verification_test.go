@@ -488,9 +488,13 @@ func (suite *VerificationTestSuite) TestVerificationExpiry() {
 func (suite *VerificationTestSuite) TestVerifyInitChangePasswordRequiresAuth() {
 	suite.SetupController(true, false)
 
+	email := "test@example.com"
+	account, err := suite.ds.GetOrCreateAccount(email)
+	suite.Require().NoError(err)
+
 	// Test change_password intent without auth - should fail with ErrIntentNotAllowed
 	body := controllers.VerifyInitRequest{
-		Email:   "test@example.com",
+		Email:   email,
 		Intent:  "change_password",
 		Service: "accounts",
 		Locale:  "en-US",
@@ -501,28 +505,26 @@ func (suite *VerificationTestSuite) TestVerifyInitChangePasswordRequiresAuth() {
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrIntentNotAllowed.Code)
 
 	// Test change_password intent with valid auth session
-	// Create test account and session
-	account, err := suite.ds.GetOrCreateAccount("test@example.com")
-	suite.Require().NoError(err)
-	session, err := suite.ds.CreateSession(account.ID, datastore.EmailAuthSessionVersion, "")
+	session, err := suite.ds.CreateSession(account.ID, datastore.PasswordAuthSessionVersion, "")
 	suite.Require().NoError(err)
 	token, err := suite.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
 	suite.Require().NoError(err)
 
-	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
-
-	req := util.CreateJSONTestRequest("/v2/verify/init", body)
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp = util.ExecuteTestRequest(req, suite.router)
-	suite.Equal(http.StatusOK, resp.Code)
+	suite.sesMock.On("SendVerificationEmail", mock.Anything, email, mock.Anything, "en-US").Return(nil).Once()
 
 	// Test change_password intent with mismatched email - should fail with ErrIntentNotAllowed
 	body.Email = "different@example.com"
-	req = util.CreateJSONTestRequest("/v2/verify/init", body)
+	req := util.CreateJSONTestRequest("/v2/verify/init", body)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusBadRequest, resp.Code)
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrIntentNotAllowed.Code)
+
+	body.Email = email
+	req = util.CreateJSONTestRequest("/v2/verify/init", body)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
 
 	suite.sesMock.AssertExpectations(suite.T())
 }
