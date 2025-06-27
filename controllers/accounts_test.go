@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base32"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -142,6 +143,8 @@ func (suite *AccountsTestSuite) TestResetPassword() {
 	// Test password finalize
 	req = util.CreateJSONTestRequest("/v2/accounts/password/finalize", controllers.RegistrationRecord{
 		SerializedRecord: &serializedRecord,
+		// This setting should be ignored
+		InvalidateSessions: false,
 	})
 	req.Header.Set("Authorization", "Bearer "+token)
 
@@ -151,6 +154,7 @@ func (suite *AccountsTestSuite) TestResetPassword() {
 	var parsedFinalizeResp controllers.PasswordFinalizeResponse
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedFinalizeResp)
 	suite.NotNil(parsedFinalizeResp.AuthToken)
+	suite.True(parsedFinalizeResp.SessionsInvalidated)
 
 	// Validate auth token
 	sessionID, _, err := suite.jwtService.ValidateAuthToken(*parsedFinalizeResp.AuthToken)
@@ -223,6 +227,8 @@ func (suite *AccountsTestSuite) TestRegistration() {
 	// Test password finalize with verification token
 	req = util.CreateJSONTestRequest("/v2/accounts/password/finalize", controllers.RegistrationRecord{
 		SerializedRecord: &serializedRecord,
+		// This setting should be ignored
+		InvalidateSessions: false,
 	})
 	req.Header.Set("Authorization", "Bearer "+*parsedResp.VerificationToken)
 
@@ -234,6 +240,7 @@ func (suite *AccountsTestSuite) TestRegistration() {
 	suite.Nil(parsedFinalizeResp.AuthToken) // No auth token until email is verified
 	suite.True(parsedFinalizeResp.RequiresEmailVerification)
 	suite.False(parsedFinalizeResp.RequiresTwoFA)
+	suite.False(parsedFinalizeResp.SessionsInvalidated)
 
 	// Verify account was created but not verified
 	account, err := suite.ds.GetAccount(nil, email)
@@ -313,6 +320,89 @@ func (suite *AccountsTestSuite) TestRegistrationUnsupportedEmail() {
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
 }
 
+func (suite *AccountsTestSuite) TestChangePassword() {
+	sessionInvalidationSettings := []bool{true, false}
+
+	for i, sessionInvalidation := range sessionInvalidationSettings {
+		// Create an account directly using datastore
+		email := fmt.Sprintf("test-change-%d@example.com", i)
+		account, err := suite.ds.GetOrCreateAccount(email)
+		suite.Require().NoError(err)
+
+		// Create sessions to verify session invalidation or lack thereof
+		for range 3 {
+			_, err := suite.ds.CreateSession(account.ID, datastore.EmailAuthSessionVersion, "")
+			suite.Require().NoError(err)
+		}
+
+		changeVerification, err := suite.ds.CreateVerification(email, "accounts", "change_password")
+		suite.Require().NoError(err)
+		_, err = suite.ds.UpdateAndGetVerificationStatus(changeVerification.ID, changeVerification.Code)
+		suite.Require().NoError(err)
+
+		changeToken, err := suite.jwtService.CreateVerificationToken(changeVerification.ID, time.Minute*30, changeVerification.Service)
+		suite.Require().NoError(err)
+
+		changeRegistrationReq := suite.opaqueClient.RegistrationInit([]byte("newpassword"))
+
+		req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
+			BlindedMessage:    hex.EncodeToString(changeRegistrationReq.Serialize()),
+			SerializeResponse: true,
+		})
+		req.Header.Set("Authorization", "Bearer "+changeToken)
+
+		resp := util.ExecuteTestRequest(req, suite.router)
+		suite.Equal(http.StatusOK, resp.Code)
+
+		var parsedResp controllers.RegistrationResponse
+		util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
+		suite.NotNil(parsedResp.SerializedResponse)
+		suite.Nil(parsedResp.VerificationToken) // No verification token for change_password intent
+
+		serializedChangeResp, err := hex.DecodeString(*parsedResp.SerializedResponse)
+		suite.Require().NoError(err)
+		changeResp, err := suite.opaqueClient.Deserialize.RegistrationResponse(serializedChangeResp)
+		suite.Require().NoError(err)
+
+		changeRecord, _ := suite.opaqueClient.RegistrationFinalize(changeResp, opaque.ClientRegistrationFinalizeOptions{
+			ClientIdentity: []byte(email),
+		})
+		serializedChangeRecord := hex.EncodeToString(changeRecord.Serialize())
+
+		// Test password change finalize with session invalidation
+		req = util.CreateJSONTestRequest("/v2/accounts/password/finalize", controllers.RegistrationRecord{
+			SerializedRecord:   &serializedChangeRecord,
+			InvalidateSessions: sessionInvalidation,
+		})
+		req.Header.Set("Authorization", "Bearer "+changeToken)
+
+		resp = util.ExecuteTestRequest(req, suite.router)
+		suite.Equal(http.StatusOK, resp.Code)
+
+		var changeFinalizeResp controllers.PasswordFinalizeResponse
+		util.DecodeJSONTestResponse(suite.T(), resp.Body, &changeFinalizeResp)
+		suite.False(changeFinalizeResp.RequiresTwoFA)
+		suite.False(changeFinalizeResp.RequiresEmailVerification)
+		suite.Equal(sessionInvalidation, changeFinalizeResp.SessionsInvalidated)
+
+		// Verify the account still exists and password was changed
+		updatedAccount, err := suite.ds.GetAccount(nil, email)
+		suite.Require().NoError(err)
+		suite.NotNil(updatedAccount.OprfSeedID)
+		suite.NotEmpty(updatedAccount.OpaqueRegistration)
+
+		sessions, err := suite.ds.ListSessions(account.ID)
+		suite.Require().NoError(err)
+		if sessionInvalidation {
+			suite.Equal(1, len(sessions))
+			suite.NotNil(changeFinalizeResp.AuthToken)
+		} else {
+			suite.Equal(3, len(sessions))
+			suite.Nil(changeFinalizeResp.AuthToken)
+		}
+	}
+}
+
 func (suite *AccountsTestSuite) TestSetPasswordBadIntents() {
 	intents := []string{"verification", "auth_token"}
 
@@ -339,27 +429,31 @@ func (suite *AccountsTestSuite) TestSetPasswordBadIntents() {
 	}
 }
 
-func (suite *AccountsTestSuite) TestResetPasswordUnverifiedEmail() {
-	// Create unverified verification
-	verification, err := suite.ds.CreateVerification("test@example.com", "accounts", "reset_password")
-	suite.Require().NoError(err)
+func (suite *AccountsTestSuite) TestSetPasswordUnverifiedEmail() {
+	intents := []string{"reset_password", "change_password"}
 
-	// Get verification token
-	token, err := suite.jwtService.CreateVerificationToken(verification.ID, time.Minute*30, verification.Service)
-	suite.Require().NoError(err)
+	for _, intent := range intents {
+		// Create unverified verification
+		verification, err := suite.ds.CreateVerification("test@example.com", "accounts", intent)
+		suite.Require().NoError(err)
 
-	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+		// Get verification token
+		token, err := suite.jwtService.CreateVerificationToken(verification.ID, time.Minute*30, verification.Service)
+		suite.Require().NoError(err)
 
-	// Test password init with unverified email
-	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-		BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
-		SerializeResponse: true,
-	})
-	req.Header.Set("Authorization", "Bearer "+token)
+		registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
 
-	resp := util.ExecuteTestRequest(req, suite.router)
-	suite.Equal(http.StatusForbidden, resp.Code)
-	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailNotVerified.Code)
+		// Test password init with unverified email
+		req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
+			BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
+			SerializeResponse: true,
+		})
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp := util.ExecuteTestRequest(req, suite.router)
+		suite.Equal(http.StatusForbidden, resp.Code)
+		util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailNotVerified.Code)
+	}
 }
 
 func (suite *AccountsTestSuite) TestDeleteAccount() {
