@@ -206,10 +206,10 @@ func NewAuthController(opaqueService *services.OpaqueService, jwtService *servic
 	}
 }
 
-func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler, permissiveAuthMiddleware func(http.Handler) http.Handler, passwordAuthEnabled bool) chi.Router {
+func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler, validateAuthMiddleware func(http.Handler) http.Handler, passwordAuthEnabled bool) chi.Router {
 	r := chi.NewRouter()
 
-	r.With(permissiveAuthMiddleware).Get("/validate", ac.Validate)
+	r.With(validateAuthMiddleware).Get("/validate", ac.Validate)
 	r.With(authMiddleware).Post("/service_token", ac.CreateServiceToken)
 	if passwordAuthEnabled {
 		r.Post("/login/init", ac.LoginInit)
@@ -283,7 +283,8 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, util.ErrIncorrectCredentials) ||
 			errors.Is(err, util.ErrIncorrectEmail) ||
-			errors.Is(err, util.ErrIncorrectPassword) {
+			errors.Is(err, util.ErrIncorrectPassword) ||
+			errors.Is(err, util.ErrEmailVerificationRequired) {
 
 			if errors.Is(err, util.ErrIncorrectEmail) {
 				// If an account exists that matches the simplified email, notify the user

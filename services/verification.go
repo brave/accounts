@@ -54,7 +54,7 @@ func (vs *VerificationService) maybeCreateVerificationToken(verification *datast
 	return &token, nil
 }
 
-func (vs *VerificationService) InitializeVerification(ctx context.Context, email, intent, service, locale string) (*string, error) {
+func (vs *VerificationService) InitializeVerification(ctx context.Context, email, intent, service string) (*datastore.Verification, *string, error) {
 	// Validate intent
 	intentAllowed := true
 	switch intent {
@@ -73,54 +73,58 @@ func (vs *VerificationService) InitializeVerification(ctx context.Context, email
 		intentAllowed = false
 	}
 	if !intentAllowed {
-		return nil, util.ErrIntentNotAllowed
+		return nil, nil, util.ErrIntentNotAllowed
 	}
 
 	// Validate email
 	strictCountryBlock := service == util.EmailAliasesServiceName || service == util.PremiumServiceName
 	if !util.IsEmailAllowed(email, strictCountryBlock) {
-		return nil, util.ErrEmailDomainNotSupported
+		return nil, nil, util.ErrEmailDomainNotSupported
 	}
 
 	// Validate account requirements
 	if intent == datastore.RegistrationIntent || intent == datastore.SetPasswordIntent {
 		accountExists, err := vs.datastore.AccountExists(email)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if intent == datastore.RegistrationIntent && accountExists {
-			return nil, util.ErrAccountExists
+			return nil, nil, util.ErrAccountExists
 		}
 		if intent == datastore.SetPasswordIntent && !accountExists {
-			return nil, util.ErrAccountDoesNotExist
+			return nil, nil, util.ErrAccountDoesNotExist
 		}
 	}
 
 	// Create verification
 	verification, err := vs.datastore.CreateVerification(email, service, intent)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Create verification token if needed
 	verificationToken, err := vs.maybeCreateVerificationToken(verification, false)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
+	return verification, verificationToken, nil
+}
+
+func (vs *VerificationService) SendVerificationEmail(ctx context.Context, verification *datastore.Verification, locale string) error {
 	// Send verification email
-	if err := vs.sesService.SendVerificationEmail(ctx, email, verification, locale); err != nil {
+	if err := vs.sesService.SendVerificationEmail(ctx, verification.Email, verification, locale); err != nil {
 		if errors.Is(err, util.ErrFailedToSendEmailInvalidFormat) {
 			if vs.datastore.DeleteVerification(verification.ID) != nil {
 				// Don't override the more descriptive error code and let cron handle the cleanup
 				_ = true
 			}
-			return nil, err
+			return err
 		}
-		return nil, fmt.Errorf("failed to send verification email: %w", err)
+		return fmt.Errorf("failed to send verification email: %w", err)
 	}
 
-	return verificationToken, nil
+	return nil
 }
 
 func (vs *VerificationService) CompleteVerification(id uuid.UUID, code string) (*VerificationCompleteResult, error) {
@@ -128,6 +132,17 @@ func (vs *VerificationService) CompleteVerification(id uuid.UUID, code string) (
 	verification, err := vs.datastore.UpdateAndGetVerificationStatus(id, code)
 	if err != nil {
 		return nil, err
+	}
+
+	account, err := vs.datastore.GetAccount(nil, verification.Email)
+	if err != nil && err != datastore.ErrAccountNotFound {
+		return nil, err
+	}
+
+	if account != nil {
+		if err = vs.datastore.UpdateAccountLastEmailVerifiedAt(account.ID); err != nil {
+			return nil, err
+		}
 	}
 
 	// Create verification token if needed
@@ -161,7 +176,7 @@ func (vs *VerificationService) GetVerificationResult(ctx context.Context, verifi
 	}
 
 	var authToken *string
-	if verification.Intent == datastore.AuthTokenIntent {
+	if verification.Intent == datastore.AuthTokenIntent || verification.Intent == datastore.RegistrationIntent {
 		if err := vs.datastore.DeleteVerification(verification.ID); err != nil {
 			return nil, err
 		}
@@ -175,7 +190,11 @@ func (vs *VerificationService) GetVerificationResult(ctx context.Context, verifi
 			return nil, err
 		}
 
-		session, err := vs.datastore.CreateSession(account.ID, datastore.EmailAuthSessionVersion, userAgent)
+		sessionVersion := datastore.EmailAuthSessionVersion
+		if verification.Intent == datastore.RegistrationIntent {
+			sessionVersion = datastore.PasswordAuthSessionVersion
+		}
+		session, err := vs.datastore.CreateSession(account.ID, sessionVersion, userAgent)
 		if err != nil {
 			return nil, err
 		}

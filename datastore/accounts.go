@@ -29,7 +29,7 @@ type Account struct {
 	// Timestamp when the account was last used (with a MOE of 30 minutes)
 	LastUsedAt time.Time `gorm:"<-:update"`
 	// Timestamp when the account was last verified via email
-	LastEmailVerifiedAt time.Time `gorm:"<-:update"`
+	LastEmailVerifiedAt *time.Time `gorm:"<-:update"`
 	// TOTPEnabled indicates whether the account has TOTP enabled
 	TOTPEnabled bool `json:"-"`
 	// Timestamp when TOTP was enabled
@@ -138,14 +138,12 @@ func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
 	return account, nil
 }
 
-// split into two methods for seed id and registration. use the struct for updates!
 func (d *Datastore) UpdateOpaqueRegistration(accountID uuid.UUID, oprfSeedID int, opaqueRegistration []byte) error {
 	result := d.DB.Model(&Account{}).
 		Where("id = ?", accountID).
 		Updates(Account{
 			OprfSeedID:         &oprfSeedID,
 			OpaqueRegistration: opaqueRegistration,
-			CreatedAt:          time.Now(),
 		})
 
 	if result.Error != nil {

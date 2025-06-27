@@ -38,7 +38,7 @@ func (suite *SessionsTestSuite) SetupTest() {
 	controller := controllers.NewSessionsController(suite.ds)
 
 	// Create middleware
-	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, 1, true)
+	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, 1, true, true)
 
 	// Setup router
 	suite.router = chi.NewRouter()
