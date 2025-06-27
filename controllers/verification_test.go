@@ -54,9 +54,10 @@ func (suite *VerificationTestSuite) SetupController(passwordAuthEnabled bool, em
 
 	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds, true)
 	servicesKeyMiddleware := middleware.ServicesKeyMiddleware(util.DevelopmentEnv)
+	optionalAuthMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion, true, false)
 
 	suite.router = chi.NewRouter()
-	suite.router.Mount("/v2/verify", controller.Router(verificationAuthMiddleware, servicesKeyMiddleware, false))
+	suite.router.Mount("/v2/verify", controller.Router(verificationAuthMiddleware, servicesKeyMiddleware, optionalAuthMiddleware, false))
 }
 
 func (suite *VerificationTestSuite) TearDownTest() {
@@ -182,7 +183,7 @@ func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
 			passwordAuthEnabled: true,
 		},
 		{
-			intent:              "set_password",
+			intent:              "reset_password",
 			service:             "accounts",
 			passwordAuthEnabled: false,
 		},
@@ -482,6 +483,48 @@ func (suite *VerificationTestSuite) TestVerificationExpiry() {
 
 	// Should return not found due to expired verification
 	suite.Equal(http.StatusNotFound, resp.Code)
+}
+
+func (suite *VerificationTestSuite) TestVerifyInitChangePasswordRequiresAuth() {
+	suite.SetupController(true, false)
+
+	// Test change_password intent without auth - should fail with ErrIntentNotAllowed
+	body := controllers.VerifyInitRequest{
+		Email:   "test@example.com",
+		Intent:  "change_password",
+		Service: "accounts",
+		Locale:  "en-US",
+	}
+
+	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrIntentNotAllowed.Code)
+
+	// Test change_password intent with valid auth session
+	// Create test account and session
+	account, err := suite.ds.GetOrCreateAccount("test@example.com")
+	suite.Require().NoError(err)
+	session, err := suite.ds.CreateSession(account.ID, datastore.EmailAuthSessionVersion, "")
+	suite.Require().NoError(err)
+	token, err := suite.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
+	suite.Require().NoError(err)
+
+	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
+
+	req := util.CreateJSONTestRequest("/v2/verify/init", body)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+
+	// Test change_password intent with mismatched email - should fail with ErrIntentNotAllowed
+	body.Email = "different@example.com"
+	req = util.CreateJSONTestRequest("/v2/verify/init", body)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrIntentNotAllowed.Code)
+
+	suite.sesMock.AssertExpectations(suite.T())
 }
 
 func TestVerificationTestSuite(t *testing.T) {

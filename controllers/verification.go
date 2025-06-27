@@ -33,7 +33,7 @@ type VerifyInitRequest struct {
 	// Email address to verify
 	Email string `json:"email" validate:"required,email,ascii" example:"test@example.com"`
 	// Purpose of verification (e.g., get auth token, simple verification)
-	Intent string `json:"intent" validate:"required,oneof=auth_token verification set_password" example:"set_password"`
+	Intent string `json:"intent" validate:"required,oneof=auth_token verification reset_password change_password" example:"reset_password"`
 	// Service requesting the verification
 	Service string `json:"service" validate:"required,oneof=accounts premium email-aliases" example:"accounts"`
 	// Locale for verification email
@@ -91,10 +91,10 @@ func NewVerificationController(datastore *datastore.Datastore, verificationServi
 	}
 }
 
-func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Handler) http.Handler, servicesKeyMiddleware func(http.Handler) http.Handler, devEndpointsEnabled bool) chi.Router {
+func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Handler) http.Handler, servicesKeyMiddleware func(http.Handler) http.Handler, optionalAuthMiddleware func(http.Handler) http.Handler, devEndpointsEnabled bool) chi.Router {
 	r := chi.NewRouter()
 
-	r.With(servicesKeyMiddleware).Post("/init", vc.VerifyInit)
+	r.With(servicesKeyMiddleware).With(optionalAuthMiddleware).Post("/init", vc.VerifyInit)
 	r.Get("/complete", vc.VerifyValidCheck)
 	r.Post("/complete", vc.VerifyComplete)
 	if devEndpointsEnabled {
@@ -111,12 +111,14 @@ func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Ha
 // @Description One of the following intents must be provided with the request:
 // @Description - `auth_token`: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the "query result" endpoint.
 // @Description - `verification`: After verification, do not create an account, but indicate that the email was verified in the "query result" response. Do not allow registration after verification.
-// @Description - `set_password`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
+// @Description - `reset_password`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
+// @Description - `change_password`: After verification, indicate that the email was verified in the "query result" response. A password may be changed for the existing account. Requires a valid auth session.
 // @Description
 // @Description One of the following service names must be provided with the request: `email-aliases`, `accounts`, `premium`.
 // @Tags Email verification
 // @Accept json
 // @Produce json
+// @Param Authorization header string false "Bearer + auth token (required for change_password intent)"
 // @Param Brave-Key header string false "Brave services key (if one is configured)"
 // @Param request body VerifyInitRequest true "Verification request params"
 // @Success 200 {object} VerifyInitResponse
@@ -124,6 +126,7 @@ func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Ha
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/verify/init [post]
 func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Request) {
+	session, _ := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
 	var requestData VerifyInitRequest
 	if !util.DecodeJSONAndValidate(w, r, &requestData) {
 		return
@@ -139,6 +142,7 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		requestData.Email,
 		requestData.Intent,
 		requestData.Service,
+		session,
 	)
 
 	if err != nil {

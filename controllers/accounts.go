@@ -213,12 +213,12 @@ func (ac *AccountsController) Router(verificationMiddleware func(http.Handler) h
 }
 
 func checkVerificationStatusAndIntent(w http.ResponseWriter, r *http.Request, verification *datastore.Verification) bool {
-	if verification.Intent == datastore.SetPasswordIntent && !verification.Verified {
+	if (verification.Intent == datastore.ResetPasswordIntent || verification.Intent == datastore.ChangePasswordIntent) && !verification.Verified {
 		util.RenderErrorResponse(w, r, http.StatusForbidden, util.ErrEmailNotVerified)
 		return false
 	}
 
-	if verification.Intent != datastore.RegistrationIntent && verification.Intent != datastore.SetPasswordIntent {
+	if verification.Intent != datastore.RegistrationIntent && verification.Intent != datastore.ResetPasswordIntent && verification.Intent != datastore.ChangePasswordIntent {
 		util.RenderErrorResponse(w, r, http.StatusForbidden, util.ErrIncorrectVerificationIntent)
 		return false
 	}
@@ -270,6 +270,7 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 			*requestData.NewAccountEmail,
 			datastore.RegistrationIntent,
 			util.AccountsServiceName,
+			nil,
 		)
 		if err != nil {
 			if errors.Is(err, util.ErrTooManyVerifications) ||

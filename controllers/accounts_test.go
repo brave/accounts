@@ -102,9 +102,9 @@ func (suite *AccountsTestSuite) createAuthSession() (string, *datastore.Account)
 	return token, account
 }
 
-func (suite *AccountsTestSuite) TestSetPassword() {
-	// Create verification with set_password intent
-	verification, err := suite.ds.CreateVerification("test@example.com", "accounts", "set_password")
+func (suite *AccountsTestSuite) TestResetPassword() {
+	// Create verification with reset_password intent
+	verification, err := suite.ds.CreateVerification("test@example.com", "accounts", "reset_password")
 	suite.Require().NoError(err)
 	_, err = suite.ds.UpdateAndGetVerificationStatus(verification.ID, verification.Code)
 	suite.Require().NoError(err)
@@ -128,7 +128,7 @@ func (suite *AccountsTestSuite) TestSetPassword() {
 	var parsedResp controllers.RegistrationResponse
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
 	suite.NotNil(parsedResp.SerializedResponse)
-	suite.Nil(parsedResp.VerificationToken) // No verification token for set_password intent
+	suite.Nil(parsedResp.VerificationToken) // No verification token for reset_password intent
 	serializedRegistationResp, err := hex.DecodeString(*parsedResp.SerializedResponse)
 	suite.Require().NoError(err)
 	registrationResp, err := suite.opaqueClient.Deserialize.RegistrationResponse(serializedRegistationResp)
@@ -339,9 +339,9 @@ func (suite *AccountsTestSuite) TestSetPasswordBadIntents() {
 	}
 }
 
-func (suite *AccountsTestSuite) TestSetPasswordUnverifiedEmail() {
+func (suite *AccountsTestSuite) TestResetPasswordUnverifiedEmail() {
 	// Create unverified verification
-	verification, err := suite.ds.CreateVerification("test@example.com", "accounts", "set_password")
+	verification, err := suite.ds.CreateVerification("test@example.com", "accounts", "reset_password")
 	suite.Require().NoError(err)
 
 	// Get verification token
