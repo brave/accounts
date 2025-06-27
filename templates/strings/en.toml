@@ -89,3 +89,11 @@ other = "Download Brave"
 [EmailContactSupport]
 description = "Support contact link text"
 other = "Contact Support"
+
+[PasswordChangeNotificationSubject]
+description = "Email subject for password change notification"
+other = "Your Brave account password has been changed"
+
+[PasswordChangeNotificationMessage]
+description = "Email message informing user that their password was changed"
+other = "Your Brave account password has been successfully changed. If you didn't make this change, please contact our support team immediately to secure your account."

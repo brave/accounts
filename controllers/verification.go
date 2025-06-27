@@ -132,9 +132,7 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if requestData.Locale == "" {
-		requestData.Locale = r.Header.Get("Accept-Language")
-	}
+	locale := util.GetRequestLocale(requestData.Locale, r)
 
 	// Initialize verification
 	verification, verificationToken, err := vc.verificationService.InitializeVerification(
@@ -159,7 +157,7 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Send verification email
-	if err := vc.verificationService.SendVerificationEmail(r.Context(), verification, requestData.Locale); err != nil {
+	if err := vc.verificationService.SendVerificationEmail(r.Context(), verification, locale); err != nil {
 		if errors.Is(err, util.ErrFailedToSendEmailInvalidFormat) {
 			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
 			return

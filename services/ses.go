@@ -54,6 +54,7 @@ type SESService struct {
 type SES interface {
 	SendVerificationEmail(ctx context.Context, email string, verification *datastore.Verification, locale string) error
 	SendSimilarEmailAlert(ctx context.Context, email string, locale string) error
+	SendPasswordChangeNotification(ctx context.Context, email string, locale string) error
 }
 
 type emailFields struct {
@@ -275,6 +276,21 @@ func (s *SESService) SendSimilarEmailAlert(ctx context.Context, email string, lo
 
 	if err := s.sendEmail(ctx, email, data.Subject, &data, s.generalHTMLTemplate, s.generalTextTemplate); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
+	}
+
+	return nil
+}
+
+func (s *SESService) SendPasswordChangeNotification(ctx context.Context, email string, locale string) error {
+	localizer := i18n.NewLocalizer(s.i18nBundle, locale)
+
+	data := similarEmailFields{
+		emailFields: newEmailFields(localizer, "PasswordChangeNotificationSubject"),
+		Message:     localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "PasswordChangeNotificationMessage"}),
+	}
+
+	if err := s.sendEmail(ctx, email, data.Subject, &data, s.generalHTMLTemplate, s.generalTextTemplate); err != nil {
+		return fmt.Errorf("failed to send password change notification email: %w", err)
 	}
 
 	return nil
