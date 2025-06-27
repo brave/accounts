@@ -32,6 +32,8 @@ type PasswordFinalizeResponse struct {
 	RequiresTwoFA bool `json:"requiresTwoFA"`
 	// Indicates to the client whether email verification will be required before password setup is complete
 	RequiresEmailVerification bool `json:"requiresEmailVerification"`
+	// Indicates to the client that sessions were invalidated (only applicable when changing password)
+	SessionsInvalidated bool `json:"sessionsInvalidated"`
 }
 
 // @Description Request to register a new account
@@ -68,6 +70,8 @@ type RegistrationRecord struct {
 	SerializedRecord *string `json:"serializedRecord" validate:"required_without_all=PublicKey MaskingKey Envelope"`
 	// Locale for verification email (optional, falls back to Accept-Language header)
 	Locale string `json:"locale" validate:"max=8" example:"en-US"`
+	// Whether to invalidate existing sessions (only applicable when changing password)
+	InvalidateSessions bool `json:"invalidateSessions"`
 }
 
 // @Description Request to initialize 2FA setup
@@ -100,6 +104,17 @@ type TwoFAFinalizeResponse struct {
 type RecoveryKeyResponse struct {
 	// Secret key for disabling 2FA in the event the authenticator is lost
 	RecoveryKey string `json:"recoveryKey"`
+}
+
+// @Description Response after successful 2FA verification for password setup
+type RegistrationFinalize2FAResponse struct {
+	// Authentication token for future requests
+	AuthToken *string `json:"authToken"`
+	// Indicates to the client that 2FA was disabled as a result of using a recovery
+	// key (and should probably lead to the user being invited to re-enable 2FA)
+	TwoFADisabled bool `json:"twoFADisabled"`
+	// Indicates to the client that sessions were invalidated (only applicable when changing password)
+	SessionsInvalidated bool `json:"sessionsInvalidated"`
 }
 
 func (req *RegistrationRequest) ToOpaqueRequest(opaqueService *services.OpaqueService) (*opaqueMsg.RegistrationRequest, error) {
@@ -312,26 +327,32 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 	render.JSON(w, r, response)
 }
 
-func (ac *AccountsController) createSessionAfterPasswordSetup(accountID uuid.UUID, userAgent string, verificationID uuid.UUID) (string, error) {
-	if err := ac.ds.DeleteAllSessions(accountID); err != nil {
-		return "", fmt.Errorf("failed to delete existing sessions: %w", err)
-	}
+func (ac *AccountsController) postPasswordSetup(accountID uuid.UUID, userAgent string, verificationID uuid.UUID, verificationIntent string, invalidateSessions bool) (*string, bool, error) {
+	var authToken *string
+	// Invalidating sessions for password changes is optional, for all other intents it is required
+	shouldInvalidateSessions := verificationIntent != datastore.ChangePasswordIntent || invalidateSessions
+	if shouldInvalidateSessions {
+		if err := ac.ds.DeleteAllSessions(accountID); err != nil {
+			return nil, false, fmt.Errorf("failed to delete existing sessions: %w", err)
+		}
 
-	session, err := ac.ds.CreateSession(accountID, datastore.PasswordAuthSessionVersion, userAgent)
-	if err != nil {
-		return "", fmt.Errorf("failed to create session: %w", err)
-	}
+		session, err := ac.ds.CreateSession(accountID, datastore.PasswordAuthSessionVersion, userAgent)
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to create session: %w", err)
+		}
 
-	authToken, err := ac.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
-	if err != nil {
-		return "", fmt.Errorf("failed to create auth token: %w", err)
+		authTokenResult, err := ac.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to create auth token: %w", err)
+		}
+		authToken = &authTokenResult
 	}
 
 	if err := ac.ds.DeleteVerification(verificationID); err != nil {
-		return "", fmt.Errorf("failed to delete verification: %w", err)
+		return nil, false, fmt.Errorf("failed to delete verification: %w", err)
 	}
 
-	return authToken, nil
+	return authToken, shouldInvalidateSessions, nil
 }
 
 // @Summary Finalize password setup
@@ -383,13 +404,13 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 	}
 
 	var authToken *string
+	sessionsInvalidated := false
 	if !registrationState.RequiresTwoFA && verification.Intent != datastore.RegistrationIntent {
-		newAuthToken, err := ac.createSessionAfterPasswordSetup(*registrationState.AccountID, r.UserAgent(), verification.ID)
+		authToken, sessionsInvalidated, err = ac.postPasswordSetup(*registrationState.AccountID, r.UserAgent(), verification.ID, verification.Intent, requestData.InvalidateSessions)
 		if err != nil {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 			return
 		}
-		authToken = &newAuthToken
 	}
 
 	// Send verification email if this is a registration intent
@@ -409,6 +430,7 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 		AuthToken:                 authToken,
 		RequiresTwoFA:             registrationState.RequiresTwoFA,
 		RequiresEmailVerification: verification.Intent == datastore.RegistrationIntent,
+		SessionsInvalidated:       sessionsInvalidated,
 	})
 }
 
@@ -420,7 +442,7 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 // @Param Authorization header string true "Bearer + verification token"
 // @Param Brave-Key header string false "Brave services key (if one is configured)"
 // @Param request body services.TwoFAAuthRequest true "2FA verification request"
-// @Success 200 {object} LoginFinalize2FAResponse
+// @Success 200 {object} RegistrationFinalize2FAResponse
 // @Failure 400 {object} util.ErrorResponse
 // @Failure 401 {object} util.ErrorResponse
 // @Failure 500 {object} util.ErrorResponse
@@ -470,16 +492,17 @@ func (ac *AccountsController) SetupPasswordFinalize2FA(w http.ResponseWriter, r 
 		return
 	}
 
-	authToken, err := ac.createSessionAfterPasswordSetup(*registrationState.AccountID, r.UserAgent(), verification.ID)
+	authToken, sessionsInvalidated, err := ac.postPasswordSetup(*registrationState.AccountID, r.UserAgent(), verification.ID, verification.Intent, requestData.InvalidateSessions)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
 
 	render.Status(r, http.StatusOK)
-	render.JSON(w, r, &LoginFinalize2FAResponse{
-		AuthToken:     authToken,
-		TwoFADisabled: requestData.RecoveryKey != nil,
+	render.JSON(w, r, &RegistrationFinalize2FAResponse{
+		AuthToken:           authToken,
+		TwoFADisabled:       requestData.RecoveryKey != nil,
+		SessionsInvalidated: sessionsInvalidated,
 	})
 }
 

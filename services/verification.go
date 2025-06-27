@@ -73,6 +73,9 @@ func (vs *VerificationService) InitializeVerification(ctx context.Context, email
 		if !vs.passwordAuthEnabled || service != util.AccountsServiceName {
 			intentAllowed = false
 		}
+		// A valid auth session is required because we allow the user to choose whether
+		// they wish to invalidate all sessions. We do not want to present this option
+		// for any other intent (i.e. password resets, where session invalidation is mandatory to reduce attack risk).
 		if session == nil || session.Email != util.CanonicalizeEmail(email) {
 			intentAllowed = false
 		}
