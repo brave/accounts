@@ -79,7 +79,7 @@ func (suite *AccountsTestSuite) TearDownTest() {
 }
 
 func (suite *AccountsTestSuite) SetupRouter(accountDeletionEnabled bool) {
-	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion, true)
+	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion, true, true)
 	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds, true)
 	permissiveVerificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds, false)
 	suite.router = chi.NewRouter()

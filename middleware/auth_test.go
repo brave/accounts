@@ -42,7 +42,7 @@ func (suite *MiddlewareTestSuite) SetupTest() {
 
 func (suite *MiddlewareTestSuite) TestAuthMiddleware() {
 	// Create middleware
-	mw := middleware.AuthMiddleware(suite.jwtService, suite.ds, 1, true)
+	mw := middleware.AuthMiddleware(suite.jwtService, suite.ds, 1, true, true)
 
 	// Create test token
 	session, err := suite.ds.CreateSession(suite.account.ID, datastore.EmailAuthSessionVersion, "")
@@ -90,7 +90,7 @@ func (suite *MiddlewareTestSuite) TestAuthMiddleware() {
 	suite.Equal(http.StatusUnauthorized, resp.Code)
 
 	// Test outdated session version
-	mw = middleware.AuthMiddleware(suite.jwtService, suite.ds, 2, true)
+	mw = middleware.AuthMiddleware(suite.jwtService, suite.ds, 2, true, true)
 	req = httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp = util.ExecuteTestRequest(req, mw(handler))
@@ -98,7 +98,7 @@ func (suite *MiddlewareTestSuite) TestAuthMiddleware() {
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrOutdatedSession.Code)
 
 	// Test with enforcing accounts service name - child token should be rejected
-	mw = middleware.AuthMiddleware(suite.jwtService, suite.ds, 1, true)
+	mw = middleware.AuthMiddleware(suite.jwtService, suite.ds, 1, true, true)
 	req = httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "Bearer "+childToken)
 	resp = util.ExecuteTestRequest(req, mw(handler))
@@ -107,7 +107,7 @@ func (suite *MiddlewareTestSuite) TestAuthMiddleware() {
 
 	// Test without enforcing accounts service name - child token should be accepted
 	expectedServiceName = util.EmailAliasesServiceName
-	mw = middleware.AuthMiddleware(suite.jwtService, suite.ds, 1, false)
+	mw = middleware.AuthMiddleware(suite.jwtService, suite.ds, 1, false, true)
 	req = httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "Bearer "+childToken)
 	resp = util.ExecuteTestRequest(req, mw(handler))
@@ -117,7 +117,7 @@ func (suite *MiddlewareTestSuite) TestAuthMiddleware() {
 	expirationDuration = time.Second * -60
 	childToken, err = suite.jwtService.CreateAuthToken(session.ID, &expirationDuration, util.EmailAliasesServiceName)
 	suite.Require().NoError(err)
-	mw = middleware.AuthMiddleware(suite.jwtService, suite.ds, 1, false)
+	mw = middleware.AuthMiddleware(suite.jwtService, suite.ds, 1, false, true)
 	req = httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "Bearer "+childToken)
 	resp = util.ExecuteTestRequest(req, mw(handler))

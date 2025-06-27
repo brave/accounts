@@ -194,10 +194,10 @@ func NewAccountsController(opaqueService *services.OpaqueService, jwtService *se
 	}
 }
 
-func (ac *AccountsController) Router(verificationMiddleware func(http.Handler) http.Handler, permissiveVerificationMiddleware func(http.Handler) http.Handler, authMiddleware func(http.Handler) http.Handler, accountDeletionEnabled bool) chi.Router {
+func (ac *AccountsController) Router(verificationMiddleware func(http.Handler) http.Handler, optionalVerificationMiddleware func(http.Handler) http.Handler, authMiddleware func(http.Handler) http.Handler, accountDeletionEnabled bool) chi.Router {
 	r := chi.NewRouter()
 
-	r.With(permissiveVerificationMiddleware).Post("/password/init", ac.SetupPasswordInit)
+	r.With(optionalVerificationMiddleware).Post("/password/init", ac.SetupPasswordInit)
 	r.With(verificationMiddleware).Post("/password/finalize", ac.SetupPasswordFinalize)
 	r.With(verificationMiddleware).Post("/password/finalize_2fa", ac.SetupPasswordFinalize2FA)
 	r.With(authMiddleware).Get("/2fa", ac.GetTwoFASettings)

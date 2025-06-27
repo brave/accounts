@@ -206,10 +206,10 @@ func NewAuthController(opaqueService *services.OpaqueService, jwtService *servic
 	}
 }
 
-func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler, permissiveAuthMiddleware func(http.Handler) http.Handler, passwordAuthEnabled bool) chi.Router {
+func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler, validateAuthMiddleware func(http.Handler) http.Handler, passwordAuthEnabled bool) chi.Router {
 	r := chi.NewRouter()
 
-	r.With(permissiveAuthMiddleware).Get("/validate", ac.Validate)
+	r.With(validateAuthMiddleware).Get("/validate", ac.Validate)
 	r.With(authMiddleware).Post("/service_token", ac.CreateServiceToken)
 	if passwordAuthEnabled {
 		r.Post("/login/init", ac.LoginInit)

@@ -98,11 +98,11 @@ func (suite *AuthTestSuite) TearDownTest() {
 }
 
 func (suite *AuthTestSuite) SetupRouter(passwordAuthEnabled bool) {
-	permissiveAuthMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion, false)
-	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion, true)
+	validateAuthMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion, false, true)
+	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion, true, true)
 
 	suite.router = chi.NewRouter()
-	suite.router.Mount("/v2/auth", suite.controller.Router(authMiddleware, permissiveAuthMiddleware, passwordAuthEnabled))
+	suite.router.Mount("/v2/auth", suite.controller.Router(authMiddleware, validateAuthMiddleware, passwordAuthEnabled))
 }
 
 func (suite *AuthTestSuite) createLoginFinalizeRequest(opaqueClient *opaque.Client, serializedKE2Hex string) controllers.LoginFinalizeRequest {
