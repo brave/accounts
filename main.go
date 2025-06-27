@@ -175,7 +175,7 @@ func main() {
 	verificationController := controllers.NewVerificationController(datastore, verificationService)
 	sessionsController := controllers.NewSessionsController(datastore)
 	userKeysController := controllers.NewUserKeysController(datastore)
-	accountsController := controllers.NewAccountsController(opaqueService, jwtService, twoFAService, datastore, verificationService)
+	accountsController := controllers.NewAccountsController(opaqueService, jwtService, twoFAService, datastore, verificationService, sesService)
 
 	r.Use(middleware.LoggerMiddleware(prometheusRegistry))
 	r.Use(cors.Handler(cors.Options{

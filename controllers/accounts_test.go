@@ -62,7 +62,7 @@ func (suite *AccountsTestSuite) SetupTest() {
 	twoFAService := services.NewTwoFAService(suite.ds, false)
 	suite.sesMock = &MockSESService{}
 	suite.verificationService = services.NewVerificationService(suite.ds, suite.jwtService, suite.sesMock, true, true)
-	suite.controller = controllers.NewAccountsController(opaqueService, suite.jwtService, twoFAService, suite.ds, suite.verificationService)
+	suite.controller = controllers.NewAccountsController(opaqueService, suite.jwtService, twoFAService, suite.ds, suite.verificationService, suite.sesMock)
 
 	suite.opaqueClient, err = opaque.NewClient(opaqueService.Config)
 	suite.Require().NoError(err)
@@ -139,6 +139,8 @@ func (suite *AccountsTestSuite) TestResetPassword() {
 		ClientIdentity: []byte(verification.Email),
 	})
 	serializedRecord := hex.EncodeToString(registrationRecord.Serialize())
+
+	suite.sesMock.On("SendPasswordChangeNotification", mock.Anything, verification.Email, mock.Anything).Return(nil).Once()
 
 	// Test password finalize
 	req = util.CreateJSONTestRequest("/v2/accounts/password/finalize", controllers.RegistrationRecord{
