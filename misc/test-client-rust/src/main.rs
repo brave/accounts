@@ -65,7 +65,7 @@ struct CliArgs {
 
     /// Set password mode flag
     #[arg(short, long)]
-    set_password: bool,
+    reset_password: bool,
 
     /// Email auth flag
     #[arg(short = 'e', long)]
@@ -202,8 +202,8 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
                 "verification"
             } else if args.email_auth {
                 "auth_token"
-            } else if args.set_password {
-                "set_password"
+            } else if args.reset_password {
+                "reset_password"
             } else {
                 "registration"
             }
@@ -535,7 +535,7 @@ fn main() {
         display_account_details(&args, auth_token.unwrap_or_default().as_str());
     } else if args.login {
         login(args);
-    } else if args.register || args.set_password {
+    } else if args.register || args.reset_password {
         set_password(args);
     } else if args.enable_totp {
         enable_totp(&args);
