@@ -162,6 +162,8 @@ func main() {
 	authMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion, true, true)
 	// validateAuthMiddleware will ensure a valid session is present with any service name
 	validateAuthMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion, false, true)
+	// optionalAuthMiddleware will validate an optional auth token; the request will continue without an auth token
+	optionalAuthMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion, true, false)
 	// verificationMiddleware will ensure a valid verification token is present
 	verificationMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore, true)
 	// optionalVerificationMiddleware will validate an optional verification token; the request will continue without a verification token
@@ -192,7 +194,7 @@ func main() {
 		if passwordAuthEnabled {
 			r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware, optionalVerificationMiddleware, authMiddleware, accountDeletionEnabled))
 		}
-		r.Mount("/verify", verificationController.Router(verificationMiddleware, servicesKeyMiddleware, devEndpointsEnabled))
+		r.Mount("/verify", verificationController.Router(verificationMiddleware, servicesKeyMiddleware, optionalAuthMiddleware, devEndpointsEnabled))
 		r.With(servicesKeyMiddleware).Mount("/sessions", sessionsController.Router(authMiddleware))
 		r.With(servicesKeyMiddleware).Mount("/keys", userKeysController.Router(authMiddleware))
 	})
