@@ -331,6 +331,9 @@ func (suite *AccountsTestSuite) TestChangePassword() {
 		account, err := suite.ds.GetOrCreateAccount(email)
 		suite.Require().NoError(err)
 
+		err = suite.ds.SetAccountLocaleIfMissing(account.ID, "fr-FR")
+		suite.Require().NoError(err)
+
 		// Create sessions to verify session invalidation or lack thereof
 		for range 3 {
 			_, err := suite.ds.CreateSession(account.ID, datastore.EmailAuthSessionVersion, "")
@@ -371,6 +374,8 @@ func (suite *AccountsTestSuite) TestChangePassword() {
 		})
 		serializedChangeRecord := hex.EncodeToString(changeRecord.Serialize())
 
+		suite.sesMock.On("SendPasswordChangeNotification", mock.Anything, email, "fr-FR").Return(nil).Once()
+
 		// Test password change finalize with session invalidation
 		req = util.CreateJSONTestRequest("/v2/accounts/password/finalize", controllers.RegistrationRecord{
 			SerializedRecord:   &serializedChangeRecord,
@@ -386,6 +391,8 @@ func (suite *AccountsTestSuite) TestChangePassword() {
 		suite.False(changeFinalizeResp.RequiresTwoFA)
 		suite.False(changeFinalizeResp.RequiresEmailVerification)
 		suite.Equal(sessionInvalidation, changeFinalizeResp.SessionsInvalidated)
+
+		suite.sesMock.AssertExpectations(suite.T())
 
 		// Verify the account still exists and password was changed
 		updatedAccount, err := suite.ds.GetAccount(nil, email)
