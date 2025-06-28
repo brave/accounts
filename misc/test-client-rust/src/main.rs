@@ -39,7 +39,7 @@ struct CliArgs {
     #[arg(long)]
     password: Option<String>,
 
-    /// Verification or auth token
+    /// Auth token
     #[arg(long)]
     token: Option<String>,
 
@@ -66,6 +66,10 @@ struct CliArgs {
     /// Set password mode flag
     #[arg(short, long)]
     reset_password: bool,
+
+    /// Change password mode flag
+    #[arg(short, long)]
+    change_password: bool,
 
     /// Email auth flag
     #[arg(short = 'e', long)]
@@ -204,6 +208,8 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
                 "auth_token"
             } else if args.reset_password {
                 "reset_password"
+            } else if args.change_password {
+                "change_password"
             } else {
                 "registration"
             }
@@ -216,11 +222,17 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
         Value::String(args.email.as_ref().expect("email must be provided").clone()),
     );
 
+    let auth_token = if args.change_password {
+        Some(args.token.as_ref().expect("auth token is required for password change").trim())
+    } else {
+        None
+    };
+
     let init_response = make_request(
         args,
         reqwest::Method::POST,
         "/v2/verify/init",
-        None,
+        auth_token,
         Some(body),
     );
     let verification_token = init_response
@@ -233,17 +245,11 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
 }
 
 fn set_password(args: CliArgs) {
-    let token = if args.register {
+    let verification_token = if args.register {
         // For registration, don't verify upfront, pass newAccountEmail instead
         None
     } else {
-        match &args.token {
-            Some(t) => Some(t.trim().to_string()),
-            None => {
-                let (token, _) = verify(&args);
-                Some(token)
-            }
-        }
+        Some(verify(&args).0)
     };
 
     let mut client_rng = OsRng;
@@ -273,7 +279,7 @@ fn set_password(args: CliArgs) {
         &args,
         reqwest::Method::POST,
         "/v2/accounts/password/init",
-        token.as_deref(),
+        verification_token.as_deref(),
         Some(body),
     );
 
@@ -284,7 +290,7 @@ fn set_password(args: CliArgs) {
             .expect("Missing verificationToken for registration")
             .to_string()
     } else {
-        token.unwrap()
+        verification_token.unwrap()
     };
 
     let resp_bin = hex::decode(
@@ -535,7 +541,7 @@ fn main() {
         display_account_details(&args, auth_token.unwrap_or_default().as_str());
     } else if args.login {
         login(args);
-    } else if args.register || args.reset_password {
+    } else if args.register || args.reset_password || args.change_password {
         set_password(args);
     } else if args.enable_totp {
         enable_totp(&args);
