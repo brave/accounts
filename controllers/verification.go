@@ -37,7 +37,7 @@ type VerifyInitRequest struct {
 	// Service requesting the verification
 	Service string `json:"service" validate:"required,oneof=accounts premium email-aliases" example:"accounts"`
 	// Locale for verification email
-	Locale string `json:"locale" validate:"max=8" example:"en-US"`
+	Locale string `json:"locale" validate:"max=20" example:"en-US"`
 }
 
 // @Description	Response containing verification check token

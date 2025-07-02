@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 type AccountsController struct {
@@ -71,7 +72,7 @@ type RegistrationRecord struct {
 	// Serialized registration record
 	SerializedRecord *string `json:"serializedRecord" validate:"required_without_all=PublicKey MaskingKey Envelope"`
 	// Locale for verification email
-	Locale string `json:"locale" validate:"max=8" example:"en-US"`
+	Locale string `json:"locale" validate:"max=20" example:"en-US"`
 	// Whether to invalidate existing sessions (only applicable when changing password)
 	InvalidateSessions bool `json:"invalidateSessions"`
 }

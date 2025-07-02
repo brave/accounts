@@ -317,10 +317,14 @@ func (k *KeyServiceClient) MakeRequest(method string, path string, body interfac
 }
 
 func GetRequestLocale(explicitLocale string, r *http.Request) string {
-	if explicitLocale != "" {
-		return explicitLocale
+	locale := explicitLocale
+	if locale == "" {
+		// Use header as fallback
+		locale = r.Header.Get("Accept-Language")
 	}
 
-	// Use header as fallback
-	return r.Header.Get("Accept-Language")
+	if len(locale) > 20 {
+		return locale[:20]
+	}
+	return locale
 }
