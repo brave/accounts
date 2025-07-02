@@ -491,6 +491,8 @@ func (suite *VerificationTestSuite) TestVerifyInitChangePasswordRequiresAuth() {
 	email := "test@example.com"
 	account, err := suite.ds.GetOrCreateAccount(email)
 	suite.Require().NoError(err)
+	err = suite.ds.UpdateAccountLastEmailVerifiedAt(account.ID)
+	suite.Require().NoError(err)
 
 	// Test change_password intent without auth - should fail with ErrIntentNotAllowed
 	body := controllers.VerifyInitRequest{

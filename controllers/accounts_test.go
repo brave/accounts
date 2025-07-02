@@ -228,7 +228,7 @@ func (suite *AccountsTestSuite) TestRegistration() {
 	req = util.CreateJSONTestRequest("/v2/accounts/password/finalize", controllers.RegistrationRecord{
 		SerializedRecord: &serializedRecord,
 		// This setting should be ignored
-		InvalidateSessions: false,
+		InvalidateSessions: true,
 	})
 	req.Header.Set("Authorization", "Bearer "+*parsedResp.VerificationToken)
 
