@@ -47,7 +47,12 @@ func (suite *SessionsTestSuite) SetupTest() {
 	// Create test accounts
 	suite.mainAccount, err = suite.ds.GetOrCreateAccount("test@example.com")
 	suite.Require().NoError(err)
+	err = suite.ds.UpdateAccountLastEmailVerifiedAt(suite.mainAccount.ID)
+	suite.Require().NoError(err)
+
 	suite.otherAccount, err = suite.ds.GetOrCreateAccount("other@example.com")
+	suite.Require().NoError(err)
+	err = suite.ds.UpdateAccountLastEmailVerifiedAt(suite.otherAccount.ID)
 	suite.Require().NoError(err)
 
 	_, err = suite.ds.CreateSession(suite.otherAccount.ID, datastore.PasswordAuthSessionVersion, "other")

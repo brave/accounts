@@ -90,6 +90,9 @@ func (suite *AccountsTestSuite) createAuthSession() (string, *datastore.Account)
 	// Create test account
 	account, err := suite.ds.GetOrCreateAccount("test@example.com")
 	suite.Require().NoError(err)
+	err = suite.ds.UpdateAccountLastEmailVerifiedAt(account.ID)
+	suite.Require().NoError(err)
+
 	// Create test account session
 	session, err := suite.ds.CreateSession(account.ID, datastore.EmailAuthSessionVersion, "")
 	suite.Require().NoError(err)
@@ -519,7 +522,6 @@ func (suite *AccountsTestSuite) TestTOTPSetupAndFinalize() {
 	suite.True(updatedAccount.IsTwoFAEnabled())
 	suite.NotNil(updatedAccount.RecoveryKeyHash)
 	suite.True(util.VerifyRecoveryKeyHash(*finalizeParsedResp.RecoveryKey, updatedAccount.RecoveryKeyHash))
-	suite.Nil(updatedAccount.LastEmailVerifiedAt)
 
 	// Test initializing TOTP when it's already enabled
 	initReq = util.CreateJSONTestRequest("/v2/accounts/2fa/totp/init", controllers.TwoFAInitRequest{

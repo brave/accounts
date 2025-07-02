@@ -38,6 +38,9 @@ func (suite *MiddlewareTestSuite) SetupTest() {
 
 	suite.account, err = suite.ds.GetOrCreateAccount("test@example.com")
 	suite.Require().NoError(err)
+
+	err = suite.ds.UpdateAccountLastEmailVerifiedAt(suite.account.ID)
+	suite.Require().NoError(err)
 }
 
 func (suite *MiddlewareTestSuite) TestAuthMiddleware() {
@@ -112,6 +115,17 @@ func (suite *MiddlewareTestSuite) TestAuthMiddleware() {
 	req.Header.Set("Authorization", "Bearer "+childToken)
 	resp = util.ExecuteTestRequest(req, mw(handler))
 	suite.Equal(http.StatusOK, resp.Code)
+
+	// Test session with unverified email
+	err = suite.ds.DB.Model(&datastore.Account{}).Where("id = ?", session.AccountID).Update("last_email_verified_at", nil).Error
+	suite.Require().NoError(err)
+	req = httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp = util.ExecuteTestRequest(req, mw(handler))
+	suite.Equal(http.StatusUnauthorized, resp.Code)
+
+	err = suite.ds.UpdateAccountLastEmailVerifiedAt(session.AccountID)
+	suite.Require().NoError(err)
 
 	// test expired child token
 	expirationDuration = time.Second * -60

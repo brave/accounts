@@ -34,8 +34,12 @@ func (suite *UserKeysTestSuite) SetupTest() {
 
 	suite.account, err = suite.ds.GetOrCreateAccount("test@example.com")
 	suite.Require().NoError(err)
+	err = suite.ds.UpdateAccountLastEmailVerifiedAt(suite.account.ID)
+	suite.Require().NoError(err)
 
 	otherAccount, err := suite.ds.GetOrCreateAccount("test2@example.com")
+	suite.Require().NoError(err)
+	err = suite.ds.UpdateAccountLastEmailVerifiedAt(otherAccount.ID)
 	suite.Require().NoError(err)
 
 	otherTestKey := datastore.DBUserKey{

@@ -414,6 +414,8 @@ func (suite *AuthTestSuite) TestCreateServiceToken() {
 	// Test TLD in 'strict' list
 	ruAccount, err := suite.ds.GetOrCreateAccount("test@example.ru")
 	suite.Require().NoError(err)
+	err = suite.ds.UpdateAccountLastEmailVerifiedAt(ruAccount.ID)
+	suite.Require().NoError(err)
 	session, err = suite.ds.CreateSession(ruAccount.ID, datastore.EmailAuthSessionVersion, "")
 	suite.Require().NoError(err)
 	token, err = suite.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
