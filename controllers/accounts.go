@@ -14,7 +14,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
 )
 
 type AccountsController struct {
@@ -399,8 +398,8 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 			locale = r.Header.Get("Accept-Language")
 		}
 		if err := ac.verificationService.SendVerificationEmail(r.Context(), verification, locale); err != nil {
-			// Log the error but don't fail the request since password setup was successful
-			log.Err(err).Msg("failed to send verification email after password setup")
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
 		}
 	}
 
