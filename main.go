@@ -158,9 +158,14 @@ func main() {
 	prometheusRegistry := prometheus.NewRegistry()
 
 	servicesKeyMiddleware := middleware.ServicesKeyMiddleware(environment)
-	authMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion, true)
-	permissiveAuthMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion, false)
-	verificationMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore)
+	// authMiddleware will ensure a valid session is present with the "accounts" service name
+	authMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion, true, true)
+	// validateAuthMiddleware will ensure a valid session is present with any service name
+	validateAuthMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion, false, true)
+	// verificationMiddleware will ensure a valid verification token is present
+	verificationMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore, true)
+	// optionalVerificationMiddleware will validate an optional verification token; the request will continue without a verification token
+	optionalVerificationMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore, false)
 
 	r := chi.NewRouter()
 
@@ -183,9 +188,9 @@ func main() {
 	})
 
 	r.Route("/v2", func(r chi.Router) {
-		r.With(servicesKeyMiddleware).Mount("/auth", authController.Router(authMiddleware, permissiveAuthMiddleware, passwordAuthEnabled))
+		r.With(servicesKeyMiddleware).Mount("/auth", authController.Router(authMiddleware, validateAuthMiddleware, passwordAuthEnabled))
 		if passwordAuthEnabled {
-			r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware, authMiddleware, accountDeletionEnabled))
+			r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware, optionalVerificationMiddleware, authMiddleware, accountDeletionEnabled))
 		}
 		r.Mount("/verify", verificationController.Router(verificationMiddleware, servicesKeyMiddleware, devEndpointsEnabled))
 		r.With(servicesKeyMiddleware).Mount("/sessions", sessionsController.Router(authMiddleware))

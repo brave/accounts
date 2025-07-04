@@ -84,7 +84,7 @@ func (d *Datastore) GetSession(sessionID uuid.UUID) (*SessionWithAccountInfo, er
 			accounts.last_used_at
 		`).
 		Joins("JOIN accounts ON sessions.account_id = accounts.id").
-		Where("sessions.id = ?", sessionID).
+		Where("sessions.id = ? AND accounts.last_email_verified_at IS NOT NULL", sessionID).
 		First(&session).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrSessionNotFound

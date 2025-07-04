@@ -32,12 +32,12 @@ type VerificationController struct {
 type VerifyInitRequest struct {
 	// Email address to verify
 	Email string `json:"email" validate:"required,email,ascii" example:"test@example.com"`
-	// Purpose of verification (e.g., get auth token, simple verification, registration)
-	Intent string `json:"intent" validate:"required,oneof=auth_token verification registration set_password" example:"registration"`
+	// Purpose of verification (e.g., get auth token, simple verification)
+	Intent string `json:"intent" validate:"required,oneof=auth_token verification set_password" example:"set_password"`
 	// Service requesting the verification
 	Service string `json:"service" validate:"required,oneof=accounts premium email-aliases" example:"accounts"`
 	// Locale for verification email
-	Locale string `json:"language" validate:"max=8" example:"en-US"`
+	Locale string `json:"locale" validate:"max=8" example:"en-US"`
 }
 
 // @Description	Response containing verification check token
@@ -111,7 +111,6 @@ func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Ha
 // @Description One of the following intents must be provided with the request:
 // @Description - `auth_token`: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the "query result" endpoint.
 // @Description - `verification`: After verification, do not create an account, but indicate that the email was verified in the "query result" response. Do not allow registration after verification.
-// @Description - `registration`: After verification, indicate that the email was verified in the "query result" response. An account may be created by setting a password.
 // @Description - `set_password`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
 // @Description
 // @Description One of the following service names must be provided with the request: `email-aliases`, `accounts`, `premium`.
@@ -134,13 +133,12 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		requestData.Locale = r.Header.Get("Accept-Language")
 	}
 
-	// Delegate to service
-	verificationToken, err := vc.verificationService.InitializeVerification(
+	// Initialize verification
+	verification, verificationToken, err := vc.verificationService.InitializeVerification(
 		r.Context(),
 		requestData.Email,
 		requestData.Intent,
 		requestData.Service,
-		requestData.Locale,
 	)
 
 	if err != nil {
@@ -148,8 +146,17 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 			errors.Is(err, util.ErrIntentNotAllowed) ||
 			errors.Is(err, util.ErrEmailDomainNotSupported) ||
 			errors.Is(err, util.ErrAccountExists) ||
-			errors.Is(err, util.ErrAccountDoesNotExist) ||
-			errors.Is(err, util.ErrFailedToSendEmailInvalidFormat) {
+			errors.Is(err, util.ErrAccountDoesNotExist) {
+			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+			return
+		}
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Send verification email
+	if err := vc.verificationService.SendVerificationEmail(r.Context(), verification, requestData.Locale); err != nil {
+		if errors.Is(err, util.ErrFailedToSendEmailInvalidFormat) {
 			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
 			return
 		}

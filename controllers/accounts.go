@@ -26,10 +26,12 @@ type AccountsController struct {
 
 // @Description Response for password setup or change
 type PasswordFinalizeResponse struct {
-	// Authentication token
-	AuthToken string `json:"authToken"`
+	// Authentication token (only present if resetting/changing password)
+	AuthToken *string `json:"authToken"`
 	// Indicates to the client whether 2FA verification will be required before password setup is complete
 	RequiresTwoFA bool `json:"requiresTwoFA"`
+	// Indicates to the client whether email verification will be required before password setup is complete
+	RequiresEmailVerification bool `json:"requiresEmailVerification"`
 }
 
 // @Description Request to register a new account
@@ -38,6 +40,8 @@ type RegistrationRequest struct {
 	BlindedMessage string `json:"blindedMessage" validate:"required"`
 	// Whether to serialize the response into binary/hex
 	SerializeResponse bool `json:"serializeResponse"`
+	// Email for new account creation (required if no verification token)
+	NewAccountEmail *string `json:"newAccountEmail" validate:"omitempty,email"`
 }
 
 // @Description Response for registering a new account
@@ -48,6 +52,8 @@ type RegistrationResponse struct {
 	Pks *string `json:"pks,omitempty"`
 	// Serialized OPAQUE registration response
 	SerializedResponse *string `json:"serializedResponse,omitempty"`
+	// JWT token for checking verification status (only present when registering a new account)
+	VerificationToken *string `json:"verificationToken,omitempty"`
 }
 
 // @Description OPAQUE registration record for a new account
@@ -60,6 +66,8 @@ type RegistrationRecord struct {
 	Envelope *string `json:"envelope" validate:"required_without=SerializedRecord"`
 	// Serialized registration record
 	SerializedRecord *string `json:"serializedRecord" validate:"required_without_all=PublicKey MaskingKey Envelope"`
+	// Locale for verification email (optional, falls back to Accept-Language header)
+	Locale string `json:"locale" validate:"max=8" example:"en-US"`
 }
 
 // @Description Request to initialize 2FA setup
@@ -185,10 +193,10 @@ func NewAccountsController(opaqueService *services.OpaqueService, jwtService *se
 	}
 }
 
-func (ac *AccountsController) Router(verificationMiddleware func(http.Handler) http.Handler, authMiddleware func(http.Handler) http.Handler, accountDeletionEnabled bool) chi.Router {
+func (ac *AccountsController) Router(verificationMiddleware func(http.Handler) http.Handler, optionalVerificationMiddleware func(http.Handler) http.Handler, authMiddleware func(http.Handler) http.Handler, accountDeletionEnabled bool) chi.Router {
 	r := chi.NewRouter()
 
-	r.With(verificationMiddleware).Post("/password/init", ac.SetupPasswordInit)
+	r.With(optionalVerificationMiddleware).Post("/password/init", ac.SetupPasswordInit)
 	r.With(verificationMiddleware).Post("/password/finalize", ac.SetupPasswordFinalize)
 	r.With(verificationMiddleware).Post("/password/finalize_2fa", ac.SetupPasswordFinalize2FA)
 	r.With(authMiddleware).Get("/2fa", ac.GetTwoFASettings)
@@ -205,7 +213,7 @@ func (ac *AccountsController) Router(verificationMiddleware func(http.Handler) h
 }
 
 func checkVerificationStatusAndIntent(w http.ResponseWriter, r *http.Request, verification *datastore.Verification) bool {
-	if !verification.Verified {
+	if verification.Intent == datastore.SetPasswordIntent && !verification.Verified {
 		util.RenderErrorResponse(w, r, http.StatusForbidden, util.ErrEmailNotVerified)
 		return false
 	}
@@ -221,10 +229,11 @@ func checkVerificationStatusAndIntent(w http.ResponseWriter, r *http.Request, ve
 // @Description Start the password setup process using OPAQUE protocol.
 // @Description If `serializeResponse` is set to true, the `serializedResponse` field will be populated
 // @Description in the response, with other fields omitted.
+// @Description Either provide a verification token for resetting/changing password OR include `newAccountEmail` for new account creation.
 // @Tags Accounts
 // @Accept json
 // @Produce json
-// @Param Authorization header string true "Bearer + verification token"
+// @Param Authorization header string false "Bearer + verification token (optional if newAccountEmail is provided)"
 // @Param Brave-Key header string false "Brave services key (if one is configured)"
 // @Param request body RegistrationRequest true "Registration request"
 // @Success 200 {object} RegistrationResponse
@@ -234,15 +243,47 @@ func checkVerificationStatusAndIntent(w http.ResponseWriter, r *http.Request, ve
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/accounts/password/init [post]
 func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.Request) {
-	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
-
-	if !checkVerificationStatusAndIntent(w, r, verification) {
-		return
-	}
+	verification, _ := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
 
 	var requestData RegistrationRequest
 	if !util.DecodeJSONAndValidate(w, r, &requestData) {
 		return
+	}
+
+	var verificationToken *string
+	if verification != nil {
+		// If verification is present, check its status and intent
+		if !checkVerificationStatusAndIntent(w, r, verification) {
+			return
+		}
+	} else {
+		// No verification token provided, check for newAccountEmail
+		if requestData.NewAccountEmail == nil || *requestData.NewAccountEmail == "" {
+			util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrNewAccountEmailRequired)
+			return
+		}
+
+		var err error
+		// Create a new verification for registration
+		verification, verificationToken, err = ac.verificationService.InitializeVerification(
+			r.Context(),
+			*requestData.NewAccountEmail,
+			datastore.RegistrationIntent,
+			util.AccountsServiceName,
+		)
+		if err != nil {
+			if errors.Is(err, util.ErrTooManyVerifications) ||
+				errors.Is(err, util.ErrIntentNotAllowed) ||
+				errors.Is(err, util.ErrEmailDomainNotSupported) ||
+				errors.Is(err, util.ErrAccountExists) ||
+				errors.Is(err, util.ErrAccountDoesNotExist) ||
+				errors.Is(err, util.ErrNewAccountEmailRequired) {
+				util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+				return
+			}
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
 	}
 
 	opaqueReq, err := requestData.ToOpaqueRequest(ac.opaqueService)
@@ -262,6 +303,9 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
+
+	// Include verification token if a new verification was created
+	response.VerificationToken = verificationToken
 
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, response)
@@ -337,15 +381,23 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if err = ac.ds.UpdateAccountLastEmailVerifiedAt(*registrationState.AccountID); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
+	var authToken *string
+	if !registrationState.RequiresTwoFA && verification.Intent != datastore.RegistrationIntent {
+		newAuthToken, err := ac.createSessionAfterPasswordSetup(*registrationState.AccountID, r.UserAgent(), verification.ID)
+		if err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
+		authToken = &newAuthToken
 	}
 
-	var authToken string
-	if !registrationState.RequiresTwoFA {
-		authToken, err = ac.createSessionAfterPasswordSetup(*registrationState.AccountID, r.UserAgent(), verification.ID)
-		if err != nil {
+	// Send verification email if this is a registration intent
+	if verification.Intent == datastore.RegistrationIntent {
+		locale := requestData.Locale
+		if locale == "" {
+			locale = r.Header.Get("Accept-Language")
+		}
+		if err := ac.verificationService.SendVerificationEmail(r.Context(), verification, locale); err != nil {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 			return
 		}
@@ -353,8 +405,9 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, &PasswordFinalizeResponse{
-		AuthToken:     authToken,
-		RequiresTwoFA: registrationState.RequiresTwoFA,
+		AuthToken:                 authToken,
+		RequiresTwoFA:             registrationState.RequiresTwoFA,
+		RequiresEmailVerification: verification.Intent == datastore.RegistrationIntent,
 	})
 }
 
