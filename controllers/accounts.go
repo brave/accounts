@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 type AccountsController struct {
@@ -22,6 +24,7 @@ type AccountsController struct {
 	twoFAService        *services.TwoFAService
 	ds                  *datastore.Datastore
 	verificationService *services.VerificationService
+	sesService          services.SES
 }
 
 // @Description Response for password setup or change
@@ -68,8 +71,8 @@ type RegistrationRecord struct {
 	Envelope *string `json:"envelope" validate:"required_without=SerializedRecord"`
 	// Serialized registration record
 	SerializedRecord *string `json:"serializedRecord" validate:"required_without_all=PublicKey MaskingKey Envelope"`
-	// Locale for verification email (optional, falls back to Accept-Language header)
-	Locale string `json:"locale" validate:"max=8" example:"en-US"`
+	// Locale for verification email
+	Locale string `json:"locale" validate:"max=20" example:"en-US"`
 	// Whether to invalidate existing sessions (only applicable when changing password)
 	InvalidateSessions bool `json:"invalidateSessions"`
 }
@@ -198,13 +201,14 @@ func FromOpaqueRegistrationResponse(opaqueResp *opaqueMsg.RegistrationResponse, 
 	}, nil
 }
 
-func NewAccountsController(opaqueService *services.OpaqueService, jwtService *services.JWTService, twoFAService *services.TwoFAService, ds *datastore.Datastore, verificationService *services.VerificationService) *AccountsController {
+func NewAccountsController(opaqueService *services.OpaqueService, jwtService *services.JWTService, twoFAService *services.TwoFAService, ds *datastore.Datastore, verificationService *services.VerificationService, sesService services.SES) *AccountsController {
 	return &AccountsController{
 		opaqueService:       opaqueService,
 		jwtService:          jwtService,
 		twoFAService:        twoFAService,
 		ds:                  ds,
 		verificationService: verificationService,
+		sesService:          sesService,
 	}
 }
 
@@ -327,10 +331,10 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 	render.JSON(w, r, response)
 }
 
-func (ac *AccountsController) postPasswordSetup(accountID uuid.UUID, userAgent string, verificationID uuid.UUID, verificationIntent string, invalidateSessions bool) (*string, bool, error) {
+func (ac *AccountsController) postPasswordSetup(ctx context.Context, accountID uuid.UUID, userAgent string, verification *datastore.Verification, invalidateSessions bool) (*string, bool, error) {
 	var authToken *string
 	// Invalidating sessions for password changes is optional, for all other intents it is required
-	shouldInvalidateSessions := verificationIntent != datastore.ChangePasswordIntent || invalidateSessions
+	shouldInvalidateSessions := verification.Intent != datastore.ChangePasswordIntent || invalidateSessions
 	if shouldInvalidateSessions {
 		if err := ac.ds.DeleteAllSessions(accountID); err != nil {
 			return nil, false, fmt.Errorf("failed to delete existing sessions: %w", err)
@@ -348,7 +352,26 @@ func (ac *AccountsController) postPasswordSetup(accountID uuid.UUID, userAgent s
 		authToken = &authTokenResult
 	}
 
-	if err := ac.ds.DeleteVerification(verificationID); err != nil {
+	// Send password change notification email for existing accounts
+	if verification.Intent == datastore.ResetPasswordIntent || verification.Intent == datastore.ChangePasswordIntent {
+		accountLocale, err := ac.ds.GetAccountLocale(accountID)
+		if err != nil {
+			// Log error, but continue with fallback locale
+			log.Err(err).Msg("failed to get account locale for password change notification")
+		}
+
+		var locale string
+		if accountLocale != nil {
+			locale = *accountLocale
+		}
+
+		if err := ac.sesService.SendPasswordChangeNotification(ctx, verification.Email, locale); err != nil {
+			// Log the error but don't fail the request since password setup was successful
+			log.Err(err).Msg("failed to send password change notification email")
+		}
+	}
+
+	if err := ac.ds.DeleteVerification(verification.ID); err != nil {
 		return nil, false, fmt.Errorf("failed to delete verification: %w", err)
 	}
 
@@ -403,10 +426,17 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 		return
 	}
 
+	locale := util.GetRequestLocale(requestData.Locale, r)
+	err = ac.ds.SetAccountLocaleIfMissing(*registrationState.AccountID, locale)
+	if err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
 	var authToken *string
 	sessionsInvalidated := false
 	if !registrationState.RequiresTwoFA && verification.Intent != datastore.RegistrationIntent {
-		authToken, sessionsInvalidated, err = ac.postPasswordSetup(*registrationState.AccountID, r.UserAgent(), verification.ID, verification.Intent, requestData.InvalidateSessions)
+		authToken, sessionsInvalidated, err = ac.postPasswordSetup(r.Context(), *registrationState.AccountID, r.UserAgent(), verification, requestData.InvalidateSessions)
 		if err != nil {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 			return
@@ -415,10 +445,6 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 
 	// Send verification email if this is a registration intent
 	if verification.Intent == datastore.RegistrationIntent {
-		locale := requestData.Locale
-		if locale == "" {
-			locale = r.Header.Get("Accept-Language")
-		}
 		if err := ac.verificationService.SendVerificationEmail(r.Context(), verification, locale); err != nil {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 			return
@@ -492,7 +518,7 @@ func (ac *AccountsController) SetupPasswordFinalize2FA(w http.ResponseWriter, r 
 		return
 	}
 
-	authToken, sessionsInvalidated, err := ac.postPasswordSetup(*registrationState.AccountID, r.UserAgent(), verification.ID, verification.Intent, requestData.InvalidateSessions)
+	authToken, sessionsInvalidated, err := ac.postPasswordSetup(r.Context(), *registrationState.AccountID, r.UserAgent(), verification, requestData.InvalidateSessions)
 	if err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return

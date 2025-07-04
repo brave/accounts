@@ -83,6 +83,11 @@ func (m *MockSESService) SendSimilarEmailAlert(ctx context.Context, email string
 	return args.Error(0)
 }
 
+func (m *MockSESService) SendPasswordChangeNotification(ctx context.Context, email string, locale string) error {
+	args := m.Called(ctx, email, locale)
+	return args.Error(0)
+}
+
 func (suite *VerificationTestSuite) TestVerifyInit() {
 	suite.SetupController(false, true)
 
