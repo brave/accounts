@@ -15,8 +15,8 @@ require (
 	github.com/bytemare/ksf v0.2.0 // indirect
 	github.com/bytemare/secp256k1 v0.2.0 // indirect
 	github.com/gtank/ristretto255 v0.1.2 // indirect
-	golang.org/x/crypto v0.35.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/crypto v0.39.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
 )
 
 replace github.com/bytemare/opaque v0.0.0 => github.com/brave-experiments/opaque v0.0.0-20250429210303-c2ce323b78e0
