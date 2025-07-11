@@ -15,6 +15,7 @@ var (
 	// Account errors, prefixed with '11'
 	ErrEmailNotVerified            = NewExposedError(11003, "email not verified")
 	ErrIncorrectVerificationIntent = NewExposedError(11004, "incorrect verification intent")
+	ErrNewAccountEmailRequired     = NewExposedError(11005, "newAccountEmail is required when no verification token is provided")
 
 	// Key errors, prefixed with '12'
 	ErrKeyNotFound = NewExposedError(12001, "key not found")
@@ -41,6 +42,7 @@ var (
 	ErrBadRecoveryKey               = NewExposedError(14010, "invalid recovery key")
 	ErrTOTPAlreadyEnabled           = NewExposedError(14011, "TOTP authentication is already enabled for this account")
 	ErrTOTPCodeAlreadyUsed          = NewExposedError(14012, "TOTP code has already been used")
+	ErrEmailVerificationRequired    = NewExposedError(14013, "email verification required")
 
 	// Misc errors, prefixed with '15'
 	ErrInvalidServicesKey = NewExposedError(15001, "invalid services key")
