@@ -54,7 +54,7 @@ func (vs *VerificationService) maybeCreateVerificationToken(verification *datast
 	return &token, nil
 }
 
-func (vs *VerificationService) InitializeVerification(ctx context.Context, email, intent, service string) (*datastore.Verification, *string, error) {
+func (vs *VerificationService) InitializeVerification(ctx context.Context, email, intent, service string, session *datastore.SessionWithAccountInfo) (*datastore.Verification, *string, error) {
 	// Validate intent
 	intentAllowed := true
 	switch intent {
@@ -65,8 +65,18 @@ func (vs *VerificationService) InitializeVerification(ctx context.Context, email
 	case datastore.VerificationIntent:
 		// All services are allowed to verify email addresses
 		intentAllowed = true
-	case datastore.RegistrationIntent, datastore.SetPasswordIntent:
+	case datastore.RegistrationIntent, datastore.ResetPasswordIntent:
 		if !vs.passwordAuthEnabled || service != util.AccountsServiceName {
+			intentAllowed = false
+		}
+	case datastore.ChangePasswordIntent:
+		if !vs.passwordAuthEnabled || service != util.AccountsServiceName {
+			intentAllowed = false
+		}
+		// A valid auth session is required because we allow the user to choose whether
+		// they wish to invalidate all sessions. We do not want to present this option
+		// for any other intent (i.e. password resets, where session invalidation is mandatory to reduce attack risk).
+		if session == nil || session.Email != util.CanonicalizeEmail(email) {
 			intentAllowed = false
 		}
 	default:
@@ -83,7 +93,7 @@ func (vs *VerificationService) InitializeVerification(ctx context.Context, email
 	}
 
 	// Validate account requirements
-	if intent == datastore.RegistrationIntent || intent == datastore.SetPasswordIntent {
+	if intent == datastore.RegistrationIntent || intent == datastore.ResetPasswordIntent || intent == datastore.ChangePasswordIntent {
 		accountExists, err := vs.datastore.AccountExists(email)
 		if err != nil {
 			return nil, nil, err
@@ -91,7 +101,7 @@ func (vs *VerificationService) InitializeVerification(ctx context.Context, email
 		if intent == datastore.RegistrationIntent && accountExists {
 			return nil, nil, util.ErrAccountExists
 		}
-		if intent == datastore.SetPasswordIntent && !accountExists {
+		if (intent == datastore.ResetPasswordIntent || intent == datastore.ChangePasswordIntent) && !accountExists {
 			return nil, nil, util.ErrAccountDoesNotExist
 		}
 	}

@@ -31,10 +31,11 @@ type Verification struct {
 }
 
 const (
-	AuthTokenIntent    = "auth_token"
-	VerificationIntent = "verification"
-	RegistrationIntent = "registration"
-	SetPasswordIntent  = "set_password"
+	AuthTokenIntent      = "auth_token"
+	VerificationIntent   = "verification"
+	RegistrationIntent   = "registration"
+	ResetPasswordIntent  = "reset_password"
+	ChangePasswordIntent = "change_password"
 
 	codeLength              = 32
 	verifyWaitMaxDuration   = 20 * time.Second

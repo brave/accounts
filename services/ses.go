@@ -241,7 +241,7 @@ func (s *SESService) SendVerificationEmail(ctx context.Context, email string, ve
 	case datastore.RegistrationIntent:
 		subjectMessageID = "RegistrationEmailSubject"
 		instructionsMessageID = "RegistrationEmailInstructions"
-	case datastore.SetPasswordIntent:
+	case datastore.ResetPasswordIntent, datastore.ChangePasswordIntent:
 		subjectMessageID = "SetPasswordEmailSubject"
 		instructionsMessageID = "SetPasswordEmailInstructions"
 	}
