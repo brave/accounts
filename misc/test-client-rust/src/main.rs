@@ -39,7 +39,7 @@ struct CliArgs {
     #[arg(long)]
     password: Option<String>,
 
-    /// Verification or auth token
+    /// Auth token
     #[arg(long)]
     token: Option<String>,
 
@@ -65,7 +65,11 @@ struct CliArgs {
 
     /// Set password mode flag
     #[arg(short, long)]
-    set_password: bool,
+    reset_password: bool,
+
+    /// Change password mode flag
+    #[arg(short, long)]
+    change_password: bool,
 
     /// Email auth flag
     #[arg(short = 'e', long)]
@@ -136,56 +140,7 @@ fn maybe_handle_twofa(args: &CliArgs, resp: Response, token: &str, endpoint: &st
     )
 }
 
-fn verify(args: &CliArgs) -> (String, Option<String>) {
-    let mut body = HashMap::new();
-    body.insert(
-        "service",
-        Value::String(
-            if let Some(service) = args.service_name.as_ref() {
-                service.as_str()
-            } else if args.email_auth || args.email_verify {
-                "email-aliases"
-            } else {
-                "accounts"
-            }
-            .to_string(),
-        ),
-    );
-    body.insert(
-        "intent",
-        Value::String(
-            if let Some(intent) = args.verify_intent.as_ref() {
-                intent.as_str()
-            } else if args.email_verify {
-                "verification"
-            } else if args.email_auth {
-                "auth_token"
-            } else if args.set_password {
-                "set_password"
-            } else {
-                "registration"
-            }
-            .to_string(),
-        ),
-    );
-
-    body.insert(
-        "email",
-        Value::String(args.email.as_ref().expect("email must be provided").clone()),
-    );
-
-    let init_response = make_request(
-        args,
-        reqwest::Method::POST,
-        "/v2/verify/init",
-        None,
-        Some(body),
-    );
-    let verification_token = init_response
-        .get("verificationToken")
-        .and_then(|v| v.as_str())
-        .expect("Failed to get verification token");
-
+fn wait_for_verification(args: &CliArgs, verification_token: &str) -> Option<String> {
     println!("Click on the verification link...");
 
     loop {
@@ -222,15 +177,79 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
             println!("verification token: {}", verification_token);
             println!("email: {}", email);
             println!("service: {}", service_name);
-            return (verification_token.to_string(), auth_token);
+            return auth_token;
         }
     }
 }
 
+fn verify(args: &CliArgs) -> (String, Option<String>) {
+    let mut body = HashMap::new();
+    body.insert(
+        "service",
+        Value::String(
+            if let Some(service) = args.service_name.as_ref() {
+                service.as_str()
+            } else if args.email_auth || args.email_verify {
+                "email-aliases"
+            } else {
+                "accounts"
+            }
+            .to_string(),
+        ),
+    );
+    body.insert(
+        "intent",
+        Value::String(
+            if let Some(intent) = args.verify_intent.as_ref() {
+                intent.as_str()
+            } else if args.email_verify {
+                "verification"
+            } else if args.email_auth {
+                "auth_token"
+            } else if args.reset_password {
+                "reset_password"
+            } else if args.change_password {
+                "change_password"
+            } else {
+                "registration"
+            }
+            .to_string(),
+        ),
+    );
+
+    body.insert(
+        "email",
+        Value::String(args.email.as_ref().expect("email must be provided").clone()),
+    );
+
+    let auth_token = if args.change_password {
+        Some(args.token.as_ref().expect("auth token is required for password change").trim())
+    } else {
+        None
+    };
+
+    let init_response = make_request(
+        args,
+        reqwest::Method::POST,
+        "/v2/verify/init",
+        auth_token,
+        Some(body),
+    );
+    let verification_token = init_response
+        .get("verificationToken")
+        .and_then(|v| v.as_str())
+        .expect("Failed to get verification token");
+
+    let auth_token = wait_for_verification(args, verification_token);
+    (verification_token.to_string(), auth_token)
+}
+
 fn set_password(args: CliArgs) {
-    let token = match &args.token {
-        Some(t) => t.trim().to_string(),
-        None => verify(&args).0,
+    let verification_token = if args.register {
+        // For registration, don't verify upfront, pass newAccountEmail instead
+        None
+    } else {
+        Some(verify(&args).0)
     };
 
     let mut client_rng = OsRng;
@@ -248,13 +267,31 @@ fn set_password(args: CliArgs) {
     body.insert("blindedMessage", registration_request_hex.into());
     body.insert("serializeResponse", true.into());
 
+    // If registering, add newAccountEmail instead of using verification token
+    if args.register {
+        body.insert(
+            "newAccountEmail",
+            args.email.as_ref().expect("email must be provided").clone().into(),
+        );
+    }
+
     let resp = make_request(
         &args,
         reqwest::Method::POST,
         "/v2/accounts/password/init",
-        Some(&token),
+        verification_token.as_deref(),
         Some(body),
     );
+
+    // Extract verification token if this was a registration
+    let token = if args.register {
+        resp.get("verificationToken")
+            .and_then(|v| v.as_str())
+            .expect("Missing verificationToken for registration")
+            .to_string()
+    } else {
+        verification_token.unwrap()
+    };
 
     let resp_bin = hex::decode(
         resp.get("serializedResponse")
@@ -299,7 +336,15 @@ fn set_password(args: CliArgs) {
     // Handle 2FA if required
     resp = maybe_handle_twofa(&args, resp, &token, "/v2/accounts/password/finalize_2fa");
 
-    display_account_details(&args, resp.get("authToken").unwrap().as_str().unwrap());
+    // If this was a registration, wait for email verification after password setup
+    let auth_token = if args.register {
+        wait_for_verification(&args, &token)
+            .expect("Failed to get auth token after verification")
+    } else {
+        resp.get("authToken").unwrap().as_str().unwrap().to_string()
+    };
+
+    display_account_details(&args, &auth_token);
 }
 
 fn login(args: CliArgs) {
@@ -496,7 +541,7 @@ fn main() {
         display_account_details(&args, auth_token.unwrap_or_default().as_str());
     } else if args.login {
         login(args);
-    } else if args.register || args.set_password {
+    } else if args.register || args.reset_password || args.change_password {
         set_password(args);
     } else if args.enable_totp {
         enable_totp(&args);

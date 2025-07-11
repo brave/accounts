@@ -153,21 +153,29 @@ func main() {
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to init SES util")
 	}
+	verificationService := services.NewVerificationService(datastore, jwtService, sesService, passwordAuthEnabled, emailAuthEnabled)
 
 	prometheusRegistry := prometheus.NewRegistry()
 
 	servicesKeyMiddleware := middleware.ServicesKeyMiddleware(environment)
-	authMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion, true)
-	permissiveAuthMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion, false)
-	verificationMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore)
+	// authMiddleware will ensure a valid session is present with the "accounts" service name
+	authMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion, true, true)
+	// validateAuthMiddleware will ensure a valid session is present with any service name
+	validateAuthMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion, false, true)
+	// optionalAuthMiddleware will validate an optional auth token; the request will continue without an auth token
+	optionalAuthMiddleware := middleware.AuthMiddleware(jwtService, datastore, minSessionVersion, true, false)
+	// verificationMiddleware will ensure a valid verification token is present
+	verificationMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore, true)
+	// optionalVerificationMiddleware will validate an optional verification token; the request will continue without a verification token
+	optionalVerificationMiddleware := middleware.VerificationAuthMiddleware(jwtService, datastore, false)
 
 	r := chi.NewRouter()
 
 	authController := controllers.NewAuthController(opaqueService, jwtService, twoFAService, datastore, sesService)
-	verificationController := controllers.NewVerificationController(datastore, jwtService, sesService, passwordAuthEnabled, emailAuthEnabled)
+	verificationController := controllers.NewVerificationController(datastore, verificationService)
 	sessionsController := controllers.NewSessionsController(datastore)
 	userKeysController := controllers.NewUserKeysController(datastore)
-	accountsController := controllers.NewAccountsController(opaqueService, jwtService, twoFAService, datastore)
+	accountsController := controllers.NewAccountsController(opaqueService, jwtService, twoFAService, datastore, verificationService, sesService)
 
 	r.Use(middleware.LoggerMiddleware(prometheusRegistry))
 	r.Use(cors.Handler(cors.Options{
@@ -182,11 +190,11 @@ func main() {
 	})
 
 	r.Route("/v2", func(r chi.Router) {
-		r.With(servicesKeyMiddleware).Mount("/auth", authController.Router(authMiddleware, permissiveAuthMiddleware, passwordAuthEnabled))
+		r.With(servicesKeyMiddleware).Mount("/auth", authController.Router(authMiddleware, validateAuthMiddleware, passwordAuthEnabled))
 		if passwordAuthEnabled {
-			r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware, authMiddleware, accountDeletionEnabled))
+			r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware, optionalVerificationMiddleware, authMiddleware, accountDeletionEnabled))
 		}
-		r.Mount("/verify", verificationController.Router(verificationMiddleware, servicesKeyMiddleware, devEndpointsEnabled))
+		r.Mount("/verify", verificationController.Router(verificationMiddleware, servicesKeyMiddleware, optionalAuthMiddleware, devEndpointsEnabled))
 		r.With(servicesKeyMiddleware).Mount("/sessions", sessionsController.Router(authMiddleware))
 		r.With(servicesKeyMiddleware).Mount("/keys", userKeysController.Router(authMiddleware))
 	})

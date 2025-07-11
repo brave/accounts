@@ -49,13 +49,15 @@ func (suite *VerificationTestSuite) SetupController(passwordAuthEnabled bool, em
 	suite.jwtService, err = services.NewJWTService(suite.ds, false)
 	suite.Require().NoError(err)
 	suite.sesMock = &MockSESService{}
-	controller := controllers.NewVerificationController(suite.ds, suite.jwtService, suite.sesMock, passwordAuthEnabled, emailAuthEnabled)
+	verificationService := services.NewVerificationService(suite.ds, suite.jwtService, suite.sesMock, passwordAuthEnabled, emailAuthEnabled)
+	controller := controllers.NewVerificationController(suite.ds, verificationService)
 
-	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds)
+	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds, true)
 	servicesKeyMiddleware := middleware.ServicesKeyMiddleware(util.DevelopmentEnv)
+	optionalAuthMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion, true, false)
 
 	suite.router = chi.NewRouter()
-	suite.router.Mount("/v2/verify", controller.Router(verificationAuthMiddleware, servicesKeyMiddleware, false))
+	suite.router.Mount("/v2/verify", controller.Router(verificationAuthMiddleware, servicesKeyMiddleware, optionalAuthMiddleware, false))
 }
 
 func (suite *VerificationTestSuite) TearDownTest() {
@@ -77,6 +79,11 @@ func (m *MockSESService) SendVerificationEmail(ctx context.Context, email string
 }
 
 func (m *MockSESService) SendSimilarEmailAlert(ctx context.Context, email string, locale string) error {
+	args := m.Called(ctx, email, locale)
+	return args.Error(0)
+}
+
+func (m *MockSESService) SendPasswordChangeNotification(ctx context.Context, email string, locale string) error {
 	args := m.Called(ctx, email, locale)
 	return args.Error(0)
 }
@@ -157,13 +164,6 @@ func (suite *VerificationTestSuite) TestVerifyInitUnsupportedEmail() {
 	suite.Equal(http.StatusBadRequest, resp.Code)
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
 
-	registerBody := body
-	registerBody.Intent = "registration"
-	registerBody.Service = "accounts"
-	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", registerBody), suite.router)
-	suite.Equal(http.StatusBadRequest, resp.Code)
-	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
-
 	// Test 'strict' TLDs for email-aliases service
 	body.Email = "test@example.ru"
 	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
@@ -174,19 +174,6 @@ func (suite *VerificationTestSuite) TestVerifyInitUnsupportedEmail() {
 	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
 	suite.Equal(http.StatusBadRequest, resp.Code)
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
-
-	// Test North Korea TLD for accounts registration
-	body.Intent = "registration"
-	body.Service = "accounts"
-	body.Email = "test@example.kp"
-	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
-	suite.Equal(http.StatusBadRequest, resp.Code)
-	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
-
-	// Email with 'strict' TLD should be allowed for registration
-	body.Email = "test@example.ru"
-	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
-	suite.Equal(http.StatusOK, resp.Code)
 }
 
 func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
@@ -201,22 +188,7 @@ func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
 			passwordAuthEnabled: true,
 		},
 		{
-			intent:              "registration",
-			service:             "premium",
-			passwordAuthEnabled: true,
-		},
-		{
-			intent:              "registration",
-			service:             "email-aliases",
-			passwordAuthEnabled: true,
-		},
-		{
-			intent:              "registration",
-			service:             "accounts",
-			passwordAuthEnabled: false,
-		},
-		{
-			intent:              "set_password",
+			intent:              "reset_password",
 			service:             "accounts",
 			passwordAuthEnabled: false,
 		},
@@ -238,6 +210,22 @@ func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
 	}
 }
 
+func (suite *VerificationTestSuite) TestVerifyInitBadIntent() {
+	suite.SetupController(true, false)
+
+	// Test registration intent - should fail because registration intent
+	// should only be used internally by the accounts service, not via direct verification init
+	body := controllers.VerifyInitRequest{
+		Email:   "test@example.com",
+		Intent:  "registration",
+		Service: "accounts",
+		Locale:  "en-US",
+	}
+
+	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+}
+
 func (suite *VerificationTestSuite) TestVerifyValidCheck() {
 	suite.SetupController(true, false)
 
@@ -246,7 +234,7 @@ func (suite *VerificationTestSuite) TestVerifyValidCheck() {
 	// Initialize verification
 	initBody := controllers.VerifyInitRequest{
 		Email:   "test@example.com",
-		Intent:  "registration",
+		Intent:  "verification",
 		Service: "accounts",
 		Locale:  "en-US",
 	}
@@ -310,7 +298,7 @@ func (suite *VerificationTestSuite) TestVerifyComplete() {
 
 	initBody := controllers.VerifyInitRequest{
 		Email:   "test@example.com",
-		Intent:  "registration",
+		Intent:  "verification",
 		Service: "accounts",
 		Locale:  "en-US",
 	}
@@ -500,6 +488,52 @@ func (suite *VerificationTestSuite) TestVerificationExpiry() {
 
 	// Should return not found due to expired verification
 	suite.Equal(http.StatusNotFound, resp.Code)
+}
+
+func (suite *VerificationTestSuite) TestVerifyInitChangePasswordRequiresAuth() {
+	suite.SetupController(true, false)
+
+	email := "test@example.com"
+	account, err := suite.ds.GetOrCreateAccount(email)
+	suite.Require().NoError(err)
+	err = suite.ds.UpdateAccountLastEmailVerifiedAt(account.ID)
+	suite.Require().NoError(err)
+
+	// Test change_password intent without auth - should fail with ErrIntentNotAllowed
+	body := controllers.VerifyInitRequest{
+		Email:   email,
+		Intent:  "change_password",
+		Service: "accounts",
+		Locale:  "en-US",
+	}
+
+	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrIntentNotAllowed.Code)
+
+	// Test change_password intent with valid auth session
+	session, err := suite.ds.CreateSession(account.ID, datastore.PasswordAuthSessionVersion, "")
+	suite.Require().NoError(err)
+	token, err := suite.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
+	suite.Require().NoError(err)
+
+	suite.sesMock.On("SendVerificationEmail", mock.Anything, email, mock.Anything, "en-US").Return(nil).Once()
+
+	// Test change_password intent with mismatched email - should fail with ErrIntentNotAllowed
+	body.Email = "different@example.com"
+	req := util.CreateJSONTestRequest("/v2/verify/init", body)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrIntentNotAllowed.Code)
+
+	body.Email = email
+	req = util.CreateJSONTestRequest("/v2/verify/init", body)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+
+	suite.sesMock.AssertExpectations(suite.T())
 }
 
 func TestVerificationTestSuite(t *testing.T) {

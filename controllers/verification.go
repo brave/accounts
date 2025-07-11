@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"html/template"
 	"net/http"
 	"slices"
@@ -26,22 +25,19 @@ const (
 
 type VerificationController struct {
 	datastore           *datastore.Datastore
-	jwtService          *services.JWTService
-	sesService          services.SES
-	passwordAuthEnabled bool
-	emailAuthEnabled    bool
+	verificationService *services.VerificationService
 }
 
 // @Description	Request to initialize email verification
 type VerifyInitRequest struct {
 	// Email address to verify
 	Email string `json:"email" validate:"required,email,ascii" example:"test@example.com"`
-	// Purpose of verification (e.g., get auth token, simple verification, registration)
-	Intent string `json:"intent" validate:"required,oneof=auth_token verification registration set_password" example:"registration"`
+	// Purpose of verification (e.g., get auth token, simple verification)
+	Intent string `json:"intent" validate:"required,oneof=auth_token verification reset_password change_password" example:"reset_password"`
 	// Service requesting the verification
 	Service string `json:"service" validate:"required,oneof=accounts premium email-aliases" example:"accounts"`
 	// Locale for verification email
-	Locale string `json:"language" validate:"max=8" example:"en-US"`
+	Locale string `json:"locale" validate:"max=20" example:"en-US"`
 }
 
 // @Description	Response containing verification check token
@@ -88,20 +84,17 @@ type localStackEmails struct {
 	Messages []interface{} `json:"messages"`
 }
 
-func NewVerificationController(datastore *datastore.Datastore, jwtService *services.JWTService, sesService services.SES, passwordAuthEnabled bool, emailAuthEnabled bool) *VerificationController {
+func NewVerificationController(datastore *datastore.Datastore, verificationService *services.VerificationService) *VerificationController {
 	return &VerificationController{
 		datastore:           datastore,
-		jwtService:          jwtService,
-		sesService:          sesService,
-		passwordAuthEnabled: passwordAuthEnabled,
-		emailAuthEnabled:    emailAuthEnabled,
+		verificationService: verificationService,
 	}
 }
 
-func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Handler) http.Handler, servicesKeyMiddleware func(http.Handler) http.Handler, devEndpointsEnabled bool) chi.Router {
+func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Handler) http.Handler, servicesKeyMiddleware func(http.Handler) http.Handler, optionalAuthMiddleware func(http.Handler) http.Handler, devEndpointsEnabled bool) chi.Router {
 	r := chi.NewRouter()
 
-	r.With(servicesKeyMiddleware).Post("/init", vc.VerifyInit)
+	r.With(servicesKeyMiddleware).With(optionalAuthMiddleware).Post("/init", vc.VerifyInit)
 	r.Get("/complete", vc.VerifyValidCheck)
 	r.Post("/complete", vc.VerifyComplete)
 	if devEndpointsEnabled {
@@ -113,32 +106,19 @@ func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Ha
 	return r
 }
 
-func (vc *VerificationController) maybeCreateVerificationToken(verification *datastore.Verification, isCompletion bool) (*string, error) {
-	// Do not generate verification token immediately for Premium verifications
-	// We'll create it later in the completion endpoint, so it can be passed to the Premium site upon redirect
-	shouldCreateOnCompletion := verification.Service == util.PremiumServiceName && verification.Intent == datastore.VerificationIntent
-	if shouldCreateOnCompletion != isCompletion {
-		return nil, nil
-	}
-	token, err := vc.jwtService.CreateVerificationToken(verification.ID, datastore.VerificationExpiration, verification.Service)
-	if err != nil {
-		return nil, err
-	}
-	return &token, nil
-}
-
 // @Summary Initialize email verification
 // @Description Starts email verification process by sending a verification email
 // @Description One of the following intents must be provided with the request:
 // @Description - `auth_token`: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the "query result" endpoint.
 // @Description - `verification`: After verification, do not create an account, but indicate that the email was verified in the "query result" response. Do not allow registration after verification.
-// @Description - `registration`: After verification, indicate that the email was verified in the "query result" response. An account may be created by setting a password.
-// @Description - `set_password`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
+// @Description - `reset_password`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
+// @Description - `change_password`: After verification, indicate that the email was verified in the "query result" response. A password may be changed for the existing account. Requires a valid auth session.
 // @Description
 // @Description One of the following service names must be provided with the request: `email-aliases`, `accounts`, `premium`.
 // @Tags Email verification
 // @Accept json
 // @Produce json
+// @Param Authorization header string false "Bearer + auth token (required for change_password intent)"
 // @Param Brave-Key header string false "Brave services key (if one is configured)"
 // @Param request body VerifyInitRequest true "Verification request params"
 // @Success 200 {object} VerifyInitResponse
@@ -146,90 +126,43 @@ func (vc *VerificationController) maybeCreateVerificationToken(verification *dat
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/verify/init [post]
 func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Request) {
+	session, _ := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
 	var requestData VerifyInitRequest
 	if !util.DecodeJSONAndValidate(w, r, &requestData) {
 		return
 	}
 
-	if requestData.Locale == "" {
-		requestData.Locale = r.Header.Get("Accept-Language")
-	}
+	locale := util.GetRequestLocale(requestData.Locale, r)
 
-	intentAllowed := true
-	switch requestData.Intent {
-	case datastore.AuthTokenIntent:
-		if !vc.emailAuthEnabled || requestData.Service != util.EmailAliasesServiceName {
-			intentAllowed = false
-		}
-	case datastore.VerificationIntent:
-		// All services are allowed to verify email addresses
-		intentAllowed = true
-	case datastore.RegistrationIntent, datastore.SetPasswordIntent:
-		if !vc.passwordAuthEnabled || requestData.Service != util.AccountsServiceName {
-			intentAllowed = false
-		}
-	default:
-		intentAllowed = false
-	}
-	if !intentAllowed {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrIntentNotAllowed)
-		return
-	}
-
-	strictCountryBlock := requestData.Service == util.EmailAliasesServiceName || requestData.Service == util.PremiumServiceName
-
-	if !util.IsEmailAllowed(requestData.Email, strictCountryBlock) {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailDomainNotSupported)
-		return
-	}
-
-	if requestData.Intent == datastore.RegistrationIntent || requestData.Intent == datastore.SetPasswordIntent {
-		accountExists, err := vc.datastore.AccountExists(requestData.Email)
-		if err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-		if requestData.Intent == datastore.RegistrationIntent && accountExists {
-			util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrAccountExists)
-			return
-		}
-		if requestData.Intent == datastore.SetPasswordIntent && !accountExists {
-			util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrAccountDoesNotExist)
-			return
-		}
-	}
-
-	verification, err := vc.datastore.CreateVerification(requestData.Email, requestData.Service, requestData.Intent)
-	if err != nil {
-		if errors.Is(err, util.ErrTooManyVerifications) {
-			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
-			return
-		}
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
-
-	verificationToken, err := vc.maybeCreateVerificationToken(verification, false)
-	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
-
-	if err := vc.sesService.SendVerificationEmail(
+	// Initialize verification
+	verification, verificationToken, err := vc.verificationService.InitializeVerification(
 		r.Context(),
 		requestData.Email,
-		verification,
-		requestData.Locale,
-	); err != nil {
-		if errors.Is(err, util.ErrFailedToSendEmailInvalidFormat) {
-			if vc.datastore.DeleteVerification(verification.ID) != nil {
-				// Don't override the more descriptive error code and let cron handle the cleanup
-				_ = true
-			}
+		requestData.Intent,
+		requestData.Service,
+		session,
+	)
+
+	if err != nil {
+		if errors.Is(err, util.ErrTooManyVerifications) ||
+			errors.Is(err, util.ErrIntentNotAllowed) ||
+			errors.Is(err, util.ErrEmailDomainNotSupported) ||
+			errors.Is(err, util.ErrAccountExists) ||
+			errors.Is(err, util.ErrAccountDoesNotExist) {
 			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
 			return
 		}
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, fmt.Errorf("failed to send verification email: %w", err))
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Send verification email
+	if err := vc.verificationService.SendVerificationEmail(r.Context(), verification, locale); err != nil {
+		if errors.Is(err, util.ErrFailedToSendEmailInvalidFormat) {
+			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+			return
+		}
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
 
@@ -295,8 +228,8 @@ func (vc *VerificationController) VerifyComplete(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Update verification status
-	verification, err := vc.datastore.UpdateAndGetVerificationStatus(requestData.ID, requestData.Code)
+	result, err := vc.verificationService.CompleteVerification(requestData.ID, requestData.Code)
+
 	if err != nil {
 		if errors.Is(err, util.ErrVerificationNotFound) {
 			util.RenderErrorResponse(w, r, http.StatusNotFound, err)
@@ -307,16 +240,10 @@ func (vc *VerificationController) VerifyComplete(w http.ResponseWriter, r *http.
 		return
 	}
 
-	verificationToken, err := vc.maybeCreateVerificationToken(verification, true)
-	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
-
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, &VerifyCompleteResponse{
-		VerificationToken: verificationToken,
-		Service:           verification.Service,
+		VerificationToken: result.VerificationToken,
+		Service:           result.Verification.Service,
 	})
 }
 
@@ -344,64 +271,26 @@ func (vc *VerificationController) VerifyQueryResult(w http.ResponseWriter, r *ht
 
 	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
 
-	responseData := VerifyResultResponse{
-		Service: verification.Service,
-	}
+	// Delegate to service
+	result, err := vc.verificationService.GetVerificationResult(
+		r.Context(),
+		verification,
+		requestData.Wait,
+		r.UserAgent(),
+	)
 
-	if !verification.Verified && requestData.Wait {
-		verified, err := vc.datastore.WaitOnVerification(r.Context(), verification.ID)
-		if err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-		verification.Verified = verified
-	}
-
-	if !verification.Verified {
-		render.Status(r, http.StatusOK)
-		render.JSON(w, r, responseData)
+	if err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
 
-	var authToken *string
-	if verification.Intent == datastore.AuthTokenIntent {
-		if err := vc.datastore.DeleteVerification(verification.ID); err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-
-		account, err := vc.datastore.GetOrCreateAccount(verification.Email)
-		if err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-
-		if err = vc.datastore.UpdateAccountLastEmailVerifiedAt(account.ID); err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-
-		session, err := vc.datastore.CreateSession(account.ID, datastore.EmailAuthSessionVersion, r.UserAgent())
-		if err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-
-		expirationDuration := childAuthTokenExpirationTime
-		authTokenResult, err := vc.jwtService.CreateAuthToken(session.ID, &expirationDuration, verification.Service)
-		if err != nil {
-			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-			return
-		}
-		authToken = &authTokenResult
-	}
-
-	responseData.AuthToken = authToken
-	responseData.Verified = true
-	responseData.Email = &verification.Email
-
 	render.Status(r, http.StatusOK)
-	render.JSON(w, r, responseData)
+	render.JSON(w, r, VerifyResultResponse{
+		AuthToken: result.AuthToken,
+		Verified:  result.Verified,
+		Email:     result.Email,
+		Service:   result.Service,
+	})
 }
 
 // @Summary Display default verification completion frontend

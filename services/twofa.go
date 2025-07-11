@@ -37,6 +37,8 @@ type TwoFAAuthRequest struct {
 	TOTPCode *string `json:"totpCode,omitempty" validate:"required_without=RecoveryKey,excluded_with=RecoveryKey"`
 	// Recovery key for 2FA bypass (optional if TOTP code is provided)
 	RecoveryKey *string `json:"recoveryKey,omitempty" validate:"required_without=TOTPCode,excluded_with=TOTPCode"`
+	// Whether to invalidate existing sessions (only applicable when changing password)
+	InvalidateSessions bool `json:"invalidateSessions"`
 }
 
 // TwoFAService provides methods for managing two-factor authentication

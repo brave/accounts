@@ -29,7 +29,9 @@ type Account struct {
 	// Timestamp when the account was last used (with a MOE of 30 minutes)
 	LastUsedAt time.Time `gorm:"<-:update"`
 	// Timestamp when the account was last verified via email
-	LastEmailVerifiedAt time.Time `gorm:"<-:update"`
+	LastEmailVerifiedAt *time.Time `gorm:"<-:update"`
+	// Locale preference for the account (e.g., "en-US", "es-ES")
+	Locale *string `json:"-"`
 	// TOTPEnabled indicates whether the account has TOTP enabled
 	TOTPEnabled bool `json:"-"`
 	// Timestamp when TOTP was enabled
@@ -138,14 +140,12 @@ func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
 	return account, nil
 }
 
-// split into two methods for seed id and registration. use the struct for updates!
 func (d *Datastore) UpdateOpaqueRegistration(accountID uuid.UUID, oprfSeedID int, opaqueRegistration []byte) error {
 	result := d.DB.Model(&Account{}).
 		Where("id = ?", accountID).
 		Updates(Account{
 			OprfSeedID:         &oprfSeedID,
 			OpaqueRegistration: opaqueRegistration,
-			CreatedAt:          time.Now(),
 		})
 
 	if result.Error != nil {
@@ -305,4 +305,34 @@ func (d *Datastore) GetTwoFADetails(accountID uuid.UUID) (*TwoFADetails, error) 
 	}
 
 	return &details, nil
+}
+
+func (d *Datastore) SetAccountLocaleIfMissing(accountID uuid.UUID, locale string) error {
+	if locale == "" {
+		return nil // Don't set empty locale
+	}
+
+	result := d.DB.Model(&Account{}).
+		Where("id = ? AND locale IS NULL", accountID).
+		Update("locale", locale)
+
+	if result.Error != nil {
+		return fmt.Errorf("error setting account locale: %w", result.Error)
+	}
+
+	return nil
+}
+
+func (d *Datastore) GetAccountLocale(accountID uuid.UUID) (*string, error) {
+	var account Account
+	result := d.DB.Select("locale").Where("id = ?", accountID).First(&account)
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, ErrAccountNotFound
+		}
+		return nil, fmt.Errorf("error fetching account locale: %w", result.Error)
+	}
+
+	return account.Locale, nil
 }
