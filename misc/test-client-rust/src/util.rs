@@ -1,6 +1,6 @@
-use std::{collections::HashMap, io::Write};
 use reqwest::StatusCode;
 use serde_json::Value;
+use std::{collections::HashMap, io::Write};
 
 use crate::CliArgs;
 
