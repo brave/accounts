@@ -3,8 +3,9 @@ mod util;
 use argon2::Argon2;
 use clap::{CommandFactory, Parser};
 use opaque_ke::{
-    CipherSuite, ClientLogin, ClientLoginFinishParameters, ClientRegistration,
-    ClientRegistrationFinishParameters, CredentialResponse, Identifiers, errors::ProtocolError, RegistrationResponse,
+    errors::ProtocolError, CipherSuite, ClientLogin, ClientLoginFinishParameters,
+    ClientRegistration, ClientRegistrationFinishParameters, CredentialResponse, Identifiers,
+    RegistrationResponse,
 };
 use rand::rngs::OsRng;
 use serde_json::Value;
@@ -64,7 +65,7 @@ struct CliArgs {
     register: bool,
 
     /// Set password mode flag
-    #[arg(short, long)]
+    #[arg(long)]
     reset_password: bool,
 
     /// Change password mode flag
@@ -223,7 +224,12 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
     );
 
     let auth_token = if args.change_password {
-        Some(args.token.as_ref().expect("auth token is required for password change").trim())
+        Some(
+            args.token
+                .as_ref()
+                .expect("auth token is required for password change")
+                .trim(),
+        )
     } else {
         None
     };
@@ -271,7 +277,11 @@ fn set_password(args: CliArgs) {
     if args.register {
         body.insert(
             "newAccountEmail",
-            args.email.as_ref().expect("email must be provided").clone().into(),
+            args.email
+                .as_ref()
+                .expect("email must be provided")
+                .clone()
+                .into(),
         );
     }
 
@@ -338,8 +348,7 @@ fn set_password(args: CliArgs) {
 
     // If this was a registration, wait for email verification after password setup
     let auth_token = if args.register {
-        wait_for_verification(&args, &token)
-            .expect("Failed to get auth token after verification")
+        wait_for_verification(&args, &token).expect("Failed to get auth token after verification")
     } else {
         resp.get("authToken").unwrap().as_str().unwrap().to_string()
     };
@@ -395,7 +404,8 @@ fn login(args: CliArgs) {
                 },
                 ..Default::default()
             },
-        ).map_err(|e| match e {
+        )
+        .map_err(|e| match e {
             ProtocolError::InvalidLoginError => panic!("Invalid credentials"),
             ProtocolError::LibraryError(_) => panic!("Internal opaque_ke error"),
             _ => panic!("Invalid result returned from server"),
