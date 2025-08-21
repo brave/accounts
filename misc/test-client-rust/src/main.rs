@@ -44,6 +44,10 @@ struct CliArgs {
     #[arg(long)]
     token: Option<String>,
 
+    /// Session ID
+    #[arg(long)]
+    session: Option<String>,
+
     /// Verify intent (optional)
     #[arg(long)]
     verify_intent: Option<String>,
@@ -59,6 +63,10 @@ struct CliArgs {
     /// Login mode flag
     #[arg(short, long)]
     login: bool,
+
+    /// Logout flag
+    #[arg(long)]
+    logout: bool,
 
     /// Register mode flag
     #[arg(short, long)]
@@ -138,7 +146,7 @@ fn maybe_handle_twofa(args: &CliArgs, resp: Response, token: &str, endpoint: &st
         endpoint,
         Some(token),
         Some(twofa_body),
-    )
+    ).0
 }
 
 fn wait_for_verification(args: &CliArgs, verification_token: &str) -> Option<String> {
@@ -148,7 +156,7 @@ fn wait_for_verification(args: &CliArgs, verification_token: &str) -> Option<Str
         let mut result_body = HashMap::new();
         result_body.insert("wait", true.into());
 
-        let result = make_request(
+        let (result, _) = make_request(
             args,
             reqwest::Method::POST,
             "/v2/verify/result",
@@ -234,7 +242,7 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
         None
     };
 
-    let init_response = make_request(
+    let (init_response, _) = make_request(
         args,
         reqwest::Method::POST,
         "/v2/verify/init",
@@ -285,7 +293,7 @@ fn set_password(args: CliArgs) {
         );
     }
 
-    let resp = make_request(
+    let (resp, _) = make_request(
         &args,
         reqwest::Method::POST,
         "/v2/accounts/password/init",
@@ -335,7 +343,7 @@ fn set_password(args: CliArgs) {
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("serializedRecord", record_hex.into());
 
-    let mut resp = make_request(
+    let (mut resp, _) = make_request(
         &args,
         reqwest::Method::POST,
         "/v2/accounts/password/finalize",
@@ -372,7 +380,7 @@ fn login(args: CliArgs) {
     body.insert("serializedKE1", credential_request_hex.into());
     body.insert("email", args.email.clone().into());
 
-    let resp = make_request(
+    let (resp, _) = make_request(
         &args,
         reqwest::Method::POST,
         "/v2/auth/login/init",
@@ -422,7 +430,7 @@ fn login(args: CliArgs) {
         .and_then(|v| v.as_str())
         .expect("Missing loginToken field");
 
-    let mut resp = make_request(
+    let (mut resp, _) = make_request(
         &args,
         reqwest::Method::POST,
         "/v2/auth/login/finalize",
@@ -454,7 +462,7 @@ fn get_service_token(args: &CliArgs) {
         ),
     );
 
-    let resp = make_request(
+    let (resp, _) = make_request(
         args,
         reqwest::Method::POST,
         "/v2/auth/service_token",
@@ -476,7 +484,7 @@ fn enable_totp(args: &CliArgs) {
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("generateQR", true.into());
 
-    let resp = make_request(
+    let (resp, _) = make_request(
         args,
         reqwest::Method::POST,
         "/v2/accounts/2fa/totp/init",
@@ -520,7 +528,7 @@ fn enable_totp(args: &CliArgs) {
     let mut finalize_body: HashMap<&str, Value> = HashMap::new();
     finalize_body.insert("code", code.into());
 
-    let resp = make_request(
+    let (resp, _) = make_request(
         args,
         reqwest::Method::POST,
         "/v2/accounts/2fa/totp/finalize",
@@ -539,6 +547,35 @@ fn enable_totp(args: &CliArgs) {
     println!("TOTP is now enabled");
 }
 
+fn logout(args: &CliArgs) {
+    println!("Logging out...");
+
+    let auth_token = args.token
+        .as_ref()
+        .expect("auth token is required for logout");
+
+    let session_id = args.session
+        .as_ref()
+        .expect("session ID is required for logout");
+
+    let (resp, status) = make_request(
+        args,
+        reqwest::Method::DELETE,
+        &format!("/v2/sessions/{}", session_id),
+        Some(auth_token),
+        None,
+    );
+
+    if status == reqwest::StatusCode::NO_CONTENT {
+        println!("Successfully logged out");
+    } else {
+        println!("Logout failed with unexpected status: {}", status);
+        if args.verbose {
+            println!("Response: {:?}", resp);
+        }
+    }
+}
+
 fn main() {
     let args = CliArgs::parse();
 
@@ -555,11 +592,13 @@ fn main() {
         set_password(args);
     } else if args.enable_totp {
         enable_totp(&args);
+    } else if args.logout {
+        logout(&args);
     } else {
         CliArgs::command()
             .print_help()
             .expect("Failed to display help message");
-        eprintln!("Must supply -l, -r, -s, -e, -t, --email-verify, or --enable-totp");
+        eprintln!("Must supply one of: -l, -r, -s, -e, -t, --email-verify, --enable-totp, --logout");
         std::process::exit(1);
     }
 }
