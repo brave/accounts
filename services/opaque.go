@@ -250,7 +250,7 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 	}
 
 	if account != nil && account.LastEmailVerifiedAt == nil {
-		return nil, nil, util.ErrEmailVerificationRequired
+		return nil, nil, util.ErrEmailNotVerified
 	}
 
 	email = util.CanonicalizeEmail(email)

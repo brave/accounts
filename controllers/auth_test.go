@@ -285,7 +285,7 @@ func (suite *AuthTestSuite) TestAuthLoginEmailNotVerified() {
 
 	// Should return 401 with email verification required error
 	suite.Equal(http.StatusUnauthorized, resp.Code)
-	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailVerificationRequired.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailNotVerified.Code)
 }
 
 func (suite *AuthTestSuite) TestAuthLoginExpiredLoginState() {

@@ -284,7 +284,7 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, util.ErrIncorrectCredentials) ||
 			errors.Is(err, util.ErrIncorrectEmail) ||
 			errors.Is(err, util.ErrIncorrectPassword) ||
-			errors.Is(err, util.ErrEmailVerificationRequired) {
+			errors.Is(err, util.ErrEmailNotVerified) {
 
 			if errors.Is(err, util.ErrIncorrectEmail) {
 				// If an account exists that matches the simplified email, notify the user
