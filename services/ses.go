@@ -14,8 +14,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
-	"github.com/aws/aws-sdk-go-v2/service/ses"
-	"github.com/aws/aws-sdk-go-v2/service/ses/types"
+	ses "github.com/aws/aws-sdk-go-v2/service/sesv2"
+	"github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go"
 	"github.com/brave/accounts/datastore"
@@ -185,23 +185,25 @@ func (s *SESService) sendEmail(ctx context.Context, email string, subject string
 	textContentString := textContent.String()
 
 	input := &ses.SendEmailInput{
+		FromEmailAddress: &s.fromAddress,
 		Destination: &types.Destination{
 			ToAddresses: []string{util.CanonicalizeEmail(email)},
 		},
-		Message: &types.Message{
-			Body: &types.Body{
-				Html: &types.Content{
-					Data: &htmlContentString,
+		Content: &types.EmailContent{
+			Simple: &types.Message{
+				Body: &types.Body{
+					Html: &types.Content{
+						Data: &htmlContentString,
+					},
+					Text: &types.Content{
+						Data: &textContentString,
+					},
 				},
-				Text: &types.Content{
-					Data: &textContentString,
+				Subject: &types.Content{
+					Data: &subject,
 				},
-			},
-			Subject: &types.Content{
-				Data: &subject,
 			},
 		},
-		Source: &s.fromAddress,
 	}
 
 	if s.configSet != "" {
