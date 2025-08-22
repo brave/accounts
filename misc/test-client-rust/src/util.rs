@@ -19,7 +19,7 @@ pub fn make_request(
     path: &str,
     bearer_token: Option<&str>,
     body: Option<HashMap<&str, Value>>,
-) -> Response {
+) -> (Response, StatusCode) {
     // add user agent of some sort.
     let client = reqwest::blocking::Client::builder()
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
@@ -41,9 +41,9 @@ pub fn make_request(
     }
 
     let response = request_builder.send().expect("Failed to send request");
+    let status = response.status();
 
-    if !response.status().is_success() {
-        let status = response.status();
+    if !status.is_success() {
         let error_body = response.text().unwrap();
         panic!(
             "Request failed with status: {}, body: {}",
@@ -51,8 +51,8 @@ pub fn make_request(
         );
     }
 
-    if response.status() == StatusCode::NO_CONTENT {
-        return HashMap::new();
+    if status == StatusCode::NO_CONTENT {
+        return (HashMap::new(), status);
     }
 
     let response_fields = response
@@ -61,12 +61,12 @@ pub fn make_request(
 
     verbose_log(&args, format!("response: {:?}", response_fields).as_str());
 
-    response_fields
+    (response_fields, status)
 }
 
 pub fn display_account_details(args: &CliArgs, auth_token: &str) {
     // Call validate endpoint
-    let response = make_request(
+    let (response, _) = make_request(
         args,
         reqwest::Method::GET,
         "/v2/auth/validate",
