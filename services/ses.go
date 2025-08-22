@@ -184,6 +184,16 @@ func (s *SESService) sendEmail(ctx context.Context, email string, subject string
 	htmlContentString := htmlContent.String()
 	textContentString := textContent.String()
 
+	xarsHeaderName := "X-Auto-Response-Suppress"
+	xarsHeaderValue := "All"
+
+	messageHeaders := []types.MessageHeader{
+		{
+			Name:  &xarsHeaderName,
+			Value: &xarsHeaderValue,
+		},
+	}
+
 	input := &ses.SendEmailInput{
 		FromEmailAddress: &s.fromAddress,
 		Destination: &types.Destination{
@@ -202,6 +212,7 @@ func (s *SESService) sendEmail(ctx context.Context, email string, subject string
 				Subject: &types.Content{
 					Data: &subject,
 				},
+				Headers: messageHeaders,
 			},
 		},
 	}
