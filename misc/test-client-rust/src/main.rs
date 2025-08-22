@@ -554,9 +554,25 @@ fn logout(args: &CliArgs) {
         .as_ref()
         .expect("auth token is required for logout");
 
-    let session_id = args.session
-        .as_ref()
-        .expect("session ID is required for logout");
+    let session_id = if let Some(session) = &args.session {
+        session.to_owned()
+    } else {
+        // Default to session ID from auth token
+        let (response, _) = make_request(
+            args,
+            reqwest::Method::GET,
+            "/v2/auth/validate",
+            Some(auth_token),
+            None,
+        );
+
+        response
+            .get("sessionId")
+            .expect("session id should be in validate response")
+            .as_str()
+            .expect("session id should be a string")
+            .to_string()
+    };
 
     let (resp, status) = make_request(
         args,
