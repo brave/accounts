@@ -55,9 +55,19 @@ pub fn make_request(
         return (HashMap::new(), status);
     }
 
-    let response_fields = response
-        .json::<Response>()
-        .expect("Failed to parse response as HashMap<String, Value>");
+    let response_text = response.text().expect("Failed to get response text");
+
+    // Try to parse as HashMap first, then fall back to treating array as HashMap with "data" key
+    let response_fields = if let Ok(map) = serde_json::from_str::<Response>(&response_text) {
+        map
+    } else if let Ok(array) = serde_json::from_str::<Vec<Value>>(&response_text) {
+        // For array responses like /v2/keys, store the array under "data" key
+        let mut map = HashMap::new();
+        map.insert("data".to_string(), Value::Array(array));
+        map
+    } else {
+        panic!("Failed to parse response as either HashMap or Array");
+    };
 
     verbose_log(&args, format!("response: {:?}", response_fields).as_str());
 
@@ -119,4 +129,27 @@ pub fn prompt_for_input(prompt: &str) -> String {
     let mut input = String::new();
     std::io::stdin().read_line(&mut input).unwrap();
     input.trim().to_string()
+}
+
+pub fn validate_key_name(name: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err("Key name cannot be empty".to_string());
+    }
+
+    if !name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-') {
+        return Err(format!("Invalid key name '{}'. Must contain only [0-9a-z_-]", name));
+    }
+
+    Ok(())
+}
+
+pub fn validate_key_material(hex_material: &str) -> Result<Vec<u8>, String> {
+    let decoded = hex::decode(hex_material)
+        .map_err(|_| "Key material must be valid hex string".to_string())?;
+
+    if decoded.len() < 16 || decoded.len() > 128 {
+        return Err(format!("Key material must be 16-128 bytes, got {} bytes", decoded.len()));
+    }
+
+    Ok(decoded)
 }

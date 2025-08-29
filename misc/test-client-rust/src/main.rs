@@ -107,6 +107,26 @@ struct CliArgs {
     /// Two-factor authentication recovery key
     #[arg(long)]
     twofa_recovery_key: Option<String>,
+
+    /// List all user keys
+    #[arg(long)]
+    list_keys: bool,
+
+    /// Store or update a user key
+    #[arg(long)]
+    store_key: bool,
+
+    /// Get a specific user key
+    #[arg(long)]
+    get_key: bool,
+
+    /// Key name (for store/get operations)
+    #[arg(long)]
+    key_name: Option<String>,
+
+    /// Key material as hex string (for store operation)
+    #[arg(long)]
+    key_material: Option<String>,
 }
 
 fn maybe_handle_twofa(args: &CliArgs, resp: Response, token: &str, endpoint: &str) -> Response {
@@ -595,6 +615,146 @@ fn logout(args: &CliArgs) {
     }
 }
 
+fn list_keys(args: &CliArgs) {
+    println!("Listing user keys...");
+
+    let auth_token = args.token
+        .as_ref()
+        .expect("auth token is required for listing keys");
+
+    let (response, _) = make_request(
+        args,
+        reqwest::Method::GET,
+        "/v2/keys",
+        Some(auth_token),
+        None,
+    );
+
+    if let Some(keys_array) = response.get("data").and_then(|v| v.as_array()) {
+        if keys_array.is_empty() {
+            println!("No keys found");
+        } else {
+            println!("Found {} key(s):", keys_array.len());
+            for (i, key) in keys_array.iter().enumerate() {
+                let service = key.get("service")
+                    .and_then(|v| v.as_str())
+                    .unwrap();
+                let key_name = key.get("keyName")
+                    .and_then(|v| v.as_str())
+                    .unwrap();
+                println!("  {}. {}/{}", i + 1, service, key_name);
+                if args.verbose {
+                    if let Some(material) = key.get("keyMaterial").and_then(|v| v.as_str()) {
+                        println!("     Material: {}", material);
+                    }
+                    if let Some(updated) = key.get("updatedAt").and_then(|v| v.as_str()) {
+                        println!("     Updated: {}", updated);
+                    }
+                }
+            }
+        }
+    } else {
+        println!("No keys found");
+    }
+}
+
+fn store_key(args: &CliArgs) {
+    println!("Storing user key...");
+
+    let auth_token = args.token
+        .as_ref()
+        .expect("auth token is required for storing keys");
+
+    let service_name = args.service_name
+        .as_ref()
+        .expect("service name is required for storing keys");
+
+    let key_name = args.key_name
+        .as_ref()
+        .expect("key name is required for storing keys");
+
+    let key_material = args.key_material
+        .as_ref()
+        .expect("key material is required for storing keys");
+
+    if let Err(e) = validate_key_name(key_name) {
+        panic!("{}", e);
+    }
+
+    if let Err(e) = validate_key_material(key_material) {
+        panic!("{}", e);
+    }
+
+    let mut body: HashMap<&str, Value> = HashMap::new();
+    body.insert("service", service_name.clone().into());
+    body.insert("keyName", key_name.clone().into());
+    body.insert("keyMaterial", key_material.clone().into());
+
+    let (resp, status) = make_request(
+        args,
+        reqwest::Method::POST,
+        "/v2/keys",
+        Some(auth_token),
+        Some(body),
+    );
+
+    if status == reqwest::StatusCode::NO_CONTENT {
+        println!("Key '{}/{}' stored successfully", service_name, key_name);
+    } else {
+        println!("Failed with unexpected status: {}", status);
+        if args.verbose {
+            println!("Response: {:?}", resp);
+        }
+    }
+}
+
+fn get_key(args: &CliArgs) {
+    println!("Getting user key...");
+
+    let auth_token = args.token
+        .as_ref()
+        .expect("auth token is required for getting keys");
+
+    let service_name = args.service_name
+        .as_ref()
+        .expect("service name is required for getting keys");
+
+    let key_name = args.key_name
+        .as_ref()
+        .expect("key name is required for getting keys");
+
+    if let Err(e) = validate_key_name(key_name) {
+        panic!("{}", e);
+    }
+
+    let (response, status) = make_request(
+        args,
+        reqwest::Method::GET,
+        &format!("/v2/keys/{}/{}", service_name, key_name),
+        Some(auth_token),
+        None,
+    );
+
+    if status == reqwest::StatusCode::OK {
+        println!("Key '{}/{}' found:", service_name, key_name);
+        if let Some(material) = response.get("keyMaterial").and_then(|v| v.as_str()) {
+            println!("Material: {}", material);
+        }
+        if args.verbose {
+            if let Some(updated) = response.get("updatedAt").and_then(|v| v.as_str()) {
+                println!("Updated: {}", updated);
+            }
+        }
+    } else if status == reqwest::StatusCode::NOT_FOUND {
+        println!("Key '{}/{}' not found", service_name, key_name);
+    } else {
+        println!("Failed with unexpected status: {}", status);
+        if args.verbose {
+            println!("Response: {:?}", response);
+        }
+    }
+}
+
 fn main() {
     let args = CliArgs::parse();
 
@@ -613,11 +773,17 @@ fn main() {
         enable_totp(&args);
     } else if args.logout {
         logout(&args);
+    } else if args.list_keys {
+        list_keys(&args);
+    } else if args.store_key {
+        store_key(&args);
+    } else if args.get_key {
+        get_key(&args);
     } else {
         CliArgs::command()
             .print_help()
             .expect("Failed to display help message");
-        eprintln!("Must supply one of: -l, -r, -s, -e, -t, --email-verify, --enable-totp, --logout");
+        eprintln!("Must supply one of: -l, -r, -s, -e, -t, --email-verify, --enable-totp, --logout, --list-keys, --store-key, --get-key");
         std::process::exit(1);
     }
 }
