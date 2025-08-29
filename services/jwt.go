@@ -22,7 +22,7 @@ const (
 	iatClaim = "iat" // Issued at time
 	kidClaim = "kid" // Key ID
 
-	ChildAuthTokenExpirationTime = time.Hour * 24 * 14
+	ChildAuthTokenExpirationTime = time.Hour * 24 * 6
 )
 
 type JWTService struct {
