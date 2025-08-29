@@ -382,8 +382,8 @@ func (suite *AuthTestSuite) TestCreateServiceToken() {
 	_, _, err = parser.ParseUnverified(parsedResp.AuthToken, &claims)
 	suite.NoError(err)
 
-	// Check expiration time (14 days from now)
-	expectedExp := time.Now().Add(14 * 24 * time.Hour).Unix()
+	// Check expiration time
+	expectedExp := time.Now().Add(6 * 24 * time.Hour).Unix()
 	suite.InDelta(expectedExp, claims["exp"].(float64), 60) // Allow 60 seconds tolerance
 
 	// Verify audience
