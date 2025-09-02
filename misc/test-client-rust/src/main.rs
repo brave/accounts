@@ -357,6 +357,9 @@ fn set_password(args: CliArgs) {
     // If this was a registration, wait for email verification after password setup
     let auth_token = if args.register {
         wait_for_verification(&args, &token).expect("Failed to get auth token after verification")
+    } else if args.change_password && !resp.get("sessionsInvalidated").unwrap().as_bool().unwrap() {
+        // Reuse existing auth token since it's still valid
+        args.token.as_ref().expect("change password requires auth").trim().to_string()
     } else {
         resp.get("authToken").unwrap().as_str().unwrap().to_string()
     };
