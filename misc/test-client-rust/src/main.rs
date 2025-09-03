@@ -677,13 +677,8 @@ fn store_key(args: &CliArgs) {
         .as_ref()
         .expect("key material is required for storing keys");
 
-    if let Err(e) = validate_key_name(key_name) {
-        panic!("{}", e);
-    }
-
-    if let Err(e) = validate_key_material(key_material) {
-        panic!("{}", e);
-    }
+    validate_key_name(key_name);
+    validate_key_material(key_material);
 
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("service", service_name.clone().into());
@@ -723,9 +718,7 @@ fn get_key(args: &CliArgs) {
         .as_ref()
         .expect("key name is required for getting keys");
 
-    if let Err(e) = validate_key_name(key_name) {
-        panic!("{}", e);
-    }
+    validate_key_name(key_name);
 
     let (response, status) = make_request(
         args,

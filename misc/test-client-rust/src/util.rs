@@ -131,25 +131,20 @@ pub fn prompt_for_input(prompt: &str) -> String {
     input.trim().to_string()
 }
 
-pub fn validate_key_name(name: &str) -> Result<(), String> {
+pub fn validate_key_name(name: &str) {
     if name.is_empty() {
-        return Err("Key name cannot be empty".to_string());
+        panic!("Key name cannot be empty");
     }
 
     if !name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-') {
-        return Err(format!("Invalid key name '{}'. Must contain only [0-9a-z_-]", name));
+        panic!("Invalid key name '{name}'. Must contain only [0-9a-z_-]");
     }
-
-    Ok(())
 }
 
-pub fn validate_key_material(hex_material: &str) -> Result<Vec<u8>, String> {
-    let decoded = hex::decode(hex_material)
-        .map_err(|_| "Key material must be valid hex string".to_string())?;
+pub fn validate_key_material(hex_material: &str) {
+    let decoded = hex::decode(hex_material).unwrap();
 
     if decoded.len() < 16 || decoded.len() > 128 {
-        return Err(format!("Key material must be 16-128 bytes, got {} bytes", decoded.len()));
+        panic!("Key material must be 16-128 bytes, got {} bytes", decoded.len());
     }
-
-    Ok(decoded)
 }
