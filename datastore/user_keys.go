@@ -57,3 +57,12 @@ func (d *Datastore) GetUserKeys(accountID uuid.UUID) ([]DBUserKey, error) {
 	}
 	return keys, nil
 }
+
+// DeleteAllUserKeys deletes all keys for an account
+func (d *Datastore) DeleteAllUserKeys(accountID uuid.UUID) error {
+	result := d.DB.Where("account_id = ?", accountID).Delete(&DBUserKey{})
+	if result.Error != nil {
+		return fmt.Errorf("failed to delete user keys: %w", result.Error)
+	}
+	return nil
+}
