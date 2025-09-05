@@ -107,13 +107,15 @@ func (suite *AccountsTestSuite) createAuthSession() (string, *datastore.Account)
 func (suite *AccountsTestSuite) createTestUserKeys(accountID uuid.UUID) {
 	err := suite.ds.StoreUserKey(&datastore.DBUserKey{
 		AccountID:   accountID,
-		Name:        "key1",
+		Service:     "accounts",
+		KeyName:     "key1",
 		KeyMaterial: []byte{1, 2, 3},
 	})
 	suite.Require().NoError(err)
 	err = suite.ds.StoreUserKey(&datastore.DBUserKey{
 		AccountID:   accountID,
-		Name:        "key2",
+		Service:     "accounts",
+		KeyName:     "key2",
 		KeyMaterial: []byte{4, 5, 6},
 	})
 	suite.Require().NoError(err)
