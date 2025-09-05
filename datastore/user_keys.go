@@ -9,12 +9,16 @@ import (
 	"gorm.io/gorm"
 )
 
+const MaxUserKeysPerService = 2
+
 // DBUserKey represents a key in the database
 type DBUserKey struct {
 	// AccountID is the UUID of the account that owns this key
 	AccountID uuid.UUID `json:"-" gorm:"primaryKey"`
-	// Name identifies the type of key (wrapping_key, sync_enc_seed, or sync_device_seed)
-	Name string `json:"name" gorm:"primaryKey"`
+	// Service identifies the service this key is for
+	Service string `json:"service" gorm:"primaryKey"`
+	// KeyName identifies the name of the key within the service
+	KeyName string `json:"keyName" gorm:"primaryKey"`
 	// KeyMaterial contains the encrypted key data as bytes
 	KeyMaterial []byte `json:"keyMaterial"`
 	// UpdatedAt is the timestamp when the key was last updated
@@ -28,7 +32,19 @@ func (DBUserKey) TableName() string {
 
 // StoreUserKey saves a user key to the database
 func (d *Datastore) StoreUserKey(key *DBUserKey) error {
-	result := d.DB.Save(key)
+	// Count existing keys for this service/account pair, excluding the current key_name
+	var count int64
+	result := d.DB.Model(&DBUserKey{}).Where("account_id = ? AND service = ? AND key_name != ?",
+		key.AccountID, key.Service, key.KeyName).Count(&count)
+	if result.Error != nil {
+		return fmt.Errorf("failed to check existing user keys: %w", result.Error)
+	}
+
+	if count >= MaxUserKeysPerService {
+		return util.ErrMaxUserKeysExceeded
+	}
+
+	result = d.DB.Save(key)
 	if result.Error != nil {
 		return fmt.Errorf("failed to store user key: %w", result.Error)
 	}
@@ -36,9 +52,9 @@ func (d *Datastore) StoreUserKey(key *DBUserKey) error {
 }
 
 // GetUserKey retrieves a user key from the database
-func (d *Datastore) GetUserKey(accountID uuid.UUID, name string) (*DBUserKey, error) {
+func (d *Datastore) GetUserKey(accountID uuid.UUID, service string, keyName string) (*DBUserKey, error) {
 	var key DBUserKey
-	result := d.DB.Where("account_id = ? AND name = ?", accountID, name).First(&key)
+	result := d.DB.Where("account_id = ? AND service = ? AND key_name = ?", accountID, service, keyName).First(&key)
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
 			return nil, util.ErrKeyNotFound
