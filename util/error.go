@@ -18,7 +18,8 @@ var (
 	ErrNewAccountEmailRequired     = NewExposedError(11005, "newAccountEmail is required when no verification token is provided")
 
 	// Key errors, prefixed with '12'
-	ErrKeyNotFound = NewExposedError(12001, "key not found")
+	ErrKeyNotFound         = NewExposedError(12001, "key not found")
+	ErrMaxUserKeysExceeded = NewExposedError(12002, "maximum number of keys exceeded for this service")
 
 	// Verification errors, prefixed with '13'
 	ErrTooManyVerifications           = NewExposedError(13001, "too many pending verification requests for email")
