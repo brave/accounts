@@ -123,7 +123,7 @@ func IsEmailAllowed(email string, checkStrictCountries bool) bool {
 	}
 
 	// Always block these TLDs
-	unsupportedTLDs := []string{".kp", ".tz"}
+	unsupportedTLDs := []string{".cu", ".kp", ".tz"}
 	for _, tld := range unsupportedTLDs {
 		if strings.HasSuffix(lowerEmail, tld) {
 			return false
@@ -131,7 +131,7 @@ func IsEmailAllowed(email string, checkStrictCountries bool) bool {
 	}
 
 	if checkStrictCountries {
-		restrictedTLDs := []string{".cu", ".ir", ".sy", ".by", ".md", ".ru", ".ve"}
+		restrictedTLDs := []string{".ir", ".sy", ".by", ".md", ".ru", ".ve"}
 		for _, tld := range restrictedTLDs {
 			if strings.HasSuffix(lowerEmail, tld) {
 				return false
