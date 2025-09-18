@@ -126,6 +126,11 @@ func (suite *AccountsTestSuite) TestResetPassword() {
 
 	suite.createTestUserKeys(account.ID)
 
+	// Create a second account with test user keys to verify they are not deleted
+	secondAccount, err := suite.ds.GetOrCreateAccount("second@example.com")
+	suite.Require().NoError(err)
+	suite.createTestUserKeys(secondAccount.ID)
+
 	// Create verification with reset_password intent
 	verification, err := suite.ds.CreateVerification("test@example.com", "accounts", "reset_password")
 	suite.Require().NoError(err)
@@ -205,6 +210,11 @@ func (suite *AccountsTestSuite) TestResetPassword() {
 	finalKeys, err := suite.ds.GetUserKeys(account.ID)
 	suite.Require().NoError(err)
 	suite.Equal(0, len(finalKeys), "User keys should be deleted during password reset")
+
+	// Verify that user keys for the second account were NOT deleted
+	secondAccountKeys, err := suite.ds.GetUserKeys(secondAccount.ID)
+	suite.Require().NoError(err)
+	suite.Equal(2, len(secondAccountKeys), "User keys for second account should NOT be deleted during first account's password reset")
 }
 
 func (suite *AccountsTestSuite) TestRegistration() {
