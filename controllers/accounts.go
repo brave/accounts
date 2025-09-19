@@ -352,6 +352,13 @@ func (ac *AccountsController) postPasswordSetup(ctx context.Context, accountID u
 		authToken = &authTokenResult
 	}
 
+	// Delete all user keys for password reset to ensure clean slate
+	if verification.Intent == datastore.ResetPasswordIntent {
+		if err := ac.ds.DeleteAllUserKeys(accountID); err != nil {
+			return nil, false, fmt.Errorf("failed to delete user keys during password reset: %w", err)
+		}
+	}
+
 	// Send password change notification email for existing accounts
 	if verification.Intent == datastore.ResetPasswordIntent || verification.Intent == datastore.ChangePasswordIntent {
 		accountLocale, err := ac.ds.GetAccountLocale(accountID)

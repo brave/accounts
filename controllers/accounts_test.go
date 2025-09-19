@@ -18,6 +18,7 @@ import (
 	"github.com/brave/accounts/util"
 	"github.com/bytemare/opaque"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/mock"
@@ -103,7 +104,33 @@ func (suite *AccountsTestSuite) createAuthSession() (string, *datastore.Account)
 	return token, account
 }
 
+func (suite *AccountsTestSuite) createTestUserKeys(accountID uuid.UUID) {
+	err := suite.ds.StoreUserKey(&datastore.DBUserKey{
+		AccountID:   accountID,
+		Name:        "key1",
+		KeyMaterial: []byte{1, 2, 3},
+	})
+	suite.Require().NoError(err)
+	err = suite.ds.StoreUserKey(&datastore.DBUserKey{
+		AccountID:   accountID,
+		Name:        "key2",
+		KeyMaterial: []byte{4, 5, 6},
+	})
+	suite.Require().NoError(err)
+}
+
 func (suite *AccountsTestSuite) TestResetPassword() {
+	// Create account and store some test user keys
+	account, err := suite.ds.GetOrCreateAccount("test@example.com")
+	suite.Require().NoError(err)
+
+	suite.createTestUserKeys(account.ID)
+
+	// Create a second account with test user keys to verify they are not deleted
+	secondAccount, err := suite.ds.GetOrCreateAccount("second@example.com")
+	suite.Require().NoError(err)
+	suite.createTestUserKeys(secondAccount.ID)
+
 	// Create verification with reset_password intent
 	verification, err := suite.ds.CreateVerification("test@example.com", "accounts", "reset_password")
 	suite.Require().NoError(err)
@@ -163,7 +190,7 @@ func (suite *AccountsTestSuite) TestResetPassword() {
 	suite.NoError(err)
 	suite.NotNil(sessionID)
 
-	account, err := suite.ds.GetAccount(nil, verification.Email)
+	account, err = suite.ds.GetAccount(nil, verification.Email)
 	suite.Require().NoError(err)
 	suite.NotNil(account.OprfSeedID)
 	suite.NotEmpty(account.OpaqueRegistration)
@@ -178,6 +205,16 @@ func (suite *AccountsTestSuite) TestResetPassword() {
 
 	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusNotFound, resp.Code)
+
+	// Verify that all user keys were deleted during password reset
+	finalKeys, err := suite.ds.GetUserKeys(account.ID)
+	suite.Require().NoError(err)
+	suite.Equal(0, len(finalKeys), "User keys should be deleted during password reset")
+
+	// Verify that user keys for the second account were NOT deleted
+	secondAccountKeys, err := suite.ds.GetUserKeys(secondAccount.ID)
+	suite.Require().NoError(err)
+	suite.Equal(2, len(secondAccountKeys), "User keys for second account should NOT be deleted during first account's password reset")
 }
 
 func (suite *AccountsTestSuite) TestRegistration() {
@@ -334,6 +371,14 @@ func (suite *AccountsTestSuite) TestChangePassword() {
 		err = suite.ds.SetAccountLocaleIfMissing(account.ID, "fr-FR")
 		suite.Require().NoError(err)
 
+		// Store some test user keys to verify they are NOT deleted during password change
+		suite.createTestUserKeys(account.ID)
+
+		// Verify keys were stored
+		initialKeys, err := suite.ds.GetUserKeys(account.ID)
+		suite.Require().NoError(err)
+		suite.Equal(2, len(initialKeys))
+
 		// Create sessions to verify session invalidation or lack thereof
 		for range 3 {
 			_, err := suite.ds.CreateSession(account.ID, datastore.EmailAuthSessionVersion, "")
@@ -409,6 +454,11 @@ func (suite *AccountsTestSuite) TestChangePassword() {
 			suite.Equal(3, len(sessions))
 			suite.Nil(changeFinalizeResp.AuthToken)
 		}
+
+		// Verify that user keys were NOT deleted during password change
+		finalKeys, err := suite.ds.GetUserKeys(account.ID)
+		suite.Require().NoError(err)
+		suite.Equal(2, len(finalKeys), "User keys should NOT be deleted during password change")
 	}
 }
 
