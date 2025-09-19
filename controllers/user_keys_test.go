@@ -197,6 +197,20 @@ func (suite *UserKeysTestSuite) TestSaveKeyInvalidHex() {
 	suite.Equal(http.StatusBadRequest, resp.Code)
 }
 
+func (suite *UserKeysTestSuite) TestSaveKeyNameTooLong() {
+	requestBody := controllers.UserKeyStoreRequest{
+		Service:     "accounts",
+		KeyName:     "this_key_name_is_way_too_long_and_exceeds_the_thirty_two_character_limit",
+		KeyMaterial: "0123456789abcdef",
+	}
+
+	req := util.CreateJSONTestRequest("/v2/keys", requestBody)
+	req.Header.Set("Authorization", "Bearer "+suite.authToken)
+	resp := util.ExecuteTestRequest(req, suite.router)
+
+	suite.Equal(http.StatusBadRequest, resp.Code)
+}
+
 func (suite *UserKeysTestSuite) TestGetKeyNotFound() {
 	req := httptest.NewRequest(http.MethodGet, "/v2/keys/accounts/nonexistent", nil)
 	req.Header.Set("Authorization", "Bearer "+suite.authToken)

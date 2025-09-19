@@ -23,7 +23,7 @@ type UserKeyStoreRequest struct {
 	// Service identifies the service this key is for
 	Service string `json:"service" validate:"required,oneof=accounts sync email-aliases"`
 	// KeyName identifies the name of the key within the service
-	KeyName string `json:"keyName" validate:"required"`
+	KeyName string `json:"keyName" validate:"required,max=32"`
 	// KeyMaterial contains the encrypted key data as hex bytes
 	KeyMaterial string `json:"keyMaterial" validate:"required,min=16,max=128"`
 }
