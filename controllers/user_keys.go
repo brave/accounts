@@ -15,20 +15,25 @@ import (
 	"github.com/google/uuid"
 )
 
-const keyNameURLParam = "name"
+const serviceURLParam = "service"
+const keyNameURLParam = "keyName"
 
 // UserKey represents the HTTP request format for a key
 type UserKeyStoreRequest struct {
-	// Name identifies the type of key (wrapping_key or sync_enc_seed)
-	Name string `json:"name" validate:"required,oneof=wrapping_key sync_enc_seed"`
+	// Service identifies the service this key is for
+	Service string `json:"service" validate:"required,oneof=accounts sync email-aliases"`
+	// KeyName identifies the name of the key within the service
+	KeyName string `json:"keyName" validate:"required,max=32"`
 	// KeyMaterial contains the encrypted key data as hex bytes
 	KeyMaterial string `json:"keyMaterial" validate:"required,min=16,max=128"`
 }
 
 // UserKey represents the HTTP response format for a key
 type UserKey struct {
-	// Name identifies the type of key (wrapping_key or sync_enc_seed)
-	Name string `json:"name"`
+	// Service identifies the service this key is for
+	Service string `json:"service"`
+	// KeyName identifies the name of the key within the service
+	KeyName string `json:"keyName"`
 	// KeyMaterial contains the encrypted key data as hex bytes
 	KeyMaterial string `json:"keyMaterial"`
 	// UpdatedAt is the timestamp when the key was last updated
@@ -44,7 +49,8 @@ func (r *UserKeyStoreRequest) ToDBUserKey(accountID uuid.UUID) (*datastore.DBUse
 
 	return &datastore.DBUserKey{
 		AccountID:   accountID,
-		Name:        r.Name,
+		Service:     r.Service,
+		KeyName:     r.KeyName,
 		KeyMaterial: encKey,
 		UpdatedAt:   time.Now().UTC(),
 	}, nil
@@ -53,7 +59,8 @@ func (r *UserKeyStoreRequest) ToDBUserKey(accountID uuid.UUID) (*datastore.DBUse
 // FromDBUserKey converts a datastore.DBUserKey to a UserKey
 func FromDBUserKey(dbKey *datastore.DBUserKey) UserKey {
 	return UserKey{
-		Name:        dbKey.Name,
+		Service:     dbKey.Service,
+		KeyName:     dbKey.KeyName,
 		KeyMaterial: hex.EncodeToString(dbKey.KeyMaterial),
 		UpdatedAt:   dbKey.UpdatedAt,
 	}
@@ -74,7 +81,7 @@ func (uc *UserKeysController) Router(authMiddleware func(http.Handler) http.Hand
 	r.Use(authMiddleware)
 
 	r.Get("/", uc.ListKeys)
-	r.Get("/{name}", uc.GetKey)
+	r.Get("/{service}/{keyName}", uc.GetKey)
 	r.Post("/", uc.SaveKey)
 
 	return r
@@ -110,24 +117,26 @@ func (uc *UserKeysController) ListKeys(w http.ResponseWriter, r *http.Request) {
 }
 
 // @Summary Get user key
-// @Description Get a specific key by name for the authenticated user
+// @Description Get a specific key by service and key name for the authenticated user
 // @Tags User keys
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + auth token"
 // @Param Brave-Key header string false "Brave services key (if one is configured)"
-// @Param name path string true "Key name"
+// @Param service path string true "Service name"
+// @Param keyName path string true "Key name"
 // @Success 200 {object} UserKey
 // @Failure 401 {object} util.ErrorResponse
 // @Failure 403 {object} util.ErrorResponse
 // @Failure 404 {object} util.ErrorResponse
 // @Failure 500 {object} util.ErrorResponse
-// @Router /v2/keys/{name} [get]
+// @Router /v2/keys/{service}/{keyName} [get]
 func (uc *UserKeysController) GetKey(w http.ResponseWriter, r *http.Request) {
 	session := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
-	name := chi.URLParam(r, keyNameURLParam)
+	service := chi.URLParam(r, serviceURLParam)
+	keyName := chi.URLParam(r, keyNameURLParam)
 
-	key, err := uc.ds.GetUserKey(session.AccountID, name)
+	key, err := uc.ds.GetUserKey(session.AccountID, service, keyName)
 	if err != nil {
 		if errors.Is(err, util.ErrKeyNotFound) {
 			util.RenderErrorResponse(w, r, http.StatusNotFound, err)
@@ -169,6 +178,10 @@ func (uc *UserKeysController) SaveKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := uc.ds.StoreUserKey(dbKey); err != nil {
+		if errors.Is(err, util.ErrMaxUserKeysExceeded) {
+			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+			return
+		}
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}

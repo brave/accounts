@@ -2,6 +2,7 @@ package controllers_test
 
 import (
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -44,7 +45,8 @@ func (suite *UserKeysTestSuite) SetupTest() {
 
 	otherTestKey := datastore.DBUserKey{
 		AccountID:   otherAccount.ID,
-		Name:        "wrapping_key",
+		Service:     "accounts",
+		KeyName:     "wrapping_key",
 		KeyMaterial: []byte("test key 10"),
 		UpdatedAt:   time.Now().UTC(),
 	}
@@ -77,13 +79,15 @@ func (suite *UserKeysTestSuite) TestListKeys() {
 	testKeys := []datastore.DBUserKey{
 		{
 			AccountID:   suite.account.ID,
-			Name:        "wrapping_key",
+			Service:     "accounts",
+			KeyName:     "wrapping_key",
 			KeyMaterial: []byte("test key 1"),
 			UpdatedAt:   updatedTime,
 		},
 		{
 			AccountID:   suite.account.ID,
-			Name:        "sync_enc_seed",
+			Service:     "sync",
+			KeyName:     "enc_seed",
 			KeyMaterial: []byte("test key 2"),
 			UpdatedAt:   updatedTime,
 		},
@@ -105,7 +109,8 @@ func (suite *UserKeysTestSuite) TestListKeys() {
 
 	suite.Len(responseKeys, len(testKeys))
 	for i, testKey := range testKeys {
-		suite.Equal(testKey.Name, responseKeys[i].Name)
+		suite.Equal(testKey.Service, responseKeys[i].Service)
+		suite.Equal(testKey.KeyName, responseKeys[i].KeyName)
 		suite.Equal(hex.EncodeToString(testKey.KeyMaterial), responseKeys[i].KeyMaterial)
 		suite.Equal(testKey.UpdatedAt, responseKeys[i].UpdatedAt)
 	}
@@ -114,14 +119,15 @@ func (suite *UserKeysTestSuite) TestListKeys() {
 func (suite *UserKeysTestSuite) TestGetKey() {
 	testKey := &datastore.DBUserKey{
 		AccountID:   suite.account.ID,
-		Name:        "wrapping_key",
+		Service:     "accounts",
+		KeyName:     "wrapping_key",
 		KeyMaterial: []byte("test key"),
 		UpdatedAt:   time.Now().UTC().Truncate(time.Millisecond),
 	}
 	err := suite.ds.StoreUserKey(testKey)
 	suite.Require().NoError(err)
 
-	req := httptest.NewRequest(http.MethodGet, "/v2/keys/wrapping_key", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v2/keys/accounts/wrapping_key", nil)
 	req.Header.Set("Authorization", "Bearer "+suite.authToken)
 	resp := util.ExecuteTestRequest(req, suite.router)
 
@@ -130,14 +136,23 @@ func (suite *UserKeysTestSuite) TestGetKey() {
 	var responseKey controllers.UserKey
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &responseKey)
 
-	suite.Equal(testKey.Name, responseKey.Name)
+	suite.Equal(testKey.Service, responseKey.Service)
+	suite.Equal(testKey.KeyName, responseKey.KeyName)
 	suite.Equal(hex.EncodeToString(testKey.KeyMaterial), responseKey.KeyMaterial)
 	suite.Equal(testKey.UpdatedAt, responseKey.UpdatedAt)
+
+	// Test that the key cannot be retrieved using a different service name
+	req = httptest.NewRequest(http.MethodGet, "/v2/keys/sync/wrapping_key", nil)
+	req.Header.Set("Authorization", "Bearer "+suite.authToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
+
+	suite.Equal(http.StatusNotFound, resp.Code)
 }
 
 func (suite *UserKeysTestSuite) TestSaveKey() {
 	requestBody := controllers.UserKeyStoreRequest{
-		Name:        "wrapping_key",
+		Service:     "accounts",
+		KeyName:     "wrapping_key",
 		KeyMaterial: "0123456789abcdef",
 	}
 
@@ -148,14 +163,16 @@ func (suite *UserKeysTestSuite) TestSaveKey() {
 	suite.Equal(http.StatusNoContent, resp.Code)
 
 	// Verify key was stored
-	key, err := suite.ds.GetUserKey(suite.account.ID, "wrapping_key")
+	key, err := suite.ds.GetUserKey(suite.account.ID, "accounts", "wrapping_key")
 	suite.Require().NoError(err)
-	suite.Equal("wrapping_key", key.Name)
+	suite.Equal("accounts", key.Service)
+	suite.Equal("wrapping_key", key.KeyName)
 }
 
-func (suite *UserKeysTestSuite) TestSaveKeyInvalidKeyName() {
+func (suite *UserKeysTestSuite) TestSaveKeyInvalidService() {
 	requestBody := controllers.UserKeyStoreRequest{
-		Name:        "bad_key_name",
+		Service:     "invalid_service",
+		KeyName:     "wrapping_key",
 		KeyMaterial: "0123456789abcdef",
 	}
 
@@ -168,7 +185,8 @@ func (suite *UserKeysTestSuite) TestSaveKeyInvalidKeyName() {
 
 func (suite *UserKeysTestSuite) TestSaveKeyInvalidHex() {
 	requestBody := controllers.UserKeyStoreRequest{
-		Name:        "wrapping_key",
+		Service:     "accounts",
+		KeyName:     "wrapping_key",
 		KeyMaterial: "invalid hex",
 	}
 
@@ -179,10 +197,95 @@ func (suite *UserKeysTestSuite) TestSaveKeyInvalidHex() {
 	suite.Equal(http.StatusBadRequest, resp.Code)
 }
 
+func (suite *UserKeysTestSuite) TestSaveKeyNameTooLong() {
+	requestBody := controllers.UserKeyStoreRequest{
+		Service:     "accounts",
+		KeyName:     "this_key_name_is_way_too_long_and_exceeds_the_thirty_two_character_limit",
+		KeyMaterial: "0123456789abcdef",
+	}
+
+	req := util.CreateJSONTestRequest("/v2/keys", requestBody)
+	req.Header.Set("Authorization", "Bearer "+suite.authToken)
+	resp := util.ExecuteTestRequest(req, suite.router)
+
+	suite.Equal(http.StatusBadRequest, resp.Code)
+}
+
 func (suite *UserKeysTestSuite) TestGetKeyNotFound() {
-	req := httptest.NewRequest(http.MethodGet, "/v2/keys/nonexistent", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v2/keys/accounts/nonexistent", nil)
 	req.Header.Set("Authorization", "Bearer "+suite.authToken)
 	resp := util.ExecuteTestRequest(req, suite.router)
 
 	suite.Equal(http.StatusNotFound, resp.Code)
+}
+
+func (suite *UserKeysTestSuite) createMaxKeys(service string) {
+	requestBody := controllers.UserKeyStoreRequest{
+		Service:     service,
+		KeyMaterial: "0123456789abcdef",
+	}
+
+	for i := 0; i < datastore.MaxUserKeysPerService; i++ {
+		requestBody.KeyName = fmt.Sprintf("test_key_%d", i)
+
+		req := util.CreateJSONTestRequest("/v2/keys", requestBody)
+		req.Header.Set("Authorization", "Bearer "+suite.authToken)
+		resp := util.ExecuteTestRequest(req, suite.router)
+
+		suite.Equal(http.StatusNoContent, resp.Code)
+	}
+}
+
+func (suite *UserKeysTestSuite) TestSaveKeyLimitExceeded() {
+	// First, store some keys for a different service to ensure per-service isolation
+	suite.createMaxKeys("sync")
+
+	// Now store MaxUserKeysPerService keys for the accounts service
+	suite.createMaxKeys("accounts")
+
+	// Try to store one more key for accounts service - should fail
+	requestBody := controllers.UserKeyStoreRequest{
+		Service:     "accounts",
+		KeyName:     "key_excess",
+		KeyMaterial: "0123456789abcdef",
+	}
+
+	req := util.CreateJSONTestRequest("/v2/keys", requestBody)
+	req.Header.Set("Authorization", "Bearer "+suite.authToken)
+	resp := util.ExecuteTestRequest(req, suite.router)
+
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrMaxUserKeysExceeded.Code)
+}
+
+func (suite *UserKeysTestSuite) TestUpdateExistingKey() {
+	// Store MaxUserKeysPerService keys for accounts service
+	suite.createMaxKeys("accounts")
+
+	// Update the first key - should succeed
+	requestBody := controllers.UserKeyStoreRequest{
+		Service:     "accounts",
+		KeyName:     "test_key_0",
+		KeyMaterial: "fedcba9876543210",
+	}
+
+	req := util.CreateJSONTestRequest("/v2/keys", requestBody)
+	req.Header.Set("Authorization", "Bearer "+suite.authToken)
+	resp := util.ExecuteTestRequest(req, suite.router)
+
+	suite.Equal(http.StatusNoContent, resp.Code)
+
+	// Verify the key was updated
+	req = httptest.NewRequest(http.MethodGet, "/v2/keys/accounts/test_key_0", nil)
+	req.Header.Set("Authorization", "Bearer "+suite.authToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
+
+	suite.Equal(http.StatusOK, resp.Code)
+
+	var responseKey controllers.UserKey
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &responseKey)
+
+	suite.Equal(requestBody.Service, responseKey.Service)
+	suite.Equal(requestBody.KeyName, responseKey.KeyName)
+	suite.Equal(requestBody.KeyMaterial, responseKey.KeyMaterial)
 }
