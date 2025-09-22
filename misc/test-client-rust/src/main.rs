@@ -112,9 +112,9 @@ struct CliArgs {
     #[arg(long)]
     list_keys: bool,
 
-    /// Store or update a user key
+    /// Store or update a user key (with key material as hex string)
     #[arg(long)]
-    store_key: bool,
+    store_key: Option<String>,
 
     /// Get a specific user key
     #[arg(long)]
@@ -123,10 +123,6 @@ struct CliArgs {
     /// Key name (for store/get operations)
     #[arg(long)]
     key_name: Option<String>,
-
-    /// Key material as hex string (for store operation)
-    #[arg(long)]
-    key_material: Option<String>,
 }
 
 fn maybe_handle_twofa(args: &CliArgs, resp: Response, token: &str, endpoint: &str) -> Response {
@@ -669,7 +665,7 @@ fn store_key(args: &CliArgs) {
 
     let key_name = validate_key_name(args.key_name.as_ref());
 
-    let key_material = validate_key_material(args.key_material.as_ref());
+    let key_material = validate_key_material(args.store_key.as_ref());
 
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("service", service_name.clone().into());
@@ -755,7 +751,7 @@ fn main() {
         logout(&args);
     } else if args.list_keys {
         list_keys(&args);
-    } else if args.store_key {
+    } else if args.store_key.is_some() {
         store_key(&args);
     } else if args.get_key {
         get_key(&args);
