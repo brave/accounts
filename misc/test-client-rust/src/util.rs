@@ -131,7 +131,9 @@ pub fn prompt_for_input(prompt: &str) -> String {
     input.trim().to_string()
 }
 
-pub fn validate_key_name(name: &str) {
+pub fn validate_key_name(name: Option<&String>) -> &str {
+    let name = name.expect("key name is required");
+
     if name.is_empty() {
         panic!("Key name cannot be empty");
     }
@@ -139,12 +141,18 @@ pub fn validate_key_name(name: &str) {
     if !name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-') {
         panic!("Invalid key name '{name}'. Must contain only [0-9a-z_-]");
     }
+
+    name
 }
 
-pub fn validate_key_material(hex_material: &str) {
+pub fn validate_key_material(hex_material: Option<&String>) -> &str {
+    let hex_material = hex_material.expect("key material is required");
+
     let decoded = hex::decode(hex_material).unwrap();
 
     if decoded.len() < 16 || decoded.len() > 128 {
         panic!("Key material must be 16-128 bytes, got {} bytes", decoded.len());
     }
+
+    hex_material
 }
