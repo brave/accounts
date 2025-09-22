@@ -643,13 +643,11 @@ fn list_keys(args: &CliArgs) {
                     .and_then(|v| v.as_str())
                     .unwrap();
                 println!("  {}. {}/{}", i + 1, service, key_name);
-                if args.verbose {
-                    if let Some(material) = key.get("keyMaterial").and_then(|v| v.as_str()) {
-                        println!("     Material: {}", material);
-                    }
-                    if let Some(updated) = key.get("updatedAt").and_then(|v| v.as_str()) {
-                        println!("     Updated: {}", updated);
-                    }
+                if let Some(material) = key.get("keyMaterial").and_then(|v| v.as_str()) {
+                    println!("     Material: {}", material);
+                }
+                if let Some(updated) = key.get("updatedAt").and_then(|v| v.as_str()) {
+                    println!("     Updated: {}", updated);
                 }
             }
         }
