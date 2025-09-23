@@ -125,7 +125,7 @@ struct CliArgs {
     key_name: Option<String>,
 }
 
-fn maybe_handle_twofa(args: &CliArgs, resp: Response, token: &str, endpoint: &str) -> Response {
+fn maybe_handle_twofa(args: &CliArgs, resp: Value, token: &str, endpoint: &str) -> Value {
     // If 2FA not required, just return the original response
     if !resp
         .get("requiresTwoFA")
@@ -626,7 +626,7 @@ fn list_keys(args: &CliArgs) {
         None,
     );
 
-    if let Some(keys_array) = response.get("data").and_then(|v| v.as_array()) {
+    if let Some(keys_array) = response.as_array() {
         if keys_array.is_empty() {
             println!("No keys found");
         } else {
