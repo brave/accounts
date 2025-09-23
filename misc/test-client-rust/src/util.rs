@@ -4,9 +4,6 @@ use std::{collections::HashMap, io::Write};
 
 use crate::CliArgs;
 
-// Type alias for response data
-pub type Response = HashMap<String, Value>;
-
 pub fn verbose_log(cli_args: &CliArgs, message: &str) {
     if cli_args.verbose {
         println!("{}", message);
@@ -19,7 +16,7 @@ pub fn make_request(
     path: &str,
     bearer_token: Option<&str>,
     body: Option<HashMap<&str, Value>>,
-) -> (Response, StatusCode) {
+) -> (Value, StatusCode) {
     // add user agent of some sort.
     let client = reqwest::blocking::Client::builder()
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
@@ -52,26 +49,15 @@ pub fn make_request(
     }
 
     if status == StatusCode::NO_CONTENT {
-        return (HashMap::new(), status);
+        return (serde_json::json!({}), status);
     }
 
     let response_text = response.text().expect("Failed to get response text");
 
-    // Try to parse as HashMap first, then fall back to treating array as HashMap with "data" key
-    let response_fields = if let Ok(map) = serde_json::from_str::<Response>(&response_text) {
-        map
-    } else if let Ok(array) = serde_json::from_str::<Vec<Value>>(&response_text) {
-        // For array responses like /v2/keys, store the array under "data" key
-        let mut map = HashMap::new();
-        map.insert("data".to_string(), Value::Array(array));
-        map
-    } else {
-        panic!("Failed to parse response as either HashMap or Array");
-    };
+    let response_value = serde_json::from_str::<Value>(&response_text).expect("Failed to parse JSON response");
+    verbose_log(&args, format!("response: {:?}", response_value).as_str());
 
-    verbose_log(&args, format!("response: {:?}", response_fields).as_str());
-
-    (response_fields, status)
+    (response_value, status)
 }
 
 pub fn display_account_details(args: &CliArgs, auth_token: &str) {
