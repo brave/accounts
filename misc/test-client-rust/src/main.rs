@@ -123,6 +123,10 @@ struct CliArgs {
     /// Key name (for store/get operations)
     #[arg(long)]
     key_name: Option<String>,
+
+    /// Invalidate all existing sessions during change_password or reset_password
+    #[arg(long)]
+    invalidate_sessions: bool,
 }
 
 fn maybe_handle_twofa(args: &CliArgs, resp: Value, token: &str, endpoint: &str) -> Value {
@@ -358,6 +362,10 @@ fn set_password(args: CliArgs) {
 
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("serializedRecord", record_hex.into());
+
+    if args.change_password && args.invalidate_sessions {
+        body.insert("invalidateSessions", true.into());
+    }
 
     let (mut resp, _) = make_request(
         &args,
