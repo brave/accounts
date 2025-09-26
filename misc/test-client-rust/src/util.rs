@@ -6,7 +6,7 @@ use crate::CliArgs;
 
 pub fn verbose_log(cli_args: &CliArgs, message: &str) {
     if cli_args.verbose {
-        println!("{}", message);
+        println!("{message}");
     }
 }
 
@@ -24,14 +24,14 @@ pub fn make_request(
         .expect("Failed to create HTTP client");
     let mut request_builder = client.request(method, args.base_url.clone() + path);
 
-    verbose_log(&args, format!("request to {}: {:?}", path, body).as_str());
+    verbose_log(args, format!("request to {path}: {body:?}").as_str());
     if let Some(body) = body {
         request_builder = request_builder.json(&body);
     }
 
     // Add authorization header if bearer token is provided
     if let Some(token) = bearer_token {
-        request_builder = request_builder.header("Authorization", format!("Bearer {}", token));
+        request_builder = request_builder.header("Authorization", format!("Bearer {token}"));
     }
     if let Some(key) = args.services_key.as_ref() {
         request_builder = request_builder.header("brave-key", key)
@@ -43,8 +43,7 @@ pub fn make_request(
     if !status.is_success() {
         let error_body = response.text().unwrap();
         panic!(
-            "Request failed with status: {}, body: {}",
-            status, error_body
+            "Request failed with status: {status}, body: {error_body}"
         );
     }
 
@@ -52,10 +51,8 @@ pub fn make_request(
         return (serde_json::json!({}), status);
     }
 
-    let response_text = response.text().expect("Failed to get response text");
-
-    let response_value = serde_json::from_str::<Value>(&response_text).expect("Failed to parse JSON response");
-    verbose_log(&args, format!("response: {:?}", response_value).as_str());
+    let response_value = response.json::<Value>().expect("Failed to parse JSON response");
+    verbose_log(args, format!("response: {response_value:?}").as_str());
 
     (response_value, status)
 }
@@ -70,7 +67,7 @@ pub fn display_account_details(args: &CliArgs, auth_token: &str) {
         None,
     );
 
-    println!("auth token: {}", auth_token);
+    println!("auth token: {auth_token}");
     // Print accountId and sessionId
     println!(
         "account id: {}",
@@ -110,35 +107,21 @@ pub fn display_account_details(args: &CliArgs, auth_token: &str) {
 }
 
 pub fn prompt_for_input(prompt: &str) -> String {
-    print!("{}", prompt);
+    print!("{prompt}");
     std::io::stdout().flush().unwrap();
     let mut input = String::new();
     std::io::stdin().read_line(&mut input).unwrap();
     input.trim().to_string()
 }
 
-pub fn validate_key_name(name: Option<&String>) -> &str {
+pub fn validate_key_name(name: Option<&str>) -> &str {
     let name = name.expect("key name is required");
-
-    if name.is_empty() {
-        panic!("Key name cannot be empty");
-    }
-
-    if !name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-') {
-        panic!("Invalid key name '{name}'. Must contain only [0-9a-z_-]");
-    }
-
+    assert!(!name.is_empty(), "Key name cannot be empty");
     name
 }
 
 pub fn validate_key_material(hex_material: Option<&String>) -> &str {
     let hex_material = hex_material.expect("key material is required");
-
-    let decoded = hex::decode(hex_material).unwrap();
-
-    if decoded.len() < 16 || decoded.len() > 128 {
-        panic!("Key material must be 16-128 bytes, got {} bytes", decoded.len());
-    }
-
+    hex::decode(hex_material).expect("key material should contain valid hex");
     hex_material
 }
