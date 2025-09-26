@@ -123,6 +123,6 @@ pub fn validate_key_name(name: Option<&str>) -> &str {
 
 pub fn validate_key_material(hex_material: Option<&String>) -> &str {
     let hex_material = hex_material.expect("key material is required");
-    hex::decode(hex_material).unwrap();
+    hex::decode(hex_material).expect("key material should contain valid hex");
     hex_material
 }
