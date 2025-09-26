@@ -671,7 +671,7 @@ fn store_key(args: &CliArgs) {
         .as_ref()
         .expect("service name is required for storing keys");
 
-    let key_name = validate_key_name(args.key_name.as_ref());
+    let key_name = validate_key_name(args.key_name.as_deref());
 
     let key_material = validate_key_material(args.store_key.as_ref());
 
@@ -709,7 +709,7 @@ fn get_key(args: &CliArgs) {
         .as_ref()
         .expect("service name is required for getting keys");
 
-    let key_name = validate_key_name(args.key_name.as_ref());
+    let key_name = validate_key_name(args.key_name.as_deref());
 
     let (response, status) = make_request(
         args,
