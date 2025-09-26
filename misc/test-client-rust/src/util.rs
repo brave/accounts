@@ -52,9 +52,7 @@ pub fn make_request(
         return (serde_json::json!({}), status);
     }
 
-    let response_text = response.text().expect("Failed to get response text");
-
-    let response_value = serde_json::from_str::<Value>(&response_text).expect("Failed to parse JSON response");
+    let response_value = response.json::<Value>().expect("Failed to parse JSON response");
     verbose_log(&args, format!("response: {:?}", response_value).as_str());
 
     (response_value, status)
