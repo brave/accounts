@@ -139,7 +139,7 @@ fn maybe_handle_twofa(args: &CliArgs, resp: Value, token: &str, endpoint: &str) 
         return resp;
     }
 
-    verbose_log(&args, "Two-factor authentication is required");
+    verbose_log(args, "Two-factor authentication is required");
 
     let mut twofa_body: HashMap<&str, Value> = HashMap::new();
     if let Some(recovery_key) = args.twofa_recovery_key.as_ref() {
@@ -151,7 +151,7 @@ fn maybe_handle_twofa(args: &CliArgs, resp: Value, token: &str, endpoint: &str) 
             let code = totp
                 .generate_current()
                 .expect("Failed to generate TOTP code");
-            verbose_log(&args, format!("Generated TOTP code: {}", code).as_str());
+            verbose_log(args, format!("Generated TOTP code: {code}").as_str());
             code
         } else {
             // Prompt user for code
@@ -203,9 +203,9 @@ fn wait_for_verification(args: &CliArgs, verification_token: &str) -> Option<Str
                 .expect("service should be in result response")
                 .as_str()
                 .expect("service should be a string");
-            println!("verification token: {}", verification_token);
-            println!("email: {}", email);
-            println!("service: {}", service_name);
+            println!("verification token: {verification_token}");
+            println!("email: {email}");
+            println!("service: {service_name}");
             return auth_token;
         }
     }
@@ -467,7 +467,7 @@ fn login(args: CliArgs) {
 
     verbose_log(
         &args,
-        format!("intermediate login token: {}", login_token).as_str(),
+        format!("intermediate login token: {login_token}").as_str(),
     );
 
     // Handle 2FA if required
@@ -501,7 +501,7 @@ fn get_service_token(args: &CliArgs) {
         Some(body),
     );
 
-    display_account_details(&args, resp.get("authToken").unwrap().as_str().unwrap());
+    display_account_details(args, resp.get("authToken").unwrap().as_str().unwrap());
 }
 
 fn enable_totp(args: &CliArgs) {
@@ -533,12 +533,12 @@ fn enable_totp(args: &CliArgs) {
         .expect("Failed to get QR code")
         .to_string();
 
-    println!("TOTP URL: {}", totp_uri);
+    println!("TOTP URL: {totp_uri}");
 
     // Open QR code in browser in a separate thread
     thread::spawn(move || {
         if let Err(e) = open::that(qr_code) {
-            eprintln!("Failed to open QR code: {}", e);
+            eprintln!("Failed to open QR code: {e}");
         }
     });
 
@@ -549,7 +549,7 @@ fn enable_totp(args: &CliArgs) {
     let code = totp
         .generate_current()
         .expect("Failed to generate TOTP code");
-    verbose_log(&args, format!("Generated TOTP code: {}", code).as_str());
+    verbose_log(args, format!("Generated TOTP code: {code}").as_str());
 
     // Finalize 2FA setup
     let mut finalize_body: HashMap<&str, Value> = HashMap::new();
@@ -568,7 +568,7 @@ fn enable_totp(args: &CliArgs) {
     );
 
     if let Some(recovery_key) = resp.get("recoveryKey").and_then(|v| v.as_str()) {
-        println!("Recovery key: {}", recovery_key);
+        println!("Recovery key: {recovery_key}");
     }
 
     println!("TOTP is now enabled");
@@ -604,7 +604,7 @@ fn logout(args: &CliArgs) {
     let (resp, status) = make_request(
         args,
         reqwest::Method::DELETE,
-        &format!("/v2/sessions/{}", session_id),
+        &format!("/v2/sessions/{session_id}"),
         Some(auth_token),
         None,
     );
@@ -612,9 +612,9 @@ fn logout(args: &CliArgs) {
     if status == reqwest::StatusCode::NO_CONTENT {
         println!("Successfully logged out");
     } else {
-        println!("Logout failed with unexpected status: {}", status);
+        println!("Logout failed with unexpected status: {status}");
         if args.verbose {
-            println!("Response: {:?}", resp);
+            println!("Response: {resp:?}");
         }
     }
 }
@@ -648,10 +648,10 @@ fn list_keys(args: &CliArgs) {
                     .unwrap();
                 println!("  {}. {}/{}", i + 1, service, key_name);
                 if let Some(material) = key.get("keyMaterial").and_then(|v| v.as_str()) {
-                    println!("     Material: {}", material);
+                    println!("     Material: {material}");
                 }
                 if let Some(updated) = key.get("updatedAt").and_then(|v| v.as_str()) {
-                    println!("     Updated: {}", updated);
+                    println!("     Updated: {updated}");
                 }
             }
         }
@@ -689,11 +689,11 @@ fn store_key(args: &CliArgs) {
     );
 
     if status == reqwest::StatusCode::NO_CONTENT {
-        println!("Key '{}/{}' stored successfully", service_name, key_name);
+        println!("Key '{service_name}/{key_name}' stored successfully");
     } else {
-        println!("Failed with unexpected status: {}", status);
+        println!("Failed with unexpected status: {status}");
         if args.verbose {
-            println!("Response: {:?}", resp);
+            println!("Response: {resp:?}");
         }
     }
 }
@@ -714,25 +714,25 @@ fn get_key(args: &CliArgs) {
     let (response, status) = make_request(
         args,
         reqwest::Method::GET,
-        &format!("/v2/keys/{}/{}", service_name, key_name),
+        &format!("/v2/keys/{service_name}/{key_name}"),
         Some(auth_token),
         None,
     );
 
     if status == reqwest::StatusCode::OK {
-        println!("Key '{}/{}' found:", service_name, key_name);
+        println!("Key '{service_name}/{key_name}' found:");
         if let Some(material) = response.get("keyMaterial").and_then(|v| v.as_str()) {
-            println!("Material: {}", material);
+            println!("Material: {material}");
         }
         if args.verbose {
             if let Some(updated) = response.get("updatedAt").and_then(|v| v.as_str()) {
-                println!("Updated: {}", updated);
+                println!("Updated: {updated}");
             }
         }
     } else {
-        println!("Failed with unexpected status: {}", status);
+        println!("Failed with unexpected status: {status}");
         if args.verbose {
-            println!("Response: {:?}", response);
+            println!("Response: {response:?}");
         }
     }
 }
