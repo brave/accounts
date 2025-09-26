@@ -118,9 +118,7 @@ pub fn prompt_for_input(prompt: &str) -> String {
 pub fn validate_key_name(name: Option<&str>) -> &str {
     let name = name.expect("key name is required");
 
-    if name.is_empty() {
-        panic!("Key name cannot be empty");
-    }
+    assert!(!name.is_empty(), "Key name cannot be empty");
 
     if !name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-') {
         panic!("Invalid key name '{name}'. Must contain only [0-9a-z_-]");
