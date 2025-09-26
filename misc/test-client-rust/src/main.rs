@@ -729,8 +729,6 @@ fn get_key(args: &CliArgs) {
                 println!("Updated: {}", updated);
             }
         }
-    } else if status == reqwest::StatusCode::NOT_FOUND {
-        println!("Key '{}/{}' not found", service_name, key_name);
     } else {
         println!("Failed with unexpected status: {}", status);
         if args.verbose {
