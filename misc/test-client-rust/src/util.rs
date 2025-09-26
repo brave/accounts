@@ -117,7 +117,7 @@ pub fn prompt_for_input(prompt: &str) -> String {
     input.trim().to_string()
 }
 
-pub fn validate_key_name(name: Option<&String>) -> &str {
+pub fn validate_key_name(name: Option<&str>) -> &str {
     let name = name.expect("key name is required");
 
     if name.is_empty() {
