@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
           path: accounts
       - name: Setup golang
@@ -41,7 +41,7 @@ jobs:
         run: go install github.com/swaggo/swag/cmd/swag@latest && swag init
         working-directory: ./accounts
       - name: Checkout swagger-ui repo
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
           repository: swagger-api/swagger-ui
           path: swagger-ui
