@@ -112,6 +112,7 @@ func (suite *UserKeysTestSuite) TestListKeys() {
 		suite.Equal(testKey.Service, responseKeys[i].Service)
 		suite.Equal(testKey.KeyName, responseKeys[i].KeyName)
 		suite.Equal(hex.EncodeToString(testKey.KeyMaterial), responseKeys[i].KeyMaterial)
+		suite.Equal(1, responseKeys[i].SerialNumber) // New keys start at 1
 		suite.Equal(testKey.UpdatedAt, responseKeys[i].UpdatedAt)
 	}
 }
@@ -139,6 +140,7 @@ func (suite *UserKeysTestSuite) TestGetKey() {
 	suite.Equal(testKey.Service, responseKey.Service)
 	suite.Equal(testKey.KeyName, responseKey.KeyName)
 	suite.Equal(hex.EncodeToString(testKey.KeyMaterial), responseKey.KeyMaterial)
+	suite.Equal(1, responseKey.SerialNumber) // New key starts at 1
 	suite.Equal(testKey.UpdatedAt, responseKey.UpdatedAt)
 
 	// Test that the key cannot be retrieved using a different service name
@@ -288,4 +290,72 @@ func (suite *UserKeysTestSuite) TestUpdateExistingKey() {
 	suite.Equal(requestBody.Service, responseKey.Service)
 	suite.Equal(requestBody.KeyName, responseKey.KeyName)
 	suite.Equal(requestBody.KeyMaterial, responseKey.KeyMaterial)
+	suite.Equal(2, responseKey.SerialNumber) // Should be 2 since key was updated
+}
+
+func (suite *UserKeysTestSuite) TestSerialNumberIncrement() {
+	requestBody := controllers.UserKeyStoreRequest{
+		Service:     "accounts",
+		KeyName:     "test_serial",
+		KeyMaterial: "0123456789abcdef",
+	}
+
+	req := util.CreateJSONTestRequest("/v2/keys", requestBody)
+	req.Header.Set("Authorization", "Bearer "+suite.authToken)
+	resp := util.ExecuteTestRequest(req, suite.router)
+
+	suite.Equal(http.StatusNoContent, resp.Code)
+
+	// Retrieve the key and verify serial number is 1
+	req = httptest.NewRequest(http.MethodGet, "/v2/keys/accounts/test_serial", nil)
+	req.Header.Set("Authorization", "Bearer "+suite.authToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
+
+	suite.Equal(http.StatusOK, resp.Code)
+
+	var responseKey controllers.UserKey
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &responseKey)
+
+	suite.Equal(1, responseKey.SerialNumber)
+	suite.Equal("0123456789abcdef", responseKey.KeyMaterial)
+
+	// Update the key and verify serial number is incremented to 2
+	requestBody.KeyMaterial = "fedcba9876543210"
+	req = util.CreateJSONTestRequest("/v2/keys", requestBody)
+	req.Header.Set("Authorization", "Bearer "+suite.authToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
+
+	suite.Equal(http.StatusNoContent, resp.Code)
+
+	// Retrieve the updated key
+	req = httptest.NewRequest(http.MethodGet, "/v2/keys/accounts/test_serial", nil)
+	req.Header.Set("Authorization", "Bearer "+suite.authToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
+
+	suite.Equal(http.StatusOK, resp.Code)
+
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &responseKey)
+
+	suite.Equal(2, responseKey.SerialNumber)
+	suite.Equal("fedcba9876543210", responseKey.KeyMaterial)
+
+	// Update the key again and verify serial number is incremented to 3
+	requestBody.KeyMaterial = "abcdef0123456789"
+	req = util.CreateJSONTestRequest("/v2/keys", requestBody)
+	req.Header.Set("Authorization", "Bearer "+suite.authToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
+
+	suite.Equal(http.StatusNoContent, resp.Code)
+
+	// Retrieve the updated key
+	req = httptest.NewRequest(http.MethodGet, "/v2/keys/accounts/test_serial", nil)
+	req.Header.Set("Authorization", "Bearer "+suite.authToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
+
+	suite.Equal(http.StatusOK, resp.Code)
+
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &responseKey)
+
+	suite.Equal(3, responseKey.SerialNumber)
+	suite.Equal("abcdef0123456789", responseKey.KeyMaterial)
 }

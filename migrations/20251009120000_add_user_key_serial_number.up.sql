@@ -1,0 +1,2 @@
+ALTER TABLE user_keys ADD COLUMN serial_number INTEGER NOT NULL DEFAULT 1;
+

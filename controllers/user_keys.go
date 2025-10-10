@@ -36,6 +36,8 @@ type UserKey struct {
 	KeyName string `json:"keyName"`
 	// KeyMaterial contains the encrypted key data as hex bytes
 	KeyMaterial string `json:"keyMaterial"`
+	// SerialNumber is incremented each time the key is overwritten
+	SerialNumber int `json:"serialNumber"`
 	// UpdatedAt is the timestamp when the key was last updated
 	UpdatedAt time.Time `json:"updatedAt"`
 }
@@ -59,10 +61,11 @@ func (r *UserKeyStoreRequest) ToDBUserKey(accountID uuid.UUID) (*datastore.DBUse
 // FromDBUserKey converts a datastore.DBUserKey to a UserKey
 func FromDBUserKey(dbKey *datastore.DBUserKey) UserKey {
 	return UserKey{
-		Service:     dbKey.Service,
-		KeyName:     dbKey.KeyName,
-		KeyMaterial: hex.EncodeToString(dbKey.KeyMaterial),
-		UpdatedAt:   dbKey.UpdatedAt,
+		Service:      dbKey.Service,
+		KeyName:      dbKey.KeyName,
+		KeyMaterial:  hex.EncodeToString(dbKey.KeyMaterial),
+		SerialNumber: dbKey.SerialNumber,
+		UpdatedAt:    dbKey.UpdatedAt,
 	}
 }
 
