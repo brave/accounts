@@ -180,7 +180,11 @@ func (j *JWTService) parseToken(tokenString string, claimKey string) (uuid.UUID,
 		var audStr string
 		audRaw, exists := claims[audClaim]
 		if exists {
-			audStr = audRaw.(string)
+			audVal, ok := audRaw.(string)
+			if !ok {
+				return uuid.Nil, "", fmt.Errorf("audience claim is not a string")
+			}
+			audStr = audVal
 		}
 		id, err := uuid.Parse(idStr)
 		return id, audStr, err

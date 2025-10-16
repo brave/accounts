@@ -2,6 +2,7 @@ package middleware_test
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -84,6 +85,21 @@ func (suite *MiddlewareTestSuite) TestAuthMiddleware() {
 	// Test alg=none token
 	req = httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "Bearer "+noneToken)
+	resp = util.ExecuteTestRequest(req, mw(handler))
+	suite.Equal(http.StatusUnauthorized, resp.Code)
+
+	// Test token with non-string audience claim
+	parts := strings.Split(token, ".")
+	payloadBytes, _ := base64.RawURLEncoding.DecodeString(parts[1])
+	var claims map[string]interface{}
+	json.Unmarshal(payloadBytes, &claims)
+	claims["aud"] = 12345 // Change aud to number instead of string
+	malformedPayloadBytes, _ := json.Marshal(claims)
+	malformedPayload := base64.RawURLEncoding.EncodeToString(malformedPayloadBytes)
+	malformedAudToken := parts[0] + "." + malformedPayload + "." + parts[2]
+
+	req = httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer "+malformedAudToken)
 	resp = util.ExecuteTestRequest(req, mw(handler))
 	suite.Equal(http.StatusUnauthorized, resp.Code)
 
