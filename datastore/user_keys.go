@@ -21,6 +21,8 @@ type DBUserKey struct {
 	KeyName string `json:"keyName" gorm:"primaryKey"`
 	// KeyMaterial contains the encrypted key data as bytes
 	KeyMaterial []byte `json:"keyMaterial"`
+	// SerialNumber is incremented each time the key is overwritten
+	SerialNumber int `json:"serialNumber" gorm:"default:1"`
 	// UpdatedAt is the timestamp when the key was last updated
 	UpdatedAt time.Time `json:"updatedAt" gorm:"autoUpdateTime:false"`
 }
@@ -32,10 +34,40 @@ func (DBUserKey) TableName() string {
 
 // StoreUserKey saves a user key to the database
 func (d *Datastore) StoreUserKey(key *DBUserKey) error {
-	// Count existing keys for this service/account pair, excluding the current key_name
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		updated, err := d.updateExistingKeyTx(tx, key)
+		if err != nil {
+			return err
+		}
+		if updated {
+			return nil
+		}
+		return d.insertNewKeyTx(tx, key)
+	})
+}
+
+// updateExistingKeyTx attempts to update an existing key atomically
+func (d *Datastore) updateExistingKeyTx(tx *gorm.DB, key *DBUserKey) (bool, error) {
+	result := tx.Model(&DBUserKey{}).
+		Where("account_id = ? AND service = ? AND key_name = ?",
+			key.AccountID, key.Service, key.KeyName).
+		Updates(map[string]interface{}{
+			"key_material":  key.KeyMaterial,
+			"updated_at":    key.UpdatedAt,
+			"serial_number": gorm.Expr("serial_number + 1"),
+		})
+	if result.Error != nil {
+		return false, fmt.Errorf("failed to update existing key: %w", result.Error)
+	}
+	return result.RowsAffected > 0, nil
+}
+
+// insertNewKeyTx inserts a new key after enforcing the per-service limit
+func (d *Datastore) insertNewKeyTx(tx *gorm.DB, key *DBUserKey) error {
 	var count int64
-	result := d.DB.Model(&DBUserKey{}).Where("account_id = ? AND service = ? AND key_name != ?",
-		key.AccountID, key.Service, key.KeyName).Count(&count)
+	result := tx.Model(&DBUserKey{}).
+		Where("account_id = ? AND service = ?", key.AccountID, key.Service).
+		Count(&count)
 	if result.Error != nil {
 		return fmt.Errorf("failed to check existing user keys: %w", result.Error)
 	}
@@ -44,9 +76,8 @@ func (d *Datastore) StoreUserKey(key *DBUserKey) error {
 		return util.ErrMaxUserKeysExceeded
 	}
 
-	result = d.DB.Save(key)
-	if result.Error != nil {
-		return fmt.Errorf("failed to store user key: %w", result.Error)
+	if err := tx.Create(key).Error; err != nil {
+		return fmt.Errorf("failed to insert new key: %w", err)
 	}
 	return nil
 }
