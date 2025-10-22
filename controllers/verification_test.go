@@ -14,6 +14,7 @@ import (
 	"github.com/brave/accounts/services"
 	"github.com/brave/accounts/util"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
@@ -340,22 +341,19 @@ func (suite *VerificationTestSuite) TestVerifyQueryResult() {
 	suite.SetupController(false, true)
 
 	testCases := []struct {
-		intent                         string
-		service                        string
-		shouldHaveAuthToken            bool
-		verificationUsableMoreThanOnce bool
+		intent              string
+		service             string
+		shouldHaveAuthToken bool
 	}{
 		{
-			intent:                         "auth_token",
-			service:                        "email-aliases",
-			shouldHaveAuthToken:            true,
-			verificationUsableMoreThanOnce: false,
+			intent:              "auth_token",
+			service:             "email-aliases",
+			shouldHaveAuthToken: true,
 		},
 		{
-			intent:                         "verification",
-			service:                        "email-aliases",
-			shouldHaveAuthToken:            false,
-			verificationUsableMoreThanOnce: true,
+			intent:              "verification",
+			service:             "email-aliases",
+			shouldHaveAuthToken: false,
 		},
 	}
 
@@ -418,11 +416,14 @@ func (suite *VerificationTestSuite) TestVerifyQueryResult() {
 		suite.True(result.Verified)
 		suite.Equal(&expectedEmail, result.Email)
 		suite.Equal(tc.service, result.Service)
+
+		var firstSessionID uuid.UUID
 		if tc.shouldHaveAuthToken {
-			suite.NotNil(result.AuthToken)
+			suite.Require().NotNil(result.AuthToken)
 
 			sessionID, _, err := suite.jwtService.ValidateAuthToken(*result.AuthToken)
 			suite.NoError(err)
+			firstSessionID = sessionID
 			session, err := suite.ds.GetSession(sessionID)
 			suite.NoError(err)
 			suite.Require().NotNil(session)
@@ -431,20 +432,36 @@ func (suite *VerificationTestSuite) TestVerifyQueryResult() {
 			suite.Nil(result.AuthToken)
 		}
 
-		// Third query - should work or be blocked depending on test case
+		// Third query
 		request = util.CreateJSONTestRequest("/v2/verify/result", req)
 		request.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
 		resp = util.ExecuteTestRequest(request, suite.router)
+		suite.Equal(http.StatusOK, resp.Code)
 
-		if tc.verificationUsableMoreThanOnce {
-			suite.Equal(http.StatusOK, resp.Code)
+		util.DecodeJSONTestResponse(suite.T(), resp.Body, &result)
+		suite.True(result.Verified)
+		suite.Equal(&expectedEmail, result.Email)
+		suite.Equal(tc.service, result.Service)
 
-			util.DecodeJSONTestResponse(suite.T(), resp.Body, &result)
-			suite.True(result.Verified)
-			suite.Equal(&expectedEmail, result.Email)
-			suite.Equal(tc.service, result.Service)
-		} else {
+		if tc.shouldHaveAuthToken {
+			suite.Require().NotNil(result.AuthToken)
+
+			// Ensure session ID is the same as the one from second query
+			sessionID, _, err := suite.jwtService.ValidateAuthToken(*result.AuthToken)
+			suite.NoError(err)
+			suite.Equal(firstSessionID, sessionID)
+
+			// Delete verifications by session ID (simulating what validate endpoint does)
+			err = suite.ds.DeleteVerificationsByNewSessionID(sessionID)
+			suite.NoError(err)
+
+			// Fourth query - verification should be deleted after validate
+			request = util.CreateJSONTestRequest("/v2/verify/result", req)
+			request.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
+			resp = util.ExecuteTestRequest(request, suite.router)
 			suite.Equal(http.StatusNotFound, resp.Code)
+		} else {
+			suite.Nil(result.AuthToken)
 		}
 	}
 }

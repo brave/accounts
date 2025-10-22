@@ -120,6 +120,38 @@ func (suite *AuthTestSuite) createLoginFinalizeRequest(opaqueClient *opaque.Clie
 	}
 }
 
+func (suite *AuthTestSuite) TestAuthValidateDeletesVerificationWithSession() {
+	// Create verification
+	verification, err := suite.ds.CreateVerification(suite.account.Email, util.AccountsServiceName, datastore.RegistrationIntent)
+	suite.Require().NoError(err)
+	session, err := suite.ds.CreateSession(suite.account.ID, datastore.PasswordAuthSessionVersion, "")
+	suite.Require().NoError(err)
+
+	// Set the new_session_id on the verification
+	err = suite.ds.SetVerificationNewSessionID(verification.ID, session.ID)
+	suite.Require().NoError(err)
+
+	// Create auth token using that session
+	token, err := suite.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
+	suite.Require().NoError(err)
+
+	// Verify the verification exists
+	_, err = suite.ds.GetVerificationStatus(verification.ID)
+	suite.NoError(err)
+
+	// Call auth validate
+	req := httptest.NewRequest("GET", "/v2/auth/validate", nil)
+	req.Header.Add("Authorization", "Bearer "+token)
+
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+
+	// Verify the verification no longer exists
+	_, err = suite.ds.GetVerificationStatus(verification.ID)
+	suite.Error(err)
+	suite.Equal(util.ErrVerificationNotFound, err)
+}
+
 func (suite *AuthTestSuite) TestAuthValidate() {
 	// Create test account session
 	session, err := suite.ds.CreateSession(suite.account.ID, datastore.EmailAuthSessionVersion, "")
