@@ -315,10 +315,6 @@ func (suite *AccountsTestSuite) TestRegistration() {
 	suite.Require().NoError(err)
 	suite.Equal(datastore.PasswordAuthSessionVersion, session.Version)
 
-	// Ensure verification is deleted
-	_, err = suite.ds.GetVerificationStatus(verification.ID)
-	suite.Require().Error(err)
-
 	suite.sesMock.AssertExpectations(suite.T())
 }
 

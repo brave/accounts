@@ -26,6 +26,8 @@ type Verification struct {
 	Service string
 	// Intent describes the purpose of the verification
 	Intent string
+	// NewSessionID stores the session ID after verification with a registration/auth token intent is complete
+	NewSessionID *uuid.UUID
 	// CreatedAt records when the verification was initiated
 	CreatedAt time.Time `gorm:"<-:update"`
 }
@@ -241,6 +243,31 @@ func (d *Datastore) DeleteVerification(id uuid.UUID) error {
 
 	if result.RowsAffected == 0 {
 		return util.ErrVerificationNotFound
+	}
+
+	return nil
+}
+
+func (d *Datastore) SetVerificationNewSessionID(id uuid.UUID, sessionID uuid.UUID) error {
+	result := d.DB.Model(&Verification{}).
+		Where("id = ?", id).
+		Update("new_session_id", sessionID)
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to set new session id: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return util.ErrVerificationNotFound
+	}
+
+	return nil
+}
+
+func (d *Datastore) DeleteVerificationsByNewSessionID(sessionID uuid.UUID) error {
+	result := d.DB.Delete(&Verification{}, "new_session_id = ?", sessionID)
+	if result.Error != nil {
+		return fmt.Errorf("failed to delete verifications by session id: %w", result.Error)
 	}
 
 	return nil
