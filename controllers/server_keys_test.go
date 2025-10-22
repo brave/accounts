@@ -2,6 +2,7 @@ package controllers_test
 
 import (
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/brave/accounts/util"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -86,6 +88,7 @@ func (suite *ServerKeysTestSuite) TestCreateJWT() {
 func (suite *ServerKeysTestSuite) TestDeriveOPRFKey() {
 	body := controllers.OPRFSeedRequest{
 		CredentialIdentifier: "test@example.com",
+		IP:                   "127.0.0.1",
 	}
 
 	// First call
@@ -142,6 +145,7 @@ func (suite *ServerKeysTestSuite) TestDeriveOPRFKeyWithSeedID() {
 	body := controllers.OPRFSeedRequest{
 		CredentialIdentifier: "test@example.com",
 		SeedID:               &[]int{1}[0],
+		IP:                   "127.0.0.1",
 	}
 
 	req := util.CreateJSONTestRequest("/v2/server_keys/oprf_seed", body)
@@ -171,8 +175,162 @@ func (suite *ServerKeysTestSuite) TestUnauthorizedAccess() {
 	// Test OPRF endpoint
 	oprfBody := controllers.OPRFSeedRequest{
 		CredentialIdentifier: "test@example.com",
+		IP:                   "127.0.0.1",
 	}
 	req = util.CreateJSONTestRequest("/v2/server_keys/oprf_seed", oprfBody)
 	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusUnauthorized, resp.Code)
+}
+
+func (suite *ServerKeysTestSuite) TestRateLimitOPRF() {
+	// Test rate limiting by IP with random credentials
+	testIP := "192.168.1.100"
+
+	// Make requests up to the rate limit with same IP but different credentials
+	for i := 0; i < controllers.RateLimitMaxRequestsPerMinute; i++ {
+		oprfBody := controllers.OPRFSeedRequest{
+			CredentialIdentifier: uuid.New().String() + "@example.com",
+			IP:                   testIP,
+		}
+		req := util.CreateJSONTestRequest("/v2/server_keys/oprf_seed", oprfBody)
+		req.Header.Add(util.KeyServiceSecretHeader, headerSecret)
+		resp := util.ExecuteTestRequest(req, suite.router)
+		suite.Equal(http.StatusOK, resp.Code)
+	}
+
+	// Next request should be rate limited
+	oprfBody := controllers.OPRFSeedRequest{
+		CredentialIdentifier: uuid.New().String() + "@example.com",
+		IP:                   testIP,
+	}
+	req := util.CreateJSONTestRequest("/v2/server_keys/oprf_seed", oprfBody)
+	req.Header.Add(util.KeyServiceSecretHeader, headerSecret)
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusTooManyRequests, resp.Code)
+
+	var errorResp util.ErrorResponse
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &errorResp)
+	suite.Equal(http.StatusTooManyRequests, errorResp.Status)
+
+	// Test rate limiting by credential identifier with random IPs
+	credentialID := "ratelimit-cred@example.com"
+
+	// Make requests up to the rate limit with same credential but different IPs
+	for i := 0; i < controllers.RateLimitMaxRequestsPerMinute; i++ {
+		oprfBody2 := controllers.OPRFSeedRequest{
+			CredentialIdentifier: credentialID,
+			IP:                   fmt.Sprintf("192.168.2.%d", i+1),
+		}
+		req := util.CreateJSONTestRequest("/v2/server_keys/oprf_seed", oprfBody2)
+		req.Header.Add(util.KeyServiceSecretHeader, headerSecret)
+		resp := util.ExecuteTestRequest(req, suite.router)
+		suite.Equal(http.StatusOK, resp.Code)
+	}
+
+	// Next request should be rate limited
+	oprfBody2 := controllers.OPRFSeedRequest{
+		CredentialIdentifier: credentialID,
+		IP:                   "192.168.3.1",
+	}
+	req = util.CreateJSONTestRequest("/v2/server_keys/oprf_seed", oprfBody2)
+	req.Header.Add(util.KeyServiceSecretHeader, headerSecret)
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusTooManyRequests, resp.Code)
+
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &errorResp)
+	suite.Equal(http.StatusTooManyRequests, errorResp.Status)
+}
+
+func (suite *ServerKeysTestSuite) TestRateLimitTOTP() {
+	// Test rate limiting by IP with random account IDs
+	testIP := "192.168.1.102"
+
+	// Make requests up to the rate limit with same IP but different accounts
+	for i := 0; i < controllers.RateLimitMaxRequestsPerMinute; i++ {
+		accountID := uuid.New()
+
+		// Generate a TOTP key for testing
+		key, err := totp.Generate(totp.GenerateOpts{
+			Issuer:      "Test",
+			AccountName: fmt.Sprintf("test%d@example.com", i),
+		})
+		suite.Require().NoError(err)
+		err = suite.ds.StoreTOTPKey(accountID, key)
+		suite.Require().NoError(err)
+
+		totpBody := controllers.TOTPValidateRequest{
+			AccountID: accountID,
+			Code:      "123456",
+			IP:        testIP,
+		}
+
+		req := util.CreateJSONTestRequest("/v2/server_keys/totp/validate", totpBody)
+		req.Header.Add(util.KeyServiceSecretHeader, headerSecret)
+		resp := util.ExecuteTestRequest(req, suite.router)
+		// These should fail with Unauthorized due to invalid code, not rate limit
+		suite.Equal(http.StatusUnauthorized, resp.Code)
+	}
+
+	// Next request should be rate limited before validation
+	accountID := uuid.New()
+	key, err := totp.Generate(totp.GenerateOpts{
+		Issuer:      "Test",
+		AccountName: "test-extra@example.com",
+	})
+	suite.Require().NoError(err)
+	err = suite.ds.StoreTOTPKey(accountID, key)
+	suite.Require().NoError(err)
+
+	totpBody := controllers.TOTPValidateRequest{
+		AccountID: accountID,
+		Code:      "123456",
+		IP:        testIP,
+	}
+	req := util.CreateJSONTestRequest("/v2/server_keys/totp/validate", totpBody)
+	req.Header.Add(util.KeyServiceSecretHeader, headerSecret)
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusTooManyRequests, resp.Code)
+
+	var errorResp util.ErrorResponse
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &errorResp)
+	suite.Equal(http.StatusTooManyRequests, errorResp.Status)
+
+	// Test rate limiting by account ID with random IPs
+	accountID2 := uuid.New()
+
+	// Generate a TOTP key for testing
+	key2, err := totp.Generate(totp.GenerateOpts{
+		Issuer:      "Test",
+		AccountName: "test-account@example.com",
+	})
+	suite.Require().NoError(err)
+	err = suite.ds.StoreTOTPKey(accountID2, key2)
+	suite.Require().NoError(err)
+
+	// Make requests up to the rate limit with same account but different IPs
+	for i := 0; i < controllers.RateLimitMaxRequestsPerMinute; i++ {
+		totpBody2 := controllers.TOTPValidateRequest{
+			AccountID: accountID2,
+			Code:      "123456",
+			IP:        fmt.Sprintf("192.168.3.%d", i+1),
+		}
+		req := util.CreateJSONTestRequest("/v2/server_keys/totp/validate", totpBody2)
+		req.Header.Add(util.KeyServiceSecretHeader, headerSecret)
+		resp := util.ExecuteTestRequest(req, suite.router)
+		suite.Equal(http.StatusUnauthorized, resp.Code)
+	}
+
+	// Next request should be rate limited
+	totpBody2 := controllers.TOTPValidateRequest{
+		AccountID: accountID2,
+		Code:      "123456",
+		IP:        "192.168.4.1",
+	}
+	req = util.CreateJSONTestRequest("/v2/server_keys/totp/validate", totpBody2)
+	req.Header.Add(util.KeyServiceSecretHeader, headerSecret)
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusTooManyRequests, resp.Code)
+
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &errorResp)
+	suite.Equal(http.StatusTooManyRequests, errorResp.Status)
 }

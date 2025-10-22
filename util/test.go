@@ -13,6 +13,7 @@ import (
 
 func ExecuteTestRequest(req *http.Request, handler http.Handler) *httptest.ResponseRecorder {
 	rr := httptest.NewRecorder()
+	req.RemoteAddr = "127.0.0.1:12345"
 	handler.ServeHTTP(rr, req)
 
 	return rr

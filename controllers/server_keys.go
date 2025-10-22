@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const rateLimitMaxRequestsPerMinute = 10
+const RateLimitMaxRequestsPerMinute = 10
 
 var errRateLimitExceeded = errors.New("rate limit exceeded")
 
@@ -88,7 +88,7 @@ func NewServerKeysController(opaqueService *services.OpaqueService, jwtService *
 		opaqueService: opaqueService,
 		jwtService:    jwtService,
 		twoFAService:  twoFAService,
-		rateLimiter:   httprate.NewRateLimiter(rateLimitMaxRequestsPerMinute, time.Minute, rateLimitHandler),
+		rateLimiter:   httprate.NewRateLimiter(RateLimitMaxRequestsPerMinute, time.Minute, rateLimitHandler),
 	}
 }
 
@@ -236,7 +236,7 @@ func (sc *ServerKeysController) ValidateTOTPCode(w http.ResponseWriter, r *http.
 	}
 
 	// Validate TOTP code for the specified account
-	err := sc.twoFAService.ValidateTOTPCode(request.AccountID, request.Code)
+	err := sc.twoFAService.ValidateTOTPCode(request.AccountID, request.Code, nil)
 	if err != nil {
 		if errors.Is(err, util.ErrKeyNotFound) {
 			util.RenderErrorResponse(w, r, http.StatusNotFound, err)

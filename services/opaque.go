@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 
@@ -131,10 +132,11 @@ func (o *OpaqueService) BinaryDeserializer() (*opaque.Deserializer, error) {
 	return o.Config.Deserializer()
 }
 
-func (o *OpaqueService) getKeyServiceClientOPRFSeed(credIdentifier string, seedID *int) ([]byte, int, error) {
+func (o *OpaqueService) getKeyServiceClientOPRFSeed(credIdentifier string, seedID *int, clientAddr string) ([]byte, int, error) {
 	type oprfSeedRequest struct {
 		CredentialIdentifier string `json:"credentialIdentifier"`
 		SeedID               *int   `json:"seedId"`
+		IP                   string `json:"ip"`
 	}
 
 	type oprfSeedResponse struct {
@@ -142,9 +144,17 @@ func (o *OpaqueService) getKeyServiceClientOPRFSeed(credIdentifier string, seedI
 		SeedID     int    `json:"seedId"`
 	}
 
+	// Extract IP from addr (remove port if present)
+	ip, _, err := net.SplitHostPort(clientAddr)
+	if err != nil {
+		// If no port, use the addr as-is
+		ip = clientAddr
+	}
+
 	reqBody := oprfSeedRequest{
 		CredentialIdentifier: credIdentifier,
 		SeedID:               seedID,
+		IP:                   ip,
 	}
 
 	var response oprfSeedResponse
@@ -160,7 +170,7 @@ func (o *OpaqueService) getKeyServiceClientOPRFSeed(credIdentifier string, seedI
 	return clientSeed, response.SeedID, nil
 }
 
-func (o *OpaqueService) newOpaqueServer(credIdentifier string, seedID *int) (*opaque.Server, int, error) {
+func (o *OpaqueService) newOpaqueServer(credIdentifier string, seedID *int, clientAddr string) (*opaque.Server, int, error) {
 	if seedID == nil && o.currentSeedID != nil {
 		seedID = o.currentSeedID
 	}
@@ -169,7 +179,7 @@ func (o *OpaqueService) newOpaqueServer(credIdentifier string, seedID *int) (*op
 		return nil, 0, fmt.Errorf("failed to init opaque server: %w", err)
 	}
 	if o.keyServiceClient != nil {
-		clientSeed, serverSeedID, err := o.getKeyServiceClientOPRFSeed(credIdentifier, seedID)
+		clientSeed, serverSeedID, err := o.getKeyServiceClientOPRFSeed(credIdentifier, seedID, clientAddr)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -185,8 +195,8 @@ func (o *OpaqueService) newOpaqueServer(credIdentifier string, seedID *int) (*op
 	return server, *seedID, nil
 }
 
-func (o *OpaqueService) SetupPasswordInit(email string, request *opaqueMsg.RegistrationRequest) (*opaqueMsg.RegistrationResponse, error) {
-	server, seedID, err := o.newOpaqueServer(email, nil)
+func (o *OpaqueService) SetupPasswordInit(email string, request *opaqueMsg.RegistrationRequest, clientAddr string) (*opaqueMsg.RegistrationResponse, error) {
+	server, seedID, err := o.newOpaqueServer(email, nil, clientAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +247,7 @@ func (o *OpaqueService) SetupPasswordFinalize(email string, registration *opaque
 	return registrationState, nil
 }
 
-func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.KE2, *datastore.InterimPasswordState, error) {
+func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1, clientAddr string) (*opaqueMsg.KE2, *datastore.InterimPasswordState, error) {
 	account, err := o.ds.GetAccount(nil, email)
 	if err != nil {
 		if !errors.Is(err, datastore.ErrAccountNotFound) {
@@ -262,7 +272,7 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 		seedID = account.OprfSeedID
 	}
 
-	server, serverSeedID, err := o.newOpaqueServer(email, seedID)
+	server, serverSeedID, err := o.newOpaqueServer(email, seedID, clientAddr)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -311,13 +321,13 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 	return ke2, akeState, nil
 }
 
-func (o *OpaqueService) LoginFinalize(loginStateID uuid.UUID, ke3 *opaqueMsg.KE3) (*datastore.InterimPasswordState, error) {
+func (o *OpaqueService) LoginFinalize(loginStateID uuid.UUID, ke3 *opaqueMsg.KE3, clientAddr string) (*datastore.InterimPasswordState, error) {
 	loginState, err := o.ds.GetLoginState(loginStateID, false)
 	if err != nil {
 		return nil, err
 	}
 
-	server, _, err := o.newOpaqueServer(loginState.Email, &loginState.OprfSeedID)
+	server, _, err := o.newOpaqueServer(loginState.Email, &loginState.OprfSeedID, clientAddr)
 	if err != nil {
 		// nolint:errcheck
 		o.ds.DeleteInterimPasswordState(loginState.ID)

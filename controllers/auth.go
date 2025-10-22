@@ -279,7 +279,7 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ke2, akeState, err := ac.opaqueService.LoginInit(requestData.Email, opaqueReq)
+	ke2, akeState, err := ac.opaqueService.LoginInit(requestData.Email, opaqueReq, r.RemoteAddr)
 	if err != nil {
 		if errors.Is(err, util.ErrIncorrectCredentials) ||
 			errors.Is(err, util.ErrIncorrectEmail) ||
@@ -376,7 +376,7 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	loginState, err := ac.opaqueService.LoginFinalize(loginStateID, opaqueReq)
+	loginState, err := ac.opaqueService.LoginFinalize(loginStateID, opaqueReq, r.RemoteAddr)
 	if err != nil {
 		if errors.Is(err, util.ErrIncorrectCredentials) ||
 			errors.Is(err, util.ErrIncorrectEmail) ||
@@ -458,7 +458,7 @@ func (ac *AuthController) LoginFinalize2FA(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Process the 2FA authentication request
-	if err := ac.twoFAService.ProcessChallenge(loginState, &requestData); err != nil {
+	if err := ac.twoFAService.ProcessChallenge(loginState, &requestData, r.RemoteAddr); err != nil {
 		if errors.Is(err, util.ErrBadTOTPCode) || errors.Is(err, util.ErrBadRecoveryKey) || errors.Is(err, util.ErrTOTPCodeAlreadyUsed) {
 			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 			return
