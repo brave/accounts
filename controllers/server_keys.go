@@ -16,8 +16,6 @@ import (
 
 const RateLimitMaxRequestsPerMinute = 10
 
-var errRateLimitExceeded = errors.New("rate limit exceeded")
-
 type ServerKeysController struct {
 	opaqueService *services.OpaqueService
 	jwtService    *services.JWTService
@@ -81,7 +79,7 @@ type TOTPValidateRequest struct {
 
 func NewServerKeysController(opaqueService *services.OpaqueService, jwtService *services.JWTService, twoFAService *services.TwoFAService) *ServerKeysController {
 	rateLimitHandler := httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
-		util.RenderErrorResponse(w, r, http.StatusTooManyRequests, errRateLimitExceeded)
+		util.RenderErrorResponse(w, r, http.StatusTooManyRequests, util.ErrRateLimitExceeded)
 	})
 
 	return &ServerKeysController{
