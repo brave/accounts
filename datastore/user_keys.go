@@ -7,6 +7,7 @@ import (
 	"github.com/brave/accounts/util"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const MaxUserKeysPerService = 2
@@ -35,51 +36,40 @@ func (DBUserKey) TableName() string {
 // StoreUserKey saves a user key to the database
 func (d *Datastore) StoreUserKey(key *DBUserKey) error {
 	return d.DB.Transaction(func(tx *gorm.DB) error {
-		updated, err := d.updateExistingKeyTx(tx, key)
-		if err != nil {
-			return err
+		// Count existing keys for this service/account pair, excluding the current key_name
+		var count int64
+		result := tx.Model(&DBUserKey{}).
+			Where("account_id = ? AND service = ? AND key_name != ?",
+				key.AccountID, key.Service, key.KeyName).
+			Count(&count)
+		if result.Error != nil {
+			return fmt.Errorf("failed to check existing user keys: %w", result.Error)
 		}
-		if updated {
-			return nil
+
+		// If the key doesn't exist in the DB, we need `count` to be less than the max since we'll be adding a new key.
+		// If it does exist already, then we expect `count` to be strictly less than the max since the key we're updating is excluded from `count`.
+		if count >= MaxUserKeysPerService {
+			return util.ErrMaxUserKeysExceeded
 		}
-		return d.insertNewKeyTx(tx, key)
+
+		result = tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "account_id"},
+				{Name: "service"},
+				{Name: "key_name"},
+			},
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"key_material":  key.KeyMaterial,
+				"updated_at":    key.UpdatedAt,
+				"serial_number": gorm.Expr("user_keys.serial_number + 1"),
+			}),
+		}).Create(key)
+
+		if result.Error != nil {
+			return fmt.Errorf("failed to store user key: %w", result.Error)
+		}
+		return nil
 	})
-}
-
-// updateExistingKeyTx attempts to update an existing key atomically
-func (d *Datastore) updateExistingKeyTx(tx *gorm.DB, key *DBUserKey) (bool, error) {
-	result := tx.Model(&DBUserKey{}).
-		Where("account_id = ? AND service = ? AND key_name = ?",
-			key.AccountID, key.Service, key.KeyName).
-		Updates(map[string]interface{}{
-			"key_material":  key.KeyMaterial,
-			"updated_at":    key.UpdatedAt,
-			"serial_number": gorm.Expr("serial_number + 1"),
-		})
-	if result.Error != nil {
-		return false, fmt.Errorf("failed to update existing key: %w", result.Error)
-	}
-	return result.RowsAffected > 0, nil
-}
-
-// insertNewKeyTx inserts a new key after enforcing the per-service limit
-func (d *Datastore) insertNewKeyTx(tx *gorm.DB, key *DBUserKey) error {
-	var count int64
-	result := tx.Model(&DBUserKey{}).
-		Where("account_id = ? AND service = ?", key.AccountID, key.Service).
-		Count(&count)
-	if result.Error != nil {
-		return fmt.Errorf("failed to check existing user keys: %w", result.Error)
-	}
-
-	if count >= MaxUserKeysPerService {
-		return util.ErrMaxUserKeysExceeded
-	}
-
-	if err := tx.Create(key).Error; err != nil {
-		return fmt.Errorf("failed to insert new key: %w", err)
-	}
-	return nil
 }
 
 // GetUserKey retrieves a user key from the database
