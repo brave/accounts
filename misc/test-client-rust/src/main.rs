@@ -650,6 +650,9 @@ fn list_keys(args: &CliArgs) {
                 if let Some(material) = key.get("keyMaterial").and_then(|v| v.as_str()) {
                     println!("     Material: {material}");
                 }
+                if let Some(serial_number) = key.get("serialNumber").and_then(|v| v.as_i64()) {
+                    println!("     Serial number: {serial_number}");
+                }
                 if let Some(updated) = key.get("updatedAt").and_then(|v| v.as_str()) {
                     println!("     Updated: {updated}");
                 }
@@ -723,6 +726,9 @@ fn get_key(args: &CliArgs) {
         println!("Key '{service_name}/{key_name}' found:");
         if let Some(material) = response.get("keyMaterial").and_then(|v| v.as_str()) {
             println!("Material: {material}");
+        }
+        if let Some(serial_number) = response.get("serialNumber").and_then(|v| v.as_i64()) {
+            println!("Serial number: {serial_number}");
         }
         if args.verbose {
             if let Some(updated) = response.get("updatedAt").and_then(|v| v.as_str()) {
