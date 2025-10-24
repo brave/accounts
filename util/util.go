@@ -301,6 +301,10 @@ func (k *KeyServiceClient) MakeRequest(method string, path string, body interfac
 		}
 	}
 
+	if status == http.StatusTooManyRequests {
+		return ErrRateLimitExceeded
+	}
+
 	if status != http.StatusOK && status != http.StatusNoContent {
 		return fmt.Errorf("key service returned status %d", status)
 	}

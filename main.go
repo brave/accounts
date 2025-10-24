@@ -15,6 +15,7 @@ import (
 	"github.com/brave/accounts/services"
 	"github.com/brave/accounts/util"
 	"github.com/go-chi/chi/v5"
+	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/go-chi/docgen"
 	"github.com/prometheus/client_golang/prometheus"
@@ -177,6 +178,7 @@ func main() {
 	userKeysController := controllers.NewUserKeysController(datastore)
 	accountsController := controllers.NewAccountsController(opaqueService, jwtService, twoFAService, datastore, verificationService, sesService)
 
+	r.Use(chiMiddleware.RealIP)
 	r.Use(middleware.LoggerMiddleware(prometheusRegistry))
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: allowedOrigins,

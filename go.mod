@@ -51,6 +51,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
+	github.com/go-chi/httprate v0.15.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
 	github.com/go-openapi/spec v0.21.0 // indirect
@@ -62,6 +63,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
+	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
@@ -73,6 +75,7 @@ require (
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/swaggo/files/v2 v2.0.0 // indirect
+	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect

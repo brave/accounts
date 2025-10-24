@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"image/png"
+	"net"
 	"net/http"
 	"os"
 	"regexp"
@@ -104,11 +105,11 @@ func (t *TwoFAService) DisableTwoFA(accountID uuid.UUID) error {
 }
 
 // ProcessChallenge verifies either TOTP code or recovery key for an account
-func (t *TwoFAService) ProcessChallenge(loginState *datastore.InterimPasswordState, req *TwoFAAuthRequest) error {
+func (t *TwoFAService) ProcessChallenge(loginState *datastore.InterimPasswordState, req *TwoFAAuthRequest, clientAddr string) error {
 	// Verify either TOTP code or recovery key
 	if req.TOTPCode != nil {
 		// Verify TOTP code
-		if err := t.ValidateTOTPCode(*loginState.AccountID, *req.TOTPCode); err != nil {
+		if err := t.ValidateTOTPCode(*loginState.AccountID, *req.TOTPCode, &clientAddr); err != nil {
 			return err
 		}
 	} else if req.RecoveryKey != nil {
@@ -183,9 +184,12 @@ func (t *TwoFAService) makeKeyServiceTOTPGenerateRequest(accountID uuid.UUID, em
 }
 
 // ValidateTOTPCode checks if the provided code is valid for the specified account
-func (t *TwoFAService) ValidateTOTPCode(accountID uuid.UUID, code string) error {
+func (t *TwoFAService) ValidateTOTPCode(accountID uuid.UUID, code string, clientAddr *string) error {
 	if t.keyServiceClient != nil {
-		if err := t.makeKeyServiceValidateRequest(accountID, code); err != nil {
+		if clientAddr == nil {
+			return fmt.Errorf("client address is required")
+		}
+		if err := t.makeKeyServiceValidateRequest(accountID, code, *clientAddr); err != nil {
 			return err
 		}
 	} else {
@@ -224,15 +228,24 @@ func (t *TwoFAService) ValidateTOTPCode(accountID uuid.UUID, code string) error 
 }
 
 // makeKeyServiceValidateRequest sends a request to the key service to validate a TOTP code
-func (t *TwoFAService) makeKeyServiceValidateRequest(accountID uuid.UUID, code string) error {
+func (t *TwoFAService) makeKeyServiceValidateRequest(accountID uuid.UUID, code string, clientAddr string) error {
 	type totpValidateRequest struct {
 		AccountID uuid.UUID `json:"accountId"`
 		Code      string    `json:"code"`
+		IP        string    `json:"ip"`
+	}
+
+	// Extract IP from addr (remove port if present)
+	ip, _, err := net.SplitHostPort(clientAddr)
+	if err != nil {
+		// If no port, use the addr as-is
+		ip = clientAddr
 	}
 
 	reqBody := totpValidateRequest{
 		AccountID: accountID,
 		Code:      code,
+		IP:        ip,
 	}
 
 	var response struct{}
