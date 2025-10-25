@@ -294,68 +294,99 @@ func (suite *UserKeysTestSuite) TestUpdateExistingKey() {
 }
 
 func (suite *UserKeysTestSuite) TestSerialNumberIncrement() {
-	requestBody := controllers.UserKeyStoreRequest{
+	// Create two keys with the same name but different services
+	accountsKey := controllers.UserKeyStoreRequest{
 		Service:     "accounts",
 		KeyName:     "test_serial",
 		KeyMaterial: "0123456789abcdef",
 	}
 
-	req := util.CreateJSONTestRequest("/v2/keys", requestBody)
+	emailAliasesKey := controllers.UserKeyStoreRequest{
+		Service:     "email-aliases",
+		KeyName:     "test_serial",
+		KeyMaterial: "fedcba9876543210",
+	}
+
+	// Store the accounts key
+	req := util.CreateJSONTestRequest("/v2/keys", accountsKey)
 	req.Header.Set("Authorization", "Bearer "+suite.authToken)
 	resp := util.ExecuteTestRequest(req, suite.router)
-
 	suite.Equal(http.StatusNoContent, resp.Code)
 
-	// Retrieve the key and verify serial number is 1
+	// Store the email-aliases key
+	req = util.CreateJSONTestRequest("/v2/keys", emailAliasesKey)
+	req.Header.Set("Authorization", "Bearer "+suite.authToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusNoContent, resp.Code)
+
+	// Retrieve both keys and verify they both have serial number 1
 	req = httptest.NewRequest(http.MethodGet, "/v2/keys/accounts/test_serial", nil)
 	req.Header.Set("Authorization", "Bearer "+suite.authToken)
 	resp = util.ExecuteTestRequest(req, suite.router)
-
 	suite.Equal(http.StatusOK, resp.Code)
 
-	var responseKey controllers.UserKey
-	util.DecodeJSONTestResponse(suite.T(), resp.Body, &responseKey)
+	var accountsResponse controllers.UserKey
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &accountsResponse)
+	suite.Equal(1, accountsResponse.SerialNumber)
+	suite.Equal("0123456789abcdef", accountsResponse.KeyMaterial)
 
-	suite.Equal(1, responseKey.SerialNumber)
-	suite.Equal("0123456789abcdef", responseKey.KeyMaterial)
-
-	// Update the key and verify serial number is incremented to 2
-	requestBody.KeyMaterial = "fedcba9876543210"
-	req = util.CreateJSONTestRequest("/v2/keys", requestBody)
+	req = httptest.NewRequest(http.MethodGet, "/v2/keys/email-aliases/test_serial", nil)
 	req.Header.Set("Authorization", "Bearer "+suite.authToken)
 	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
 
+	var emailAliasesResponse controllers.UserKey
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &emailAliasesResponse)
+	suite.Equal(1, emailAliasesResponse.SerialNumber)
+	suite.Equal("fedcba9876543210", emailAliasesResponse.KeyMaterial)
+
+	// Update the accounts key
+	accountsKey.KeyMaterial = "1111111111111111"
+	req = util.CreateJSONTestRequest("/v2/keys", accountsKey)
+	req.Header.Set("Authorization", "Bearer "+suite.authToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusNoContent, resp.Code)
 
-	// Retrieve the updated key
+	// Verify accounts key serial number incremented to 2
 	req = httptest.NewRequest(http.MethodGet, "/v2/keys/accounts/test_serial", nil)
 	req.Header.Set("Authorization", "Bearer "+suite.authToken)
 	resp = util.ExecuteTestRequest(req, suite.router)
-
 	suite.Equal(http.StatusOK, resp.Code)
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &accountsResponse)
+	suite.Equal(2, accountsResponse.SerialNumber)
+	suite.Equal("1111111111111111", accountsResponse.KeyMaterial)
 
-	util.DecodeJSONTestResponse(suite.T(), resp.Body, &responseKey)
-
-	suite.Equal(2, responseKey.SerialNumber)
-	suite.Equal("fedcba9876543210", responseKey.KeyMaterial)
-
-	// Update the key again and verify serial number is incremented to 3
-	requestBody.KeyMaterial = "abcdef0123456789"
-	req = util.CreateJSONTestRequest("/v2/keys", requestBody)
+	// Verify email-aliases key is unchanged with serial number still 1
+	req = httptest.NewRequest(http.MethodGet, "/v2/keys/email-aliases/test_serial", nil)
 	req.Header.Set("Authorization", "Bearer "+suite.authToken)
 	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &emailAliasesResponse)
+	suite.Equal(1, emailAliasesResponse.SerialNumber)
+	suite.Equal("fedcba9876543210", emailAliasesResponse.KeyMaterial)
 
+	// Update the email-aliases key
+	emailAliasesKey.KeyMaterial = "2222222222222222"
+	req = util.CreateJSONTestRequest("/v2/keys", emailAliasesKey)
+	req.Header.Set("Authorization", "Bearer "+suite.authToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusNoContent, resp.Code)
 
-	// Retrieve the updated key
+	// Verify email-aliases key serial number incremented to 2
+	req = httptest.NewRequest(http.MethodGet, "/v2/keys/email-aliases/test_serial", nil)
+	req.Header.Set("Authorization", "Bearer "+suite.authToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &emailAliasesResponse)
+	suite.Equal(2, emailAliasesResponse.SerialNumber)
+	suite.Equal("2222222222222222", emailAliasesResponse.KeyMaterial)
+
+	// Verify accounts key is still unchanged with serial number 2
 	req = httptest.NewRequest(http.MethodGet, "/v2/keys/accounts/test_serial", nil)
 	req.Header.Set("Authorization", "Bearer "+suite.authToken)
 	resp = util.ExecuteTestRequest(req, suite.router)
-
 	suite.Equal(http.StatusOK, resp.Code)
-
-	util.DecodeJSONTestResponse(suite.T(), resp.Body, &responseKey)
-
-	suite.Equal(3, responseKey.SerialNumber)
-	suite.Equal("abcdef0123456789", responseKey.KeyMaterial)
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &accountsResponse)
+	suite.Equal(2, accountsResponse.SerialNumber)
+	suite.Equal("1111111111111111", accountsResponse.KeyMaterial)
 }
