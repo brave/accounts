@@ -186,11 +186,10 @@ func (vs *VerificationService) GetVerificationResult(ctx context.Context, verifi
 	}
 
 	var authToken *string
-	if verification.Intent == datastore.AuthTokenIntent || verification.Intent == datastore.RegistrationIntent {
-		if err := vs.datastore.DeleteVerification(verification.ID); err != nil {
-			return nil, err
-		}
-
+	var sessionID *uuid.UUID
+	if verification.NewSessionID != nil {
+		sessionID = verification.NewSessionID
+	} else if verification.Intent == datastore.AuthTokenIntent || verification.Intent == datastore.RegistrationIntent {
 		account, err := vs.datastore.GetOrCreateAccount(verification.Email)
 		if err != nil {
 			return nil, err
@@ -209,8 +208,16 @@ func (vs *VerificationService) GetVerificationResult(ctx context.Context, verifi
 			return nil, err
 		}
 
+		if err = vs.datastore.SetVerificationNewSessionID(verification.ID, session.ID); err != nil {
+			return nil, err
+		}
+
+		sessionID = &session.ID
+	}
+
+	if sessionID != nil {
 		expirationDuration := ChildAuthTokenExpirationTime
-		authTokenResult, err := vs.jwtService.CreateAuthToken(session.ID, &expirationDuration, verification.Service)
+		authTokenResult, err := vs.jwtService.CreateAuthToken(*sessionID, &expirationDuration, verification.Service)
 		if err != nil {
 			return nil, err
 		}
