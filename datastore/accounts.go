@@ -1,6 +1,7 @@
 package datastore
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/brave/accounts/util"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var ErrAccountNotFound = errors.New("account not found")
@@ -40,6 +42,12 @@ type Account struct {
 	RecoveryKeyHash []byte `json:"-"`
 	// Timestamp when the recovery key was created
 	RecoveryKeyCreatedAt *time.Time `json:"-"`
+	// WebAuthn user handle (64 random bytes)
+	WebAuthnID []byte `json:"-"`
+	// WebAuthnEnabled indicates whether the account has WebAuthn enabled
+	WebAuthnEnabled bool `json:"-"`
+	// Timestamp when WebAuthn was enabled
+	WebAuthnEnabledAt *time.Time `json:"-"`
 	// Timestamp when the account was created
 	CreatedAt time.Time `gorm:"<-:false"`
 }
@@ -50,12 +58,18 @@ type TwoFADetails struct {
 	TOTP bool `json:"totp"`
 	// TOTPEnabledAt indicates when TOTP was enabled
 	TOTPEnabledAt *time.Time `json:"totpEnabledAt,omitempty"`
+	// WebAuthn indicates whether WebAuthn is enabled
+	WebAuthn bool `json:"webAuthn"`
+	// WebAuthnEnabledAt indicates when WebAuthn was enabled
+	WebAuthnEnabledAt *time.Time `json:"webAuthnEnabledAt,omitempty"`
+	// WebAuthnCredentials is a list of registered WebAuthn credentials
+	WebAuthnCredentials []DBWebAuthnCredential `json:"webAuthnCredentials,omitempty"`
 	// RecoveryKeyCreatedAt indicates when the recovery key was created
 	RecoveryKeyCreatedAt *time.Time `json:"recoveryKeyCreatedAt,omitempty"`
 }
 
 func (a *Account) IsTwoFAEnabled() bool {
-	return a.TOTPEnabled
+	return a.TOTPEnabled || a.WebAuthnEnabled
 }
 
 func (d *Datastore) GetAccount(tx *gorm.DB, email string) (*Account, error) {
@@ -63,7 +77,7 @@ func (d *Datastore) GetAccount(tx *gorm.DB, email string) (*Account, error) {
 	if tx == nil {
 		tx = d.DB
 	}
-	result := tx.Where("email = ?", util.CanonicalizeEmail(email)).First(&account)
+	result := tx.Omit("webauthn_id").Where("email = ?", util.CanonicalizeEmail(email)).First(&account)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, ErrAccountNotFound
@@ -196,6 +210,32 @@ func (d *Datastore) UpdateAccountLastEmailVerifiedAt(accountID uuid.UUID) error 
 	return nil
 }
 
+func (d *Datastore) SetWebAuthnSetting(accountID uuid.UUID, enabled bool) error {
+	var enabledAt *time.Time
+
+	if enabled {
+		now := time.Now().UTC()
+		enabledAt = &now
+	}
+
+	result := d.DB.Model(&Account{}).
+		Where("id = ?", accountID).
+		Updates(map[string]interface{}{
+			"webauthn_enabled":    enabled,
+			"webauthn_enabled_at": enabledAt,
+		})
+
+	if result.Error != nil {
+		return fmt.Errorf("error updating WebAuthn setting for account: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return ErrAccountNotFound
+	}
+
+	return nil
+}
+
 func (d *Datastore) SetTOTPSetting(accountID uuid.UUID, enabled bool) error {
 	var enabledAt *time.Time
 
@@ -293,7 +333,7 @@ func (d *Datastore) HasRecoveryKey(accountID uuid.UUID) (bool, error) {
 func (d *Datastore) GetTwoFADetails(accountID uuid.UUID) (*TwoFADetails, error) {
 	var details TwoFADetails
 	result := d.DB.Model(&Account{}).
-		Select("totp_enabled as totp, totp_enabled_at, recovery_key_created_at").
+		Select("totp_enabled as totp, totp_enabled_at, webauthn_enabled as web_authn, webauthn_enabled_at, recovery_key_created_at").
 		Where("id = ?", accountID).
 		First(&details)
 
@@ -303,6 +343,14 @@ func (d *Datastore) GetTwoFADetails(accountID uuid.UUID) (*TwoFADetails, error) 
 		}
 		return nil, fmt.Errorf("error fetching 2FA details: %w", result.Error)
 	}
+
+	// Fetch WebAuthn credentials
+	credentials, err := d.GetWebAuthnCredentials(accountID)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching WebAuthn credentials: %w", err)
+	}
+
+	details.WebAuthnCredentials = credentials
 
 	return &details, nil
 }
@@ -335,4 +383,47 @@ func (d *Datastore) GetAccountLocale(accountID uuid.UUID) (*string, error) {
 	}
 
 	return account.Locale, nil
+}
+
+// GetOrCreateWebAuthnID returns the WebAuthn ID for an account, creating it if it doesn't exist
+func (d *Datastore) GetOrCreateWebAuthnID(accountID uuid.UUID) ([]byte, error) {
+	var webauthnID []byte
+
+	err := d.DB.Transaction(func(tx *gorm.DB) error {
+		var account Account
+		result := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Select("webauthn_id").
+			Where("id = ?", accountID).
+			First(&account)
+
+		if result.Error != nil {
+			return fmt.Errorf("error fetching account webauthn_id: %w", result.Error)
+		}
+
+		// If webauthn_id already exists, return it
+		if account.WebAuthnID != nil {
+			webauthnID = account.WebAuthnID
+			return nil
+		}
+
+		// Generate a new 64-byte random ID
+		webauthnID = make([]byte, 64)
+		if _, err := rand.Read(webauthnID); err != nil {
+			return fmt.Errorf("failed to generate webauthn_id: %w", err)
+		}
+
+		// Update the account with the new webauthn_id
+		result = tx.Model(&Account{}).Where("id = ?", accountID).Update("webauthn_id", webauthnID)
+		if result.Error != nil {
+			return fmt.Errorf("error updating account webauthn_id: %w", result.Error)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return webauthnID, nil
 }

@@ -626,11 +626,6 @@ func (ac *AccountsController) SetupTOTPFinalize(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if err := ac.ds.SetTOTPSetting(session.AccountID, true); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
-
 	// Check if recovery key already exists
 	hasRecoveryKey, err := ac.ds.HasRecoveryKey(session.AccountID)
 	if err != nil {
@@ -650,6 +645,11 @@ func (ac *AccountsController) SetupTOTPFinalize(w http.ResponseWriter, r *http.R
 		}
 
 		response.RecoveryKey = &recoveryKey
+	}
+
+	if err := ac.ds.SetTOTPSetting(session.AccountID, true); err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
 	}
 
 	render.Status(r, http.StatusOK)

@@ -13,9 +13,11 @@ import (
 
 var (
 	// Account errors, prefixed with '11'
-	ErrEmailNotVerified            = NewExposedError(11003, "email not verified")
-	ErrIncorrectVerificationIntent = NewExposedError(11004, "incorrect verification intent")
-	ErrNewAccountEmailRequired     = NewExposedError(11005, "newAccountEmail is required when no verification token is provided")
+	ErrEmailNotVerified             = NewExposedError(11003, "email not verified")
+	ErrIncorrectVerificationIntent  = NewExposedError(11004, "incorrect verification intent")
+	ErrNewAccountEmailRequired      = NewExposedError(11005, "newAccountEmail is required when no verification token is provided")
+	ErrWebAuthnCredentialNotFound   = NewExposedError(11006, "webauthn credential not found")
+	ErrInterimWebAuthnStateNotFound = NewExposedError(11007, "interim webauthn registration state not found")
 
 	// Key errors, prefixed with '12'
 	ErrKeyNotFound         = NewExposedError(12001, "key not found")
