@@ -408,12 +408,12 @@ func (t *TwoFAService) FinalizeWebAuthnCredentialRegistration(accountID uuid.UUI
 	// Parse the credential creation response
 	parsedResponse, err := response.Parse()
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse credential creation response: %w", err)
+		return nil, util.ErrBadWebAuthnResponse
 	}
 
 	credential, err := t.webAuthn.CreateCredential(user, *state.SessionData, parsedResponse)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create credential: %w", err)
+		return nil, util.ErrBadWebAuthnResponse
 	}
 
 	// Save the credential
@@ -422,4 +422,54 @@ func (t *TwoFAService) FinalizeWebAuthnCredentialRegistration(accountID uuid.UUI
 	}
 
 	return credential, nil
+}
+
+// CreateWebAuthnLoginChallenge creates a new WebAuthn login challenge for multi-factor authentication
+func (t *TwoFAService) CreateWebAuthnLoginChallenge(accountID uuid.UUID, email string, loginStateID uuid.UUID) (*protocol.CredentialAssertion, error) {
+	user, err := newWebAuthnUser(t.ds, accountID, email)
+	if err != nil {
+		return nil, err
+	}
+
+	assertion, session, err := t.webAuthn.BeginMediatedLogin(user, webAuthnMediationRequirement)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin login: %w", err)
+	}
+
+	// Store the session data in the interim password state
+	if err := t.ds.SetInterimPasswordStateWebAuthnChallenge(loginStateID, session); err != nil {
+		return nil, fmt.Errorf("failed to store webauthn challenge: %w", err)
+	}
+
+	return assertion, nil
+}
+
+// VerifyWebAuthnCredential verifies a WebAuthn credential challenge response
+func (t *TwoFAService) VerifyWebAuthnCredential(accountID uuid.UUID, email string, state *datastore.InterimPasswordState, response *protocol.CredentialAssertionResponse) (*webauthn.Credential, error) {
+	if state.WebAuthnChallenge == nil {
+		return nil, fmt.Errorf("webauthn challenge not found in login state")
+	}
+
+	user, err := newWebAuthnUser(t.ds, accountID, email)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the credential assertion response
+	parsedResponse, err := response.Parse()
+	if err != nil {
+		return nil, util.ErrBadWebAuthnResponse
+	}
+
+	validatedCredential, err := t.webAuthn.ValidateLogin(user, *state.WebAuthnChallenge, parsedResponse)
+	if err != nil {
+		return nil, util.ErrBadWebAuthnResponse
+	}
+
+	// Update the credential in the database
+	if err := t.ds.SaveWebAuthnCredential(accountID, "", validatedCredential); err != nil {
+		return nil, fmt.Errorf("failed to update credential: %w", err)
+	}
+
+	return validatedCredential, nil
 }

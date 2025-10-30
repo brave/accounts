@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/brave/accounts/util"
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -33,6 +34,8 @@ type InterimPasswordState struct {
 	RequiresTwoFA bool `json:"-" gorm:"column:requires_twofa"`
 	// IsRegistration indicates whether the state is for a registration operation
 	IsRegistration bool `json:"-" gorm:"column:is_registration"`
+	// WebAuthnChallenge stores the WebAuthn session data for login challenge
+	WebAuthnChallenge *webauthn.SessionData `json:"-" gorm:"serializer:json"`
 	// CreatedAt records when this login state was initialized
 	CreatedAt time.Time `json:"createdAt" gorm:"<-:update"`
 }
@@ -87,6 +90,10 @@ func (d *Datastore) UpdateInterimPasswordState(stateID uuid.UUID, state []byte) 
 
 func (d *Datastore) MarkInterimPasswordStateAsAwaitingTwoFA(stateID uuid.UUID) error {
 	return d.DB.Model(&InterimPasswordState{}).Where("id = ?", stateID).Update("awaiting_twofa", true).Error
+}
+
+func (d *Datastore) SetInterimPasswordStateWebAuthnChallenge(stateID uuid.UUID, sessionData *webauthn.SessionData) error {
+	return d.DB.Model(&InterimPasswordState{}).Where("id = ?", stateID).Update("webauthn_challenge", sessionData).Error
 }
 
 func (d *Datastore) DeleteInterimPasswordState(stateID uuid.UUID) error {

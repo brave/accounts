@@ -1,6 +1,7 @@
 ALTER TABLE accounts ADD COLUMN webauthn_id BYTEA;
 ALTER TABLE accounts ADD COLUMN webauthn_enabled BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE accounts ADD COLUMN webauthn_enabled_at TIMESTAMP;
+ALTER TABLE interim_password_states ADD COLUMN webauthn_challenge JSON;
 
 CREATE TABLE webauthn_credentials (
     account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,

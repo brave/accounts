@@ -58,16 +58,6 @@ func (d *Datastore) GetWebAuthnCredentials(accountID uuid.UUID) ([]DBWebAuthnCre
 	return dbCredentials, nil
 }
 
-func (d *Datastore) CountWebAuthnCredentials(accountID uuid.UUID) (int64, error) {
-	var count int64
-
-	if err := d.DB.Model(&DBWebAuthnCredential{}).Where("account_id = ?", accountID).Count(&count).Error; err != nil {
-		return 0, fmt.Errorf("failed to count webauthn credentials: %w", err)
-	}
-
-	return count, nil
-}
-
 func (d *Datastore) DeleteWebAuthnCredential(accountID uuid.UUID, credentialID []byte) error {
 	result := d.DB.Delete(&DBWebAuthnCredential{}, "account_id = ? AND id = ?", accountID, credentialID)
 	if result.Error != nil {

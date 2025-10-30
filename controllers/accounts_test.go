@@ -607,14 +607,14 @@ func (suite *AccountsTestSuite) TestTOTPSetupAndFinalize() {
 	token, account := suite.createAuthSession()
 
 	// Test initializing TOTP setup
-	initReq := util.CreateJSONTestRequest("/v2/accounts/2fa/totp/init", controllers.TwoFAInitRequest{
+	initReq := util.CreateJSONTestRequest("/v2/accounts/2fa/totp/init", controllers.TOTPInitRequest{
 		GenerateQR: true,
 	})
 	initReq.Header.Set("Authorization", "Bearer "+token)
 	initResp := util.ExecuteTestRequest(initReq, suite.router)
 	suite.Equal(http.StatusOK, initResp.Code)
 
-	var initParsedResp controllers.TwoFAInitResponse
+	var initParsedResp controllers.TOTPInitResponse
 	util.DecodeJSONTestResponse(suite.T(), initResp.Body, &initParsedResp)
 	suite.Require().NotEmpty(initParsedResp.URI)
 	suite.Require().NotNil(initParsedResp.QRCode)
@@ -640,7 +640,7 @@ func (suite *AccountsTestSuite) TestTOTPSetupAndFinalize() {
 	}
 
 	for _, invalidCode := range invalidCodes {
-		finalizeReq := util.CreateJSONTestRequest("/v2/accounts/2fa/totp/finalize", controllers.TwoFAFinalizeRequest{
+		finalizeReq := util.CreateJSONTestRequest("/v2/accounts/2fa/totp/finalize", controllers.TOTPFinalizeRequest{
 			Code: invalidCode,
 		})
 		finalizeReq.Header.Set("Authorization", "Bearer "+token)
@@ -651,7 +651,7 @@ func (suite *AccountsTestSuite) TestTOTPSetupAndFinalize() {
 		}
 	}
 
-	finalizeReq := util.CreateJSONTestRequest("/v2/accounts/2fa/totp/finalize", controllers.TwoFAFinalizeRequest{
+	finalizeReq := util.CreateJSONTestRequest("/v2/accounts/2fa/totp/finalize", controllers.TOTPFinalizeRequest{
 		Code: validCode,
 	})
 	finalizeReq.Header.Set("Authorization", "Bearer "+token)
@@ -675,7 +675,7 @@ func (suite *AccountsTestSuite) TestTOTPSetupAndFinalize() {
 	suite.True(util.VerifyRecoveryKeyHash(*finalizeParsedResp.RecoveryKey, updatedAccount.RecoveryKeyHash))
 
 	// Test initializing TOTP when it's already enabled
-	initReq = util.CreateJSONTestRequest("/v2/accounts/2fa/totp/init", controllers.TwoFAInitRequest{
+	initReq = util.CreateJSONTestRequest("/v2/accounts/2fa/totp/init", controllers.TOTPInitRequest{
 		GenerateQR: true,
 	})
 	initReq.Header.Set("Authorization", "Bearer "+token)
