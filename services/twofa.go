@@ -27,6 +27,8 @@ import (
 const (
 	twoFAIssuerEnv               = "TWOFA_ISSUER"
 	totpQRSizeEnv                = "TOTP_QR_SIZE"
+	webAuthnRPIDEnv              = "WEBAUTHN_RP_ID"
+	webAuthnOriginsEnv           = "WEBAUTHN_ORIGINS"
 	defaultIssuer                = "Brave Account"
 	defaultQRSize                = 256
 	webAuthnMediationRequirement = protocol.MediationDefault
@@ -84,10 +86,31 @@ func NewTwoFAService(ds *datastore.Datastore, isKeyService bool) *TwoFAService {
 
 	baseURL := util.GetBaseURL()
 
+	// Determine RP ID (Relying Party ID)
+	var rpID string
+	if envRPID := os.Getenv(webAuthnRPIDEnv); envRPID != "" {
+		rpID = envRPID
+	} else {
+		// Extract domain from base URL
+		domain, err := util.GetDomainFromURL(baseURL)
+		if err != nil {
+			log.Panic().Err(err).Msg("failed to extract domain from base URL for WebAuthn RP ID")
+		}
+		rpID = domain
+	}
+
+	// Parse WebAuthn origins from environment variable
+	var webAuthnOrigins []string
+	if originsStr := os.Getenv(webAuthnOriginsEnv); originsStr != "" {
+		webAuthnOrigins = strings.Split(strings.TrimSpace(originsStr), ",")
+	} else {
+		webAuthnOrigins = []string{baseURL}
+	}
+
 	webAuthnConfig := &webauthn.Config{
 		RPDisplayName: issuer,
-		RPID:          baseURL,
-		RPOrigins:     []string{baseURL},
+		RPID:          rpID,
+		RPOrigins:     webAuthnOrigins,
 	}
 
 	wa, err := webauthn.New(webAuthnConfig)

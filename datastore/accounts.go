@@ -43,11 +43,11 @@ type Account struct {
 	// Timestamp when the recovery key was created
 	RecoveryKeyCreatedAt *time.Time `json:"-"`
 	// WebAuthn user handle (64 random bytes)
-	WebAuthnID []byte `json:"-"`
+	WebAuthnID []byte `json:"-" gorm:"column:webauthn_id"`
 	// WebAuthnEnabled indicates whether the account has WebAuthn enabled
-	WebAuthnEnabled bool `json:"-"`
+	WebAuthnEnabled bool `json:"-" gorm:"column:webauthn_enabled"`
 	// Timestamp when WebAuthn was enabled
-	WebAuthnEnabledAt *time.Time `json:"-"`
+	WebAuthnEnabledAt *time.Time `json:"-" gorm:"column:webauthn_enabled_at"`
 	// Timestamp when the account was created
 	CreatedAt time.Time `gorm:"<-:false"`
 }
@@ -59,9 +59,9 @@ type TwoFADetails struct {
 	// TOTPEnabledAt indicates when TOTP was enabled
 	TOTPEnabledAt *time.Time `json:"totpEnabledAt,omitempty"`
 	// WebAuthn indicates whether WebAuthn is enabled
-	WebAuthn bool `json:"webAuthn"`
+	WebAuthn bool `json:"webAuthn" gorm:"column:webauthn"`
 	// WebAuthnEnabledAt indicates when WebAuthn was enabled
-	WebAuthnEnabledAt *time.Time `json:"webAuthnEnabledAt,omitempty"`
+	WebAuthnEnabledAt *time.Time `json:"webAuthnEnabledAt,omitempty" gorm:"column:webauthn_enabled_at"`
 	// WebAuthnCredentials is a list of registered WebAuthn credentials
 	WebAuthnCredentials []DBWebAuthnCredential `json:"webAuthnCredentials,omitempty"`
 	// RecoveryKeyCreatedAt indicates when the recovery key was created
@@ -333,7 +333,7 @@ func (d *Datastore) HasRecoveryKey(accountID uuid.UUID) (bool, error) {
 func (d *Datastore) GetTwoFADetails(accountID uuid.UUID) (*TwoFADetails, error) {
 	var details TwoFADetails
 	result := d.DB.Model(&Account{}).
-		Select("totp_enabled as totp, totp_enabled_at, webauthn_enabled as web_authn, webauthn_enabled_at, recovery_key_created_at").
+		Select("totp_enabled as totp, totp_enabled_at, webauthn_enabled as webauthn, webauthn_enabled_at, recovery_key_created_at").
 		Where("id = ?", accountID).
 		First(&details)
 

@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -339,4 +340,17 @@ func GetBaseURL() string {
 		return defaultBaseURL
 	}
 	return baseURL
+}
+
+// GetDomainFromURL extracts the hostname from a URL string
+func GetDomainFromURL(urlStr string) (string, error) {
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse URL: %w", err)
+	}
+	hostname := parsedURL.Hostname()
+	if hostname == "" {
+		return "", fmt.Errorf("no hostname found in URL")
+	}
+	return hostname, nil
 }

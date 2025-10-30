@@ -35,7 +35,7 @@ type InterimPasswordState struct {
 	// IsRegistration indicates whether the state is for a registration operation
 	IsRegistration bool `json:"-" gorm:"column:is_registration"`
 	// WebAuthnChallenge stores the WebAuthn session data for login challenge
-	WebAuthnChallenge *webauthn.SessionData `json:"-" gorm:"serializer:json"`
+	WebAuthnChallenge *webauthn.SessionData `json:"-" gorm:"column:webauthn_challenge;serializer:json"`
 	// CreatedAt records when this login state was initialized
 	CreatedAt time.Time `json:"createdAt" gorm:"<-:update"`
 }

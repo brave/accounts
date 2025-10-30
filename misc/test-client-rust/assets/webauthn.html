@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
     <title>WebAuthn Registration</title>
-    <script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
 </head>
+
 <body>
-    <div id="status">Starting WebAuthn registration...</div>
+    <pre id="status">Starting WebAuthn registration...</pre>
 
     <script>
         const statusEl = document.getElementById('status');
@@ -18,21 +19,28 @@
         async function registerWebAuthn() {
             try {
                 log('Fetching registration request...');
-                
+
                 const initResponse = await fetch('/request');
                 if (!initResponse.ok) {
                     throw new Error('Failed to get registration request');
                 }
-                
+
                 const credentialCreationOptions = await initResponse.json();
                 log('Registration request received');
-                
+
                 log('Prompting user for credential...');
-                
-                const credential = await SimpleWebAuthnBrowser.startRegistration(credentialCreationOptions);
-                
+
+                // Parse the JSON options into the format expected by the API
+                const options = PublicKeyCredential.parseCreationOptionsFromJSON(credentialCreationOptions.publicKey);
+
+                const credential = await navigator.credentials.create({ publicKey: options });
+
+                if (!credential) {
+                    throw new Error('No credential returned');
+                }
+
                 log('Credential created, sending to server...');
-                
+
                 const finalizeResponse = await fetch('/response', {
                     method: 'POST',
                     headers: {
@@ -40,11 +48,11 @@
                     },
                     body: JSON.stringify(credential)
                 });
-                
+
                 if (!finalizeResponse.ok) {
                     throw new Error('Failed to finalize registration');
                 }
-                
+
                 log('WebAuthn credential registered successfully!');
 
                 window.close();
@@ -58,4 +66,5 @@
         registerWebAuthn();
     </script>
 </body>
+
 </html>
