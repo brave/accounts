@@ -1,4 +1,5 @@
 mod util;
+mod webauthn;
 
 use argon2::Argon2;
 use clap::{CommandFactory, Parser};
@@ -100,6 +101,10 @@ struct CliArgs {
     #[arg(long)]
     enable_totp: bool,
 
+    /// Add WebAuthn credential with name
+    #[arg(long)]
+    add_webauthn_credential: Option<String>,
+
     /// TOTP URI for 2FA login
     #[arg(long)]
     totp_uri: Option<String>,
@@ -127,6 +132,10 @@ struct CliArgs {
     /// Invalidate all existing sessions during change_password or reset_password
     #[arg(long)]
     invalidate_sessions: bool,
+
+    /// Port for WebAuthn server
+    #[arg(long, default_value = "8081")]
+    webauthn_port: u16,
 }
 
 fn maybe_handle_twofa(args: &CliArgs, resp: Value, token: &str, endpoint: &str) -> Value {
@@ -759,6 +768,8 @@ fn main() {
         set_password(args);
     } else if args.enable_totp {
         enable_totp(&args);
+    } else if args.add_webauthn_credential.is_some() {
+        webauthn::add_webauthn_credential(args);
     } else if args.logout {
         logout(&args);
     } else if args.list_keys {
@@ -771,7 +782,7 @@ fn main() {
         CliArgs::command()
             .print_help()
             .expect("Failed to display help message");
-        eprintln!("Must supply one of: -l, -r, -s, -e, -t, --email-verify, --enable-totp, --logout, --list-keys, --store-key, --get-key");
+        eprintln!("Must supply one of: -l, -r, -s, -e, -t, --email-verify, --enable-totp, --add-webauthn-credential, --logout, --list-keys, --store-key, --get-key");
         std::process::exit(1);
     }
 }

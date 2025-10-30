@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WebAuthn Registration</title>
+    <script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
+</head>
+<body>
+    <div id="status">Starting WebAuthn registration...</div>
+
+    <script>
+        const statusEl = document.getElementById('status');
+
+        function log(message) {
+            statusEl.textContent += '\n' + message;
+        }
+
+        async function registerWebAuthn() {
+            try {
+                log('Fetching registration request...');
+                
+                const initResponse = await fetch('/request');
+                if (!initResponse.ok) {
+                    throw new Error('Failed to get registration request');
+                }
+                
+                const credentialCreationOptions = await initResponse.json();
+                log('Registration request received');
+                
+                log('Prompting user for credential...');
+                
+                const credential = await SimpleWebAuthnBrowser.startRegistration(credentialCreationOptions);
+                
+                log('Credential created, sending to server...');
+                
+                const finalizeResponse = await fetch('/response', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(credential)
+                });
+                
+                if (!finalizeResponse.ok) {
+                    throw new Error('Failed to finalize registration');
+                }
+                
+                log('WebAuthn credential registered successfully!');
+
+                window.close();
+
+            } catch (error) {
+                log('Error: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        registerWebAuthn();
+    </script>
+</body>
+</html>
