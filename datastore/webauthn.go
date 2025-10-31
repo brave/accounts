@@ -8,6 +8,7 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type DBWebAuthnCredential struct {
@@ -33,15 +34,24 @@ func (InterimWebAuthnRegistrationState) TableName() string {
 	return "interim_webauthn_registration_states"
 }
 
-func (d *Datastore) SaveWebAuthnCredential(accountID uuid.UUID, credentialName string, credential *webauthn.Credential) error {
+func (d *Datastore) SaveWebAuthnCredential(accountID uuid.UUID, credential *webauthn.Credential, credentialName *string) error {
 	dbCredential := DBWebAuthnCredential{
 		AccountID:  accountID,
 		ID:         credential.ID,
 		Credential: credential,
-		Name:       credentialName,
 	}
 
-	if err := d.DB.Save(&dbCredential).Error; err != nil {
+	// Only set name if provided (for new credentials)
+	if credentialName != nil {
+		dbCredential.Name = *credentialName
+	}
+
+	err := d.DB.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "account_id"}, {Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"credential"}),
+	}).Create(&dbCredential).Error
+
+	if err != nil {
 		return fmt.Errorf("failed to save webauthn credential: %w", err)
 	}
 
@@ -68,6 +78,13 @@ func (d *Datastore) DeleteWebAuthnCredential(accountID uuid.UUID, credentialID [
 		return util.ErrWebAuthnCredentialNotFound
 	}
 
+	return nil
+}
+
+func (d *Datastore) DeleteAllWebAuthnCredentials(accountID uuid.UUID) error {
+	if err := d.DB.Delete(&DBWebAuthnCredential{}, "account_id = ?", accountID).Error; err != nil {
+		return fmt.Errorf("failed to delete webauthn credentials: %w", err)
+	}
 	return nil
 }
 

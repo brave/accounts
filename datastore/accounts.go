@@ -52,8 +52,8 @@ type Account struct {
 	CreatedAt time.Time `gorm:"<-:false"`
 }
 
-// TwoFADetails represents the 2FA methods enabled for an account and related timestamps
-type TwoFADetails struct {
+// TwoFAConfiguration represents the 2FA methods enabled for an account and related timestamps
+type TwoFAConfiguration struct {
 	// TOTP indicates whether Time-based One-Time Password is enabled
 	TOTP bool `json:"totp"`
 	// TOTPEnabledAt indicates when TOTP was enabled
@@ -63,13 +63,9 @@ type TwoFADetails struct {
 	// WebAuthnEnabledAt indicates when WebAuthn was enabled
 	WebAuthnEnabledAt *time.Time `json:"webAuthnEnabledAt,omitempty" gorm:"column:webauthn_enabled_at"`
 	// WebAuthnCredentials is a list of registered WebAuthn credentials
-	WebAuthnCredentials []DBWebAuthnCredential `json:"webAuthnCredentials,omitempty"`
+	WebAuthnCredentials []DBWebAuthnCredential `json:"webAuthnCredentials,omitempty" gorm:"-"`
 	// RecoveryKeyCreatedAt indicates when the recovery key was created
 	RecoveryKeyCreatedAt *time.Time `json:"recoveryKeyCreatedAt,omitempty"`
-}
-
-func (a *Account) IsTwoFAEnabled() bool {
-	return a.TOTPEnabled || a.WebAuthnEnabled
 }
 
 func (d *Datastore) GetAccount(tx *gorm.DB, email string) (*Account, error) {
@@ -330,8 +326,8 @@ func (d *Datastore) HasRecoveryKey(accountID uuid.UUID) (bool, error) {
 	return exists, nil
 }
 
-func (d *Datastore) GetTwoFADetails(accountID uuid.UUID) (*TwoFADetails, error) {
-	var details TwoFADetails
+func (d *Datastore) GetTwoFAConfiguration(accountID uuid.UUID) (*TwoFAConfiguration, error) {
+	var details TwoFAConfiguration
 	result := d.DB.Model(&Account{}).
 		Select("totp_enabled as totp, totp_enabled_at, webauthn_enabled as webauthn, webauthn_enabled_at, recovery_key_created_at").
 		Where("id = ?", accountID).

@@ -1,6 +1,12 @@
 ALTER TABLE accounts ADD COLUMN webauthn_id BYTEA;
 ALTER TABLE accounts ADD COLUMN webauthn_enabled BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE accounts ADD COLUMN webauthn_enabled_at TIMESTAMP;
+
+ALTER TABLE interim_password_states ADD COLUMN totp_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE interim_password_states ADD COLUMN webauthn_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+UPDATE interim_password_states SET totp_enabled = requires_twofa;
+ALTER TABLE interim_password_states DROP COLUMN requires_twofa;
+
 ALTER TABLE interim_password_states ADD COLUMN webauthn_challenge JSON;
 
 CREATE TABLE webauthn_credentials (

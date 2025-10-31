@@ -245,7 +245,7 @@ func (suite *AuthTestSuite) performLoginSteps() (*controllers.LoginFinalizeRespo
 func (suite *AuthTestSuite) TestAuthLogin() {
 	finalizeResp, _ := suite.performLoginSteps()
 	suite.NotEmpty(finalizeResp.AuthToken)
-	suite.False(finalizeResp.RequiresTwoFA)
+	suite.Nil(finalizeResp.TwoFAOptions)
 
 	req := httptest.NewRequest("GET", "/v2/auth/validate", nil)
 	req.Header.Add("Authorization", "Bearer "+*finalizeResp.AuthToken)
@@ -484,7 +484,9 @@ func (suite *AuthTestSuite) TestAuth2FAWithTOTPCode() {
 	finalizeResp, loginToken := suite.performLoginSteps()
 
 	// Verify we need 2FA
-	suite.True(finalizeResp.RequiresTwoFA)
+	suite.Require().NotNil(finalizeResp.TwoFAOptions)
+	suite.True(finalizeResp.TwoFAOptions.TOTPEnabled)
+	suite.Nil(finalizeResp.TwoFAOptions.WebAuthnRequest)
 	suite.Nil(finalizeResp.AuthToken)
 
 	// Try using invalid TOTP code first
@@ -520,7 +522,9 @@ func (suite *AuthTestSuite) TestAuth2FAWithTOTPCode() {
 
 	// Perform login steps again to get a new login state
 	finalizeResp, loginToken = suite.performLoginSteps()
-	suite.True(finalizeResp.RequiresTwoFA)
+	suite.Require().NotNil(finalizeResp.TwoFAOptions)
+	suite.True(finalizeResp.TwoFAOptions.TOTPEnabled)
+	suite.Nil(finalizeResp.TwoFAOptions.WebAuthnRequest)
 	suite.Nil(finalizeResp.AuthToken)
 
 	// Try to reuse the same code with the new login state
@@ -540,7 +544,8 @@ func (suite *AuthTestSuite) TestAuth2FAWithTOTPCode() {
 
 	account, err := suite.ds.GetOrCreateAccount(suite.account.Email)
 	suite.Require().NoError(err)
-	suite.True(account.IsTwoFAEnabled())
+	suite.True(account.TOTPEnabled)
+	suite.False(account.WebAuthnEnabled)
 	suite.NotNil(account.RecoveryKeyHash)
 }
 
@@ -568,7 +573,9 @@ func (suite *AuthTestSuite) TestAuth2FAWithRecoveryKey() {
 	finalizeResp, loginToken := suite.performLoginSteps()
 
 	// Verify we need 2FA
-	suite.True(finalizeResp.RequiresTwoFA)
+	suite.Require().NotNil(finalizeResp.TwoFAOptions)
+	suite.True(finalizeResp.TwoFAOptions.TOTPEnabled)
+	suite.Nil(finalizeResp.TwoFAOptions.WebAuthnRequest)
 	suite.Nil(finalizeResp.AuthToken)
 
 	// Test 2FA with bad recovery key
@@ -605,11 +612,12 @@ func (suite *AuthTestSuite) TestAuth2FAWithRecoveryKey() {
 	// 2FA should now be disabled because we used recovery key
 	account, err := suite.ds.GetOrCreateAccount(suite.account.Email)
 	suite.Require().NoError(err)
-	suite.False(account.IsTwoFAEnabled())
+	suite.False(account.TOTPEnabled)
+	suite.False(account.WebAuthnEnabled)
 	suite.Nil(account.RecoveryKeyHash)
 
 	finalizeResp, _ = suite.performLoginSteps()
-	suite.False(finalizeResp.RequiresTwoFA)
+	suite.Nil(finalizeResp.TwoFAOptions)
 	suite.NotNil(finalizeResp.AuthToken)
 
 	validateReq = httptest.NewRequest("GET", "/v2/auth/validate", nil)

@@ -36,12 +36,22 @@ const (
 
 var totpCodeRegex = regexp.MustCompile(`^\d{6}$`)
 
+// TwoFAOptions represents the available two-factor authentication options
+type TwoFAOptions struct {
+	// Indicates if TOTP is enabled and available
+	TOTPEnabled bool `json:"totpEnabled"`
+	// WebAuthn challenge for authentication (if WebAuthn is enabled)
+	WebAuthnRequest interface{} `json:"webAuthnRequest"`
+}
+
 // TwoFAAuthRequest represents a request to authenticate with 2FA
 type TwoFAAuthRequest struct {
-	// TOTP verification code (optional if recovery key is provided)
-	TOTPCode *string `json:"totpCode,omitempty" validate:"required_without=RecoveryKey,excluded_with=RecoveryKey"`
-	// Recovery key for 2FA bypass (optional if TOTP code is provided)
-	RecoveryKey *string `json:"recoveryKey,omitempty" validate:"required_without=TOTPCode,excluded_with=TOTPCode"`
+	// WebAuthn credential assertion response
+	WebAuthnResponse *protocol.CredentialAssertionResponse `json:"webAuthnResponse,omitempty" validate:"required_without_all=TOTPCode RecoveryKey,excluded_with_all=TOTPCode RecoveryKey"`
+	// TOTP verification code
+	TOTPCode *string `json:"totpCode,omitempty" validate:"required_without_all=WebAuthnResponse RecoveryKey,excluded_with_all=WebAuthnResponse RecoveryKey"`
+	// Recovery key for 2FA bypass
+	RecoveryKey *string `json:"recoveryKey,omitempty" validate:"required_without_all=WebAuthnResponse TOTPCode,excluded_with_all=WebAuthnResponse TOTPCode"`
 	// Whether to invalidate existing sessions (only applicable when changing password)
 	InvalidateSessions bool `json:"invalidateSessions"`
 }
@@ -130,6 +140,7 @@ func NewTwoFAService(ds *datastore.Datastore, isKeyService bool) *TwoFAService {
 
 // DisableTwoFA disables two-factor authentication for an account
 func (t *TwoFAService) DisableTwoFA(accountID uuid.UUID) error {
+	// Disable TOTP
 	if err := t.ds.SetTOTPSetting(accountID, false); err != nil {
 		return err
 	}
@@ -138,6 +149,16 @@ func (t *TwoFAService) DisableTwoFA(accountID uuid.UUID) error {
 		return err
 	}
 
+	// Disable WebAuthn
+	if err := t.ds.SetWebAuthnSetting(accountID, false); err != nil {
+		return err
+	}
+
+	if err := t.ds.DeleteAllWebAuthnCredentials(accountID); err != nil {
+		return err
+	}
+
+	// Delete recovery key
 	if err := t.ds.SetRecoveryKey(accountID, nil); err != nil {
 		return err
 	}
@@ -145,10 +166,32 @@ func (t *TwoFAService) DisableTwoFA(accountID uuid.UUID) error {
 	return nil
 }
 
-// ProcessChallenge verifies either TOTP code or recovery key for an account
+// PrepareChallenge prepares 2FA options based on the password state
+func (t *TwoFAService) PrepareChallenge(state *datastore.InterimPasswordState) (*TwoFAOptions, error) {
+	options := &TwoFAOptions{
+		TOTPEnabled: state.TOTPEnabled,
+	}
+
+	if state.WebAuthnEnabled {
+		challenge, err := t.CreateWebAuthnLoginChallenge(state)
+		if err != nil {
+			return nil, err
+		}
+		options.WebAuthnRequest = challenge
+	}
+
+	return options, nil
+}
+
+// ProcessChallenge verifies either WebAuthn response, TOTP code, or recovery key for an account
 func (t *TwoFAService) ProcessChallenge(loginState *datastore.InterimPasswordState, req *TwoFAAuthRequest) error {
-	// Verify either TOTP code or recovery key
-	if req.TOTPCode != nil {
+	if req.WebAuthnResponse != nil {
+		// Verify WebAuthn credential
+		_, err := t.VerifyWebAuthnCredential(loginState, req.WebAuthnResponse)
+		if err != nil {
+			return err
+		}
+	} else if req.TOTPCode != nil {
 		// Verify TOTP code
 		if err := t.ValidateTOTPCode(*loginState.AccountID, *req.TOTPCode); err != nil {
 			return err
@@ -440,7 +483,7 @@ func (t *TwoFAService) FinalizeWebAuthnCredentialRegistration(accountID uuid.UUI
 	}
 
 	// Save the credential
-	if err := t.ds.SaveWebAuthnCredential(accountID, credentialName, credential); err != nil {
+	if err := t.ds.SaveWebAuthnCredential(accountID, credential, &credentialName); err != nil {
 		return nil, fmt.Errorf("failed to save credential: %w", err)
 	}
 
@@ -448,8 +491,8 @@ func (t *TwoFAService) FinalizeWebAuthnCredentialRegistration(accountID uuid.UUI
 }
 
 // CreateWebAuthnLoginChallenge creates a new WebAuthn login challenge for multi-factor authentication
-func (t *TwoFAService) CreateWebAuthnLoginChallenge(accountID uuid.UUID, email string, loginStateID uuid.UUID) (*protocol.CredentialAssertion, error) {
-	user, err := newWebAuthnUser(t.ds, accountID, email)
+func (t *TwoFAService) CreateWebAuthnLoginChallenge(state *datastore.InterimPasswordState) (*protocol.CredentialAssertion, error) {
+	user, err := newWebAuthnUser(t.ds, *state.AccountID, state.Email)
 	if err != nil {
 		return nil, err
 	}
@@ -460,7 +503,7 @@ func (t *TwoFAService) CreateWebAuthnLoginChallenge(accountID uuid.UUID, email s
 	}
 
 	// Store the session data in the interim password state
-	if err := t.ds.SetInterimPasswordStateWebAuthnChallenge(loginStateID, session); err != nil {
+	if err := t.ds.SetInterimPasswordStateWebAuthnChallenge(state.ID, session); err != nil {
 		return nil, fmt.Errorf("failed to store webauthn challenge: %w", err)
 	}
 
@@ -468,12 +511,8 @@ func (t *TwoFAService) CreateWebAuthnLoginChallenge(accountID uuid.UUID, email s
 }
 
 // VerifyWebAuthnCredential verifies a WebAuthn credential challenge response
-func (t *TwoFAService) VerifyWebAuthnCredential(accountID uuid.UUID, email string, state *datastore.InterimPasswordState, response *protocol.CredentialAssertionResponse) (*webauthn.Credential, error) {
-	if state.WebAuthnChallenge == nil {
-		return nil, fmt.Errorf("webauthn challenge not found in login state")
-	}
-
-	user, err := newWebAuthnUser(t.ds, accountID, email)
+func (t *TwoFAService) VerifyWebAuthnCredential(state *datastore.InterimPasswordState, response *protocol.CredentialAssertionResponse) (*webauthn.Credential, error) {
+	user, err := newWebAuthnUser(t.ds, *state.AccountID, state.Email)
 	if err != nil {
 		return nil, err
 	}
@@ -489,8 +528,7 @@ func (t *TwoFAService) VerifyWebAuthnCredential(accountID uuid.UUID, email strin
 		return nil, util.ErrBadWebAuthnResponse
 	}
 
-	// Update the credential in the database
-	if err := t.ds.SaveWebAuthnCredential(accountID, "", validatedCredential); err != nil {
+	if err := t.ds.SaveWebAuthnCredential(*state.AccountID, validatedCredential, nil); err != nil {
 		return nil, fmt.Errorf("failed to update credential: %w", err)
 	}
 

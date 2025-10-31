@@ -280,7 +280,7 @@ func (suite *AccountsTestSuite) TestRegistration() {
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedFinalizeResp)
 	suite.Nil(parsedFinalizeResp.AuthToken) // No auth token until email is verified
 	suite.True(parsedFinalizeResp.RequiresEmailVerification)
-	suite.False(parsedFinalizeResp.RequiresTwoFA)
+	suite.Nil(parsedFinalizeResp.TwoFAOptions)
 	suite.False(parsedFinalizeResp.SessionsInvalidated)
 
 	// Verify account was created but not verified
@@ -431,7 +431,7 @@ func (suite *AccountsTestSuite) TestChangePassword() {
 
 		var changeFinalizeResp controllers.PasswordFinalizeResponse
 		util.DecodeJSONTestResponse(suite.T(), resp.Body, &changeFinalizeResp)
-		suite.False(changeFinalizeResp.RequiresTwoFA)
+		suite.Nil(changeFinalizeResp.TwoFAOptions)
 		suite.False(changeFinalizeResp.RequiresEmailVerification)
 		suite.Equal(sessionInvalidation, changeFinalizeResp.SessionsInvalidated)
 
@@ -581,7 +581,7 @@ func (suite *AccountsTestSuite) TestGet2FASettings() {
 	resp := util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusOK, resp.Code)
 
-	var settings datastore.TwoFADetails
+	var settings datastore.TwoFAConfiguration
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &settings)
 	suite.False(settings.TOTP)
 	suite.Nil(settings.TOTPEnabledAt)
@@ -670,7 +670,8 @@ func (suite *AccountsTestSuite) TestTOTPSetupAndFinalize() {
 	// Verify 2FA is now enabled
 	updatedAccount, err := suite.ds.GetAccount(nil, account.Email)
 	suite.Require().NoError(err)
-	suite.True(updatedAccount.IsTwoFAEnabled())
+	suite.True(updatedAccount.TOTPEnabled)
+	suite.False(updatedAccount.WebAuthnEnabled)
 	suite.NotNil(updatedAccount.RecoveryKeyHash)
 	suite.True(util.VerifyRecoveryKeyHash(*finalizeParsedResp.RecoveryKey, updatedAccount.RecoveryKeyHash))
 
@@ -697,7 +698,7 @@ func (suite *AccountsTestSuite) TestDisableTOTP() {
 	suite.Require().NoError(err)
 
 	// Verify timestamps are set
-	details, err := suite.ds.GetTwoFADetails(account.ID)
+	details, err := suite.ds.GetTwoFAConfiguration(account.ID)
 	suite.Require().NoError(err)
 	suite.NotNil(details.TOTPEnabledAt)
 	suite.NotNil(details.RecoveryKeyCreatedAt)
@@ -711,11 +712,12 @@ func (suite *AccountsTestSuite) TestDisableTOTP() {
 	// Verify 2FA is now disabled
 	updatedAccount, err := suite.ds.GetAccount(nil, account.Email)
 	suite.Require().NoError(err)
-	suite.False(updatedAccount.IsTwoFAEnabled())
+	suite.False(updatedAccount.TOTPEnabled)
+	suite.False(updatedAccount.WebAuthnEnabled)
 	suite.Nil(updatedAccount.RecoveryKeyHash)
 
 	// Verify timestamps are cleared
-	details, err = suite.ds.GetTwoFADetails(account.ID)
+	details, err = suite.ds.GetTwoFAConfiguration(account.ID)
 	suite.Require().NoError(err)
 	suite.Nil(details.TOTPEnabledAt)
 	suite.Nil(details.RecoveryKeyCreatedAt)
@@ -742,7 +744,7 @@ func (suite *AccountsTestSuite) TestRecoveryKeyEndpoints() {
 	suite.True(hasKey)
 
 	// Verify timestamp was set
-	details, err := suite.ds.GetTwoFADetails(account.ID)
+	details, err := suite.ds.GetTwoFAConfiguration(account.ID)
 	suite.Require().NoError(err)
 	suite.NotNil(details.RecoveryKeyCreatedAt)
 
@@ -754,7 +756,7 @@ func (suite *AccountsTestSuite) TestRecoveryKeyEndpoints() {
 	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusOK, resp.Code)
 
-	details, err = suite.ds.GetTwoFADetails(account.ID)
+	details, err = suite.ds.GetTwoFAConfiguration(account.ID)
 	suite.Require().NoError(err)
 	// Ensure createdAt is updated
 	suite.NotEqual(*details.RecoveryKeyCreatedAt, *firstCreatedAt)
@@ -772,7 +774,7 @@ func (suite *AccountsTestSuite) TestRecoveryKeyEndpoints() {
 	suite.False(hasKey)
 
 	// Verify timestamp was cleared
-	details, err = suite.ds.GetTwoFADetails(account.ID)
+	details, err = suite.ds.GetTwoFAConfiguration(account.ID)
 	suite.Require().NoError(err)
 	suite.Nil(details.RecoveryKeyCreatedAt)
 
