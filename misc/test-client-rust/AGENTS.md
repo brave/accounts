@@ -25,8 +25,8 @@ The main binary is a CLI tool for testing Brave Accounts API endpoints. Common u
 ### Core Structure
 - `src/main.rs` - Main CLI entry point with argument parsing and flow control
 - `src/util.rs` - Shared utilities for HTTP requests and response handling
-- `src/webauthn.rs` - WebAuthn credential registration module with embedded web server
-- `assets/webauthn.html` - Static HTML page for WebAuthn browser interaction
+- `src/webauthn.rs` - WebAuthn credential registration and authentication module with embedded web server
+- `assets/webauthn.html` - Static HTML page for WebAuthn registration and login browser interaction
 
 ### Key Components
 1. **OPAQUE Protocol Integration**: Uses `opaque-ke` crate for password-authenticated key exchange
@@ -34,7 +34,10 @@ The main binary is a CLI tool for testing Brave Accounts API endpoints. Common u
 3. **HTTP Client**: Uses `reqwest` blocking client for API communication
 4. **2FA Support**: Integrates TOTP authentication, WebAuthn credentials, and recovery keys
 5. **Session Management**: Handles auth tokens, sessions, and logout functionality
-6. **WebAuthn Server**: Temporary tiny_http server for browser-based WebAuthn registration flow
+6. **WebAuthn Server**: Temporary tiny_http server for browser-based WebAuthn registration and login flows
+   - `/` route - Serves unified WebAuthn page for both registration and login
+   - `/request` route - Provides WebAuthn challenge with operation type (register/login)
+   - `/response` route - Receives WebAuthn credential response
 
 ### Authentication Flow
 The client implements the OPAQUE protocol for secure password authentication:
@@ -60,3 +63,4 @@ Base URL defaults to `http://localhost:8080` with these main endpoints:
 - `clap` - CLI argument parsing
 - `tiny_http` - Lightweight HTTP server for WebAuthn flow
 - `open` - Opens URLs in default browser
+- `dialoguer` - Interactive CLI prompts and selection menus

@@ -3,11 +3,11 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>WebAuthn Registration</title>
+    <title>WebAuthn</title>
 </head>
 
 <body>
-    <pre id="status">Starting WebAuthn registration...</pre>
+    <pre id="status">Starting WebAuthn...</pre>
 
     <script>
         const statusEl = document.getElementById('status');
@@ -16,30 +16,61 @@
             statusEl.textContent += '\n' + message;
         }
 
-        async function registerWebAuthn() {
+        async function performRegistration(requestData) {
+            log('Prompting user for credential registration...');
+
+            // Parse the JSON options into the format expected by the API
+            const options = PublicKeyCredential.parseCreationOptionsFromJSON(requestData.publicKey);
+
+            const credential = await navigator.credentials.create({ publicKey: options });
+
+            if (!credential) {
+                throw new Error('No credential returned');
+            }
+
+            log('Credential created');
+            return credential;
+        }
+
+        async function performLogin(requestData) {
+            log('Prompting user for authentication...');
+
+            // Parse the JSON options into the format expected by the API
+            const options = PublicKeyCredential.parseRequestOptionsFromJSON(requestData.publicKey);
+
+            const credential = await navigator.credentials.get({ publicKey: options });
+
+            if (!credential) {
+                throw new Error('No credential returned');
+            }
+
+            log('Authentication successful');
+            return credential;
+        }
+
+        async function performWebAuthn() {
             try {
-                log('Fetching registration request...');
+                log('Fetching request...');
 
                 const initResponse = await fetch('/request');
                 if (!initResponse.ok) {
-                    throw new Error('Failed to get registration request');
+                    throw new Error('Failed to get request');
                 }
 
-                const credentialCreationOptions = await initResponse.json();
-                log('Registration request received');
+                const requestData = await initResponse.json();
+                const operation = requestData.operation;
+                log(`Request received (${operation})`);
 
-                log('Prompting user for credential...');
-
-                // Parse the JSON options into the format expected by the API
-                const options = PublicKeyCredential.parseCreationOptionsFromJSON(credentialCreationOptions.publicKey);
-
-                const credential = await navigator.credentials.create({ publicKey: options });
-
-                if (!credential) {
-                    throw new Error('No credential returned');
+                let credential;
+                if (operation === 'register') {
+                    credential = await performRegistration(requestData.request);
+                } else if (operation === 'login') {
+                    credential = await performLogin(requestData.request);
+                } else {
+                    throw new Error('Unknown operation: ' + operation);
                 }
 
-                log('Credential created, sending to server...');
+                log('Sending credential to server...');
 
                 const finalizeResponse = await fetch('/response', {
                     method: 'POST',
@@ -50,11 +81,10 @@
                 });
 
                 if (!finalizeResponse.ok) {
-                    throw new Error('Failed to finalize registration');
+                    throw new Error('Failed to send credential');
                 }
 
-                log('WebAuthn credential registered successfully!');
-
+                log(`WebAuthn ${operation} completed successfully!`);
                 window.close();
 
             } catch (error) {
@@ -63,7 +93,7 @@
             }
         }
 
-        registerWebAuthn();
+        performWebAuthn();
     </script>
 </body>
 

@@ -1,10 +1,24 @@
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use tiny_http::{Header, Method, Response, Server};
 
 use crate::{CliArgs, util::{make_request, verbose_log}};
 
-fn handle_incoming_requests(server: Server, registration_request: &Value) -> Value {
+enum WebAuthnOperation {
+    Register,
+    Login,
+}
+
+impl std::fmt::Display for WebAuthnOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            WebAuthnOperation::Register => write!(f, "register"),
+            WebAuthnOperation::Login => write!(f, "login"),
+        }
+    }
+}
+
+fn handle_incoming_requests(server: Server, webauthn_request: &Value, operation: WebAuthnOperation) -> Value {
     for mut request in server.incoming_requests() {
         let path = request.url();
         let method = request.method();
@@ -20,13 +34,17 @@ fn handle_incoming_requests(server: Server, registration_request: &Value) -> Val
                 request.respond(response).expect("Failed to send HTML response");
             }
             (Method::Get, "/request") => {
-                let json = serde_json::to_vec(registration_request).unwrap();
+                let response_body = json!({
+                    "operation": operation.to_string(),
+                    "request": webauthn_request
+                });
+                let json = serde_json::to_vec(&response_body).unwrap();
                 let response = Response::from_data(json)
                     .with_header(
                         Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
                             .unwrap(),
                     );
-                request.respond(response).expect("Failed to send registration request");
+                request.respond(response).expect("Failed to send webauthn request");
             }
             (Method::Post, "/response") => {
                 let mut content = Vec::new();
@@ -61,7 +79,23 @@ fn handle_incoming_requests(server: Server, registration_request: &Value) -> Val
         }
     }
 
-    panic!("Server closed without completing registration");
+    panic!("Server closed without completing WebAuthn flow");
+}
+
+fn prompt_webauthn_browser(args: &CliArgs, webauthn_request: &Value, operation: WebAuthnOperation) -> Value {
+    let server_addr = format!("127.0.0.1:{}", args.webauthn_port);
+    let server = Server::http(&server_addr)
+        .unwrap_or_else(|_| panic!("Failed to bind to {}", server_addr));
+    println!("WebAuthn server running on http://{}, opening browser...", server_addr);
+
+    // Open browser in a separate thread
+    let url = format!("http://localhost:{}/", args.webauthn_port);
+    std::thread::spawn(move || {
+        open::that(&url).expect("Failed to open browser");
+    });
+
+    // Handle requests and get the client credential response
+    handle_incoming_requests(server, webauthn_request, operation)
 }
 
 pub fn add_webauthn_credential(args: CliArgs) {
@@ -103,19 +137,7 @@ pub fn add_webauthn_credential(args: CliArgs) {
 
     verbose_log(&args, format!("credential creation options: {credential_creation_options:?}").as_str());
 
-    let server_addr = format!("127.0.0.1:{}", args.webauthn_port);
-    let server = Server::http(&server_addr)
-        .unwrap_or_else(|_| panic!("Failed to bind to {}", server_addr));
-    println!("WebAuthn server running on http://{}, opening browser...", server_addr);
-
-    // Open browser in a separate thread
-    let url = format!("http://localhost:{}/", args.webauthn_port);
-    std::thread::spawn(move || {
-        open::that(&url).expect("Failed to open browser");
-    });
-
-    // Handle requests and get the client credential response
-    let credential_response = handle_incoming_requests(server, credential_creation_options);
+    let credential_response = prompt_webauthn_browser(&args, credential_creation_options, WebAuthnOperation::Register);
 
     verbose_log(&args, format!("credential response: {credential_response:?}").as_str());
 
@@ -145,4 +167,12 @@ pub fn add_webauthn_credential(args: CliArgs) {
     }
 
     println!("WebAuthn credential added successfully");
+}
+
+pub fn authenticate_webauthn(args: &CliArgs, webauthn_request: &Value) -> Value {
+    let credential_response = prompt_webauthn_browser(args, webauthn_request, WebAuthnOperation::Login);
+
+    verbose_log(args, format!("credential response: {credential_response:?}").as_str());
+
+    credential_response
 }
