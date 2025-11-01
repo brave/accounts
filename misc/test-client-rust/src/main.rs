@@ -1,7 +1,9 @@
 mod util;
+mod webauthn;
 
 use argon2::Argon2;
 use clap::{CommandFactory, Parser};
+use dialoguer::{Input, Select};
 use opaque_ke::{
     errors::ProtocolError, CipherSuite, ClientLogin, ClientLoginFinishParameters,
     ClientRegistration, ClientRegistrationFinishParameters, CredentialResponse, Identifiers,
@@ -100,6 +102,10 @@ struct CliArgs {
     #[arg(long)]
     enable_totp: bool,
 
+    /// Add WebAuthn credential with name
+    #[arg(long)]
+    add_webauthn_credential: Option<String>,
+
     /// TOTP URI for 2FA login
     #[arg(long)]
     totp_uri: Option<String>,
@@ -127,37 +133,98 @@ struct CliArgs {
     /// Invalidate all existing sessions during change_password or reset_password
     #[arg(long)]
     invalidate_sessions: bool,
+
+    /// Port for WebAuthn server
+    #[arg(long, default_value = "8081")]
+    webauthn_port: u16,
+}
+
+enum TwoFAMethod {
+    TOTP,
+    WebAuthn,
+    RecoveryKey,
+}
+
+impl std::fmt::Display for TwoFAMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            TwoFAMethod::TOTP => write!(f, "TOTP (Time-based One-Time Password)"),
+            TwoFAMethod::WebAuthn => write!(f, "WebAuthn (Security Key/Biometric)"),
+            TwoFAMethod::RecoveryKey => write!(f, "Recovery Key"),
+        }
+    }
 }
 
 fn maybe_handle_twofa(args: &CliArgs, resp: Value, token: &str, endpoint: &str) -> Value {
-    // If 2FA not required, just return the original response
-    if !resp
-        .get("requiresTwoFA")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-    {
-        return resp;
-    }
+    // Check for twoFAOptions structure
+    let twofa_options = match resp.get("twoFAOptions") {
+        Some(options) if !options.is_null() => options,
+        _ => return resp, // No 2FA required
+    };
 
     verbose_log(args, "Two-factor authentication is required");
 
+    // Check which methods are available
+    let totp_enabled = twofa_options
+        .get("totpEnabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    
+    let webauthn_request = twofa_options.get("webAuthnRequest");
+    let webauthn_enabled = webauthn_request.is_some() && !webauthn_request.unwrap().is_null();
+
     let mut twofa_body: HashMap<&str, Value> = HashMap::new();
+
     if let Some(recovery_key) = args.twofa_recovery_key.as_ref() {
         twofa_body.insert("recoveryKey", recovery_key.as_str().into());
+    } else if args.totp_uri.is_some() && totp_enabled {
+        let totp_uri = args.totp_uri.as_ref().unwrap();
+        let totp = TOTP::from_url(totp_uri).expect("Failed to parse TOTP URL");
+        let code = totp
+            .generate_current()
+            .expect("Failed to generate TOTP code");
+        verbose_log(args, format!("Generated TOTP code: {code}").as_str());
+        twofa_body.insert("totpCode", code.into());
     } else {
-        // Try to generate TOTP code if URI is provided
-        let totp_code = if let Some(totp_uri) = args.totp_uri.as_ref() {
-            let totp = TOTP::from_url(totp_uri).expect("Failed to parse TOTP URL");
-            let code = totp
-                .generate_current()
-                .expect("Failed to generate TOTP code");
-            verbose_log(args, format!("Generated TOTP code: {code}").as_str());
-            code
-        } else {
-            // Prompt user for code
-            prompt_for_input("Enter your 6-digit TOTP code: ")
-        };
-        twofa_body.insert("totpCode", totp_code.into());
+        let mut methods = Vec::new();
+        if webauthn_enabled {
+            methods.push(TwoFAMethod::WebAuthn);
+        }
+        if totp_enabled {
+            methods.push(TwoFAMethod::TOTP);
+        }
+        methods.push(TwoFAMethod::RecoveryKey);
+
+        let selection = Select::new()
+            .with_prompt("Select 2FA method")
+            .items(&methods)
+            .default(0)
+            .interact()
+            .expect("Failed to get user selection");
+
+        match &methods[selection] {
+            TwoFAMethod::TOTP => {
+                let totp_code: String = Input::new()
+                    .with_prompt("Enter your 6-digit TOTP code")
+                    .interact_text()
+                    .expect("Failed to get TOTP code");
+                twofa_body.insert("totpCode", totp_code.into());
+            }
+            TwoFAMethod::WebAuthn => {
+                let webauthn_resp = webauthn::authenticate_webauthn(
+                    args,
+                    webauthn_request.unwrap(),
+                );
+                twofa_body.insert("webAuthnResponse", webauthn_resp);
+            }
+            TwoFAMethod::RecoveryKey => {
+                let recovery_key: String = Input::new()
+                    .with_prompt("Enter your recovery key")
+                    .interact_text()
+                    .expect("Failed to get recovery key");
+                twofa_body.insert("recoveryKey", recovery_key.into());
+            }
+        }
     }
 
     make_request(
@@ -759,6 +826,8 @@ fn main() {
         set_password(args);
     } else if args.enable_totp {
         enable_totp(&args);
+    } else if args.add_webauthn_credential.is_some() {
+        webauthn::add_webauthn_credential(args);
     } else if args.logout {
         logout(&args);
     } else if args.list_keys {
@@ -771,7 +840,7 @@ fn main() {
         CliArgs::command()
             .print_help()
             .expect("Failed to display help message");
-        eprintln!("Must supply one of: -l, -r, -s, -e, -t, --email-verify, --enable-totp, --logout, --list-keys, --store-key, --get-key");
+        eprintln!("Must supply one of: -l, -r, -s, -e, -t, --email-verify, --enable-totp, --add-webauthn-credential, --logout, --list-keys, --store-key, --get-key");
         std::process::exit(1);
     }
 }
