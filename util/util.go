@@ -48,6 +48,9 @@ const (
 	recoveryKeyArgonKeyLength  = 32
 	recoveryKeyArgonSaltLength = 16
 	recoveryKeyFullHashLength  = recoveryKeyArgonKeyLength + recoveryKeyArgonSaltLength
+
+	baseURLEnv     = "BASE_URL"
+	defaultBaseURL = "http://localhost:8080"
 )
 
 func generateRecoveryKeyHash(recoveryKey string, salt []byte) []byte {
@@ -315,4 +318,13 @@ func GetRequestLocale(explicitLocale string, r *http.Request) string {
 		return locale[:20]
 	}
 	return locale
+}
+
+// GetBaseURL returns the base URL from environment or default localhost
+func GetBaseURL() string {
+	baseURL := os.Getenv(baseURLEnv)
+	if baseURL == "" {
+		return defaultBaseURL
+	}
+	return baseURL
 }
