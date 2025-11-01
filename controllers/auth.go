@@ -69,8 +69,8 @@ type LoginFinalizeRequest struct {
 type LoginFinalizeResponse struct {
 	// Authentication token for future requests
 	AuthToken *string `json:"authToken"`
-	// Indicates if 2FA verification is required before authentication is complete
-	RequiresTwoFA bool `json:"requiresTwoFA"`
+	// Two-factor authentication options available for this account
+	TwoFAOptions *services.TwoFAOptions `json:"twoFAOptions"`
 }
 
 // @Description	Response containing validated token details
@@ -398,10 +398,16 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	response := LoginFinalizeResponse{
-		RequiresTwoFA: loginState.IsTwoFAEnabled(),
-	}
-	if !loginState.IsTwoFAEnabled() {
+	response := LoginFinalizeResponse{}
+
+	if loginState.IsTwoFAEnabled() {
+		twoFAOptions, err := ac.twoFAService.PrepareChallenge(loginState)
+		if err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
+		response.TwoFAOptions = twoFAOptions
+	} else {
 		// Create a session and return an auth token
 		authToken, err := ac.createSessionAndToken(*loginState.AccountID, r.UserAgent())
 		if err != nil {
@@ -463,7 +469,10 @@ func (ac *AuthController) LoginFinalize2FA(w http.ResponseWriter, r *http.Reques
 
 	// Process the 2FA authentication request
 	if err := ac.twoFAService.ProcessChallenge(loginState, &requestData); err != nil {
-		if errors.Is(err, util.ErrBadTOTPCode) || errors.Is(err, util.ErrBadRecoveryKey) || errors.Is(err, util.ErrTOTPCodeAlreadyUsed) {
+		if errors.Is(err, util.ErrBadTOTPCode) ||
+			errors.Is(err, util.ErrBadRecoveryKey) ||
+			errors.Is(err, util.ErrTOTPCodeAlreadyUsed) ||
+			errors.Is(err, util.ErrBadWebAuthnResponse) {
 			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 			return
 		}
