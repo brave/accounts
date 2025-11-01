@@ -35,8 +35,8 @@ type AccountsController struct {
 type PasswordFinalizeResponse struct {
 	// Authentication token (only present if resetting/changing password)
 	AuthToken *string `json:"authToken"`
-	// Indicates to the client whether 2FA verification will be required before password setup is complete
-	RequiresTwoFA bool `json:"requiresTwoFA"`
+	// Two-factor authentication options available for this account
+	TwoFAOptions *services.TwoFAOptions `json:"twoFAOptions"`
 	// Indicates to the client whether email verification will be required before password setup is complete
 	RequiresEmailVerification bool `json:"requiresEmailVerification"`
 	// Indicates to the client that sessions were invalidated (only applicable when changing password)
@@ -507,13 +507,23 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 		}
 	}
 
-	render.Status(r, http.StatusOK)
-	render.JSON(w, r, &PasswordFinalizeResponse{
+	response := &PasswordFinalizeResponse{
 		AuthToken:                 authToken,
-		RequiresTwoFA:             registrationState.IsTwoFAEnabled(),
 		RequiresEmailVerification: verification.Intent == datastore.RegistrationIntent,
 		SessionsInvalidated:       sessionsInvalidated,
-	})
+	}
+
+	if registrationState.IsTwoFAEnabled() {
+		twoFAOptions, err := ac.twoFAService.PrepareChallenge(registrationState)
+		if err != nil {
+			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+			return
+		}
+		response.TwoFAOptions = twoFAOptions
+	}
+
+	render.Status(r, http.StatusOK)
+	render.JSON(w, r, response)
 }
 
 // @Summary Finalize password setup with 2FA
@@ -556,7 +566,10 @@ func (ac *AccountsController) SetupPasswordFinalize2FA(w http.ResponseWriter, r 
 	}
 
 	if err := ac.twoFAService.ProcessChallenge(registrationState, &requestData); err != nil {
-		if errors.Is(err, util.ErrBadTOTPCode) || errors.Is(err, util.ErrBadRecoveryKey) {
+		if errors.Is(err, util.ErrBadTOTPCode) ||
+			errors.Is(err, util.ErrBadRecoveryKey) ||
+			errors.Is(err, util.ErrTOTPCodeAlreadyUsed) ||
+			errors.Is(err, util.ErrBadWebAuthnResponse) {
 			util.RenderErrorResponse(w, r, http.StatusUnauthorized, err)
 			return
 		}
