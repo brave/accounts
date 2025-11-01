@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/brave/accounts/util"
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -29,28 +30,38 @@ type InterimPasswordState struct {
 	State []byte `json:"-"`
 	// AwaitingTwoFA indicates whether the login is awaiting two-factor authentication
 	AwaitingTwoFA bool `json:"-" gorm:"column:awaiting_twofa"`
-	// RequiresTwoFA indicates whether the account requires two-factor authentication
-	RequiresTwoFA bool `json:"-" gorm:"column:requires_twofa"`
+	// TOTPEnabled indicates whether TOTP is enabled for the account
+	TOTPEnabled bool `json:"-" gorm:"column:totp_enabled"`
+	// WebAuthnEnabled indicates whether WebAuthn is enabled for the account
+	WebAuthnEnabled bool `json:"-" gorm:"column:webauthn_enabled"`
 	// IsRegistration indicates whether the state is for a registration operation
 	IsRegistration bool `json:"-" gorm:"column:is_registration"`
+	// WebAuthnChallenge stores the WebAuthn session data for login challenge
+	WebAuthnChallenge *webauthn.SessionData `json:"-" gorm:"column:webauthn_challenge;serializer:json"`
 	// CreatedAt records when this login state was initialized
 	CreatedAt time.Time `json:"createdAt" gorm:"<-:update"`
 }
 
-func (d *Datastore) CreateLoginState(accountID *uuid.UUID, email string, state []byte, oprfSeedID int, requiresTwoFA bool) (*InterimPasswordState, error) {
+// IsTwoFAEnabled returns whether any form of 2FA is enabled
+func (s *InterimPasswordState) IsTwoFAEnabled() bool {
+	return s.TOTPEnabled || s.WebAuthnEnabled
+}
+
+func (d *Datastore) CreateLoginState(accountID *uuid.UUID, email string, state []byte, oprfSeedID int, totpEnabled bool, webAuthnEnabled bool) (*InterimPasswordState, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
 	}
 
 	loginState := InterimPasswordState{
-		ID:             id,
-		AccountID:      accountID,
-		Email:          util.CanonicalizeEmail(email),
-		OprfSeedID:     oprfSeedID,
-		State:          state,
-		RequiresTwoFA:  requiresTwoFA,
-		IsRegistration: false,
+		ID:              id,
+		AccountID:       accountID,
+		Email:           util.CanonicalizeEmail(email),
+		OprfSeedID:      oprfSeedID,
+		State:           state,
+		TOTPEnabled:     totpEnabled,
+		WebAuthnEnabled: webAuthnEnabled,
+		IsRegistration:  false,
 	}
 
 	if err := d.DB.Create(&loginState).Error; err != nil {
@@ -60,18 +71,19 @@ func (d *Datastore) CreateLoginState(accountID *uuid.UUID, email string, state [
 	return &loginState, nil
 }
 
-func (d *Datastore) CreateRegistrationState(accountID uuid.UUID, email string, oprfSeedID int, requiresTwoFA bool) error {
+func (d *Datastore) CreateRegistrationState(accountID uuid.UUID, email string, oprfSeedID int, totpEnabled bool, webAuthnEnabled bool) error {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return err
 	}
 	state := InterimPasswordState{
-		ID:             id,
-		AccountID:      &accountID,
-		Email:          util.CanonicalizeEmail(email),
-		OprfSeedID:     oprfSeedID,
-		RequiresTwoFA:  requiresTwoFA,
-		IsRegistration: true,
+		ID:              id,
+		AccountID:       &accountID,
+		Email:           util.CanonicalizeEmail(email),
+		OprfSeedID:      oprfSeedID,
+		TOTPEnabled:     totpEnabled,
+		WebAuthnEnabled: webAuthnEnabled,
+		IsRegistration:  true,
 	}
 
 	if err := d.DB.Create(&state).Error; err != nil {
@@ -87,6 +99,10 @@ func (d *Datastore) UpdateInterimPasswordState(stateID uuid.UUID, state []byte) 
 
 func (d *Datastore) MarkInterimPasswordStateAsAwaitingTwoFA(stateID uuid.UUID) error {
 	return d.DB.Model(&InterimPasswordState{}).Where("id = ?", stateID).Update("awaiting_twofa", true).Error
+}
+
+func (d *Datastore) SetInterimPasswordStateWebAuthnChallenge(stateID uuid.UUID, sessionData *webauthn.SessionData) error {
+	return d.DB.Model(&InterimPasswordState{}).Where("id = ?", stateID).Update("webauthn_challenge", sessionData).Error
 }
 
 func (d *Datastore) DeleteInterimPasswordState(stateID uuid.UUID) error {
@@ -110,7 +126,7 @@ func (d *Datastore) processInterimPasswordState(state *InterimPasswordState, for
 	}
 
 	// If 2FA is not required, delete the login state so that it cannot be used again
-	if !state.RequiresTwoFA {
+	if !state.IsTwoFAEnabled() {
 		if dbErr := d.DeleteInterimPasswordState(state.ID); dbErr != nil {
 			return fmt.Errorf("failed to delete login state: %w", dbErr)
 		}
@@ -128,7 +144,7 @@ func (d *Datastore) GetLoginState(loginStateID uuid.UUID, forTwoFA bool) (*Inter
 		return nil, fmt.Errorf("failed to get login state: %w", err)
 	}
 
-	if state.AwaitingTwoFA && !state.RequiresTwoFA {
+	if state.AwaitingTwoFA && !state.IsTwoFAEnabled() {
 		// This should never happen, but checking in case there is a bug elsewhere
 		return nil, util.ErrInterimPasswordStateMismatch
 	}

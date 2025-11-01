@@ -27,14 +27,12 @@ import (
 
 const (
 	fromAddressEnv       = "EMAIL_FROM_ADDRESS"
-	baseURLEnv           = "BASE_URL"
 	verifyFrontendURLEnv = "VERIFY_FRONTEND_URL"
 	awsEndpointEnv       = "AWS_ENDPOINT"
 	configSetEnv         = "SES_CONFIG_SET"
 	sesRoleEnv           = "SES_ROLE"
 
 	defaultFromAddress = "noreply@brave.com"
-	defaultBaseURL     = "http://localhost:8080"
 	expiresHeaderName  = "X-Expires-At"
 )
 
@@ -147,10 +145,7 @@ func NewSESService(i18nBundle *i18n.Bundle, env string) (*SESService, error) {
 	}
 	fromAddress = fmt.Sprintf("Brave Software <%v>", fromAddress)
 
-	baseURL := os.Getenv(baseURLEnv)
-	if baseURL == "" {
-		baseURL = defaultBaseURL
-	}
+	baseURL := util.GetBaseURL()
 
 	configSet := os.Getenv(configSetEnv)
 

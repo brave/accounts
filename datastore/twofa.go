@@ -52,7 +52,7 @@ func (d *Datastore) GetTOTPKey(accountID uuid.UUID) (string, error) {
 	result := d.DB.Where("account_id = ?", accountID).First(&key)
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
-			return "", util.ErrKeyNotFound
+			return "", util.ErrBadTOTPCode
 		}
 		return "", fmt.Errorf("failed to retrieve TOTP key: %w", result.Error)
 	}
