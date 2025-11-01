@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"image/png"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -72,6 +73,32 @@ type TwoFAService struct {
 	webAuthn *webauthn.WebAuthn
 }
 
+// GetWebAuthnRPID returns the WebAuthn Relying Party ID from environment or derives it from BASE_URL
+func GetWebAuthnRPID() string {
+	if envRPID := os.Getenv(webAuthnRPIDEnv); envRPID != "" {
+		return envRPID
+	}
+
+	baseURL := util.GetBaseURL()
+	parsedURL, err := url.Parse(baseURL)
+	if err != nil {
+		log.Panic().Err(err).Msg("failed to parse base URL for WebAuthn RP ID")
+	}
+	hostname := parsedURL.Hostname()
+	if hostname == "" {
+		log.Panic().Msg("no hostname found in base URL for WebAuthn RP ID")
+	}
+	return hostname
+}
+
+// GetWebAuthnOrigins returns the WebAuthn origins from environment or defaults to BASE_URL
+func GetWebAuthnOrigins() []string {
+	if originsStr := os.Getenv(webAuthnOriginsEnv); originsStr != "" {
+		return strings.Split(strings.TrimSpace(originsStr), ",")
+	}
+	return []string{util.GetBaseURL()}
+}
+
 // NewTwoFAService creates a new TwoFAService instance with configuration from environment
 func NewTwoFAService(ds *datastore.Datastore, isKeyService bool) *TwoFAService {
 	issuer := os.Getenv(twoFAIssuerEnv)
@@ -94,33 +121,13 @@ func NewTwoFAService(ds *datastore.Datastore, isKeyService bool) *TwoFAService {
 		client = util.NewKeyServiceClient()
 	}
 
-	baseURL := util.GetBaseURL()
-
-	// Determine RP ID (Relying Party ID)
-	var rpID string
-	if envRPID := os.Getenv(webAuthnRPIDEnv); envRPID != "" {
-		rpID = envRPID
-	} else {
-		// Extract domain from base URL
-		domain, err := util.GetDomainFromURL(baseURL)
-		if err != nil {
-			log.Panic().Err(err).Msg("failed to extract domain from base URL for WebAuthn RP ID")
-		}
-		rpID = domain
-	}
-
-	// Parse WebAuthn origins from environment variable
-	var webAuthnOrigins []string
-	if originsStr := os.Getenv(webAuthnOriginsEnv); originsStr != "" {
-		webAuthnOrigins = strings.Split(strings.TrimSpace(originsStr), ",")
-	} else {
-		webAuthnOrigins = []string{baseURL}
-	}
+	rpID := GetWebAuthnRPID()
+	origins := GetWebAuthnOrigins()
 
 	webAuthnConfig := &webauthn.Config{
 		RPDisplayName: issuer,
 		RPID:          rpID,
-		RPOrigins:     webAuthnOrigins,
+		RPOrigins:     origins,
 	}
 
 	wa, err := webauthn.New(webAuthnConfig)

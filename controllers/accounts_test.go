@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base32"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -17,11 +18,14 @@ import (
 	"github.com/brave/accounts/services"
 	"github.com/brave/accounts/util"
 	"github.com/bytemare/opaque"
+	"github.com/descope/virtualwebauthn"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/google/uuid"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -31,6 +35,7 @@ type AccountsTestSuite struct {
 	ds                  *datastore.Datastore
 	keyServiceDs        *datastore.Datastore
 	jwtService          *services.JWTService
+	twoFAService        *services.TwoFAService
 	sesMock             *MockSESService
 	verificationService *services.VerificationService
 	router              *chi.Mux
@@ -60,10 +65,10 @@ func (suite *AccountsTestSuite) SetupTest() {
 	suite.Require().NoError(err)
 	opaqueService, err := services.NewOpaqueService(suite.ds, false)
 	suite.Require().NoError(err)
-	twoFAService := services.NewTwoFAService(suite.ds, false)
+	suite.twoFAService = services.NewTwoFAService(suite.ds, false)
 	suite.sesMock = &MockSESService{}
 	suite.verificationService = services.NewVerificationService(suite.ds, suite.jwtService, suite.sesMock, true, true)
-	suite.controller = controllers.NewAccountsController(opaqueService, suite.jwtService, twoFAService, suite.ds, suite.verificationService, suite.sesMock)
+	suite.controller = controllers.NewAccountsController(opaqueService, suite.jwtService, suite.twoFAService, suite.ds, suite.verificationService, suite.sesMock)
 
 	suite.opaqueClient, err = opaque.NewClient(opaqueService.Config)
 	suite.Require().NoError(err)
@@ -102,6 +107,60 @@ func (suite *AccountsTestSuite) createAuthSession() (string, *datastore.Account)
 	suite.Require().NoError(err)
 
 	return token, account
+}
+
+func createWebAuthnCredentialResponse(t *testing.T, authenticator virtualwebauthn.Authenticator, credential virtualwebauthn.Credential, challenge interface{}) *protocol.CredentialCreationResponse {
+	rp := createWebAuthnRelyingParty()
+
+	// Marshal the credential creation options to JSON for virtualwebauthn
+	attestationOptionsJSON, err := json.Marshal(challenge)
+	require.NoError(t, err)
+
+	// Parse attestation options and create response using virtualwebauthn
+	parsedAttestationOptions, err := virtualwebauthn.ParseAttestationOptions(string(attestationOptionsJSON))
+	require.NoError(t, err)
+
+	attestationResponse := virtualwebauthn.CreateAttestationResponse(rp, authenticator, credential, *parsedAttestationOptions)
+
+	// Unmarshal the attestation response to get the credential creation response
+	var credentialCreationResponse protocol.CredentialCreationResponse
+	err = json.Unmarshal([]byte(attestationResponse), &credentialCreationResponse)
+	require.NoError(t, err)
+
+	return &credentialCreationResponse
+}
+
+func createWebAuthnRelyingParty() virtualwebauthn.RelyingParty {
+	return virtualwebauthn.RelyingParty{
+		Name:   "Brave Account",
+		ID:     services.GetWebAuthnRPID(),
+		Origin: services.GetWebAuthnOrigins()[0],
+	}
+}
+
+func addWebAuthnCredential(t *testing.T, twoFAService *services.TwoFAService, ds *datastore.Datastore, authenticator virtualwebauthn.Authenticator, account *datastore.Account, credentialName string) virtualwebauthn.Credential {
+	credential := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
+
+	// Create a WebAuthn registration challenge via service
+	creation, registrationID, err := twoFAService.CreateWebAuthnRegistrationChallenge(account.ID, account.Email)
+	require.NoError(t, err)
+
+	// Create the credential response using the helper
+	credentialCreationResponse := createWebAuthnCredentialResponse(t, authenticator, credential, creation)
+
+	// Finalize the registration via service
+	_, err = twoFAService.FinalizeWebAuthnCredentialRegistration(account.ID, account.Email, registrationID, credentialName, credentialCreationResponse)
+	require.NoError(t, err)
+
+	// Enable WebAuthn setting
+	err = ds.SetWebAuthnSetting(account.ID, true)
+	require.NoError(t, err)
+
+	return credential
+}
+
+func (suite *AccountsTestSuite) addWebAuthnCredential(authenticator virtualwebauthn.Authenticator, account *datastore.Account, credentialName string) virtualwebauthn.Credential {
+	return addWebAuthnCredential(suite.T(), suite.twoFAService, suite.ds, authenticator, account, credentialName)
 }
 
 func (suite *AccountsTestSuite) createTestUserKeys(accountID uuid.UUID) {
@@ -586,6 +645,9 @@ func (suite *AccountsTestSuite) TestGet2FASettings() {
 	suite.False(settings.TOTP)
 	suite.Nil(settings.TOTPEnabledAt)
 	suite.Nil(settings.RecoveryKeyCreatedAt)
+	suite.False(settings.WebAuthn)
+	suite.Nil(settings.WebAuthnEnabledAt)
+	suite.Nil(settings.WebAuthnCredentials)
 
 	// Enable 2FA
 	err := suite.ds.SetTOTPSetting(account.ID, true)
@@ -601,6 +663,36 @@ func (suite *AccountsTestSuite) TestGet2FASettings() {
 	suite.True(settings.TOTP)
 	suite.NotNil(settings.TOTPEnabledAt)
 	suite.Nil(settings.RecoveryKeyCreatedAt)
+	suite.False(settings.WebAuthn)
+	suite.Nil(settings.WebAuthnEnabledAt)
+	suite.Nil(settings.WebAuthnCredentials)
+
+	// Add WebAuthn credentials
+	authenticator := virtualwebauthn.NewAuthenticator()
+	suite.addWebAuthnCredential(authenticator, account, "YubiKey 5C")
+	suite.addWebAuthnCredential(authenticator, account, "Touch ID")
+
+	// Test getting settings with WebAuthn credentials
+	req = httptest.NewRequest("GET", "/v2/accounts/2fa", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &settings)
+	suite.True(settings.TOTP)
+	suite.NotNil(settings.TOTPEnabledAt)
+	suite.True(settings.WebAuthn)
+	suite.NotNil(settings.WebAuthnEnabledAt)
+	suite.Require().NotNil(settings.WebAuthnCredentials)
+	suite.Len(settings.WebAuthnCredentials, 2)
+
+	// Verify credential names
+	credentialNames := []string{}
+	for _, cred := range settings.WebAuthnCredentials {
+		credentialNames = append(credentialNames, cred.Name)
+	}
+	suite.Contains(credentialNames, "YubiKey 5C")
+	suite.Contains(credentialNames, "Touch ID")
 }
 
 func (suite *AccountsTestSuite) TestTOTPSetupAndFinalize() {
@@ -683,6 +775,132 @@ func (suite *AccountsTestSuite) TestTOTPSetupAndFinalize() {
 	initResp = util.ExecuteTestRequest(initReq, suite.router)
 	suite.Equal(http.StatusBadRequest, initResp.Code)
 	util.AssertErrorResponseCode(suite.T(), initResp, util.ErrTOTPAlreadyEnabled.Code)
+}
+
+func (suite *AccountsTestSuite) TestWebAuthnSetupAndFinalize() {
+	token, account := suite.createAuthSession()
+
+	authenticator := virtualwebauthn.NewAuthenticator()
+	credentialNames := []string{"YubiKey 5C", "Touch ID"}
+	var recoveryKey *string
+
+	for i, credentialName := range credentialNames {
+		credential := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
+
+		initReq := httptest.NewRequest("POST", "/v2/accounts/2fa/webauthn/init", nil)
+		initReq.Header.Set("Authorization", "Bearer "+token)
+		initResp := util.ExecuteTestRequest(initReq, suite.router)
+		suite.Equal(http.StatusOK, initResp.Code)
+
+		var initParsedResp controllers.WebAuthnRegistrationInitResponse
+		util.DecodeJSONTestResponse(suite.T(), initResp.Body, &initParsedResp)
+		suite.Require().NotEmpty(initParsedResp.RegistrationID)
+		suite.Require().NotNil(initParsedResp.Request)
+		suite.Require().NotNil(initParsedResp.Request.Response)
+		suite.NotEmpty(initParsedResp.Request.Response.Challenge)
+		suite.Equal("Brave Account", initParsedResp.Request.Response.RelyingParty.Name)
+
+		// Create the credential response using the helper
+		credentialCreationResponse := createWebAuthnCredentialResponse(suite.T(), authenticator, credential, initParsedResp.Request)
+
+		finalizeReq := util.CreateJSONTestRequest("/v2/accounts/2fa/webauthn/finalize", controllers.WebAuthnRegistrationFinalizeRequest{
+			RegistrationID: initParsedResp.RegistrationID,
+			Name:           credentialName,
+			Response:       credentialCreationResponse,
+		})
+		finalizeReq.Header.Set("Authorization", "Bearer "+token)
+		finalizeResp := util.ExecuteTestRequest(finalizeReq, suite.router)
+		suite.Equal(http.StatusOK, finalizeResp.Code)
+
+		var finalizeParsedResp controllers.TwoFAFinalizeResponse
+		util.DecodeJSONTestResponse(suite.T(), finalizeResp.Body, &finalizeParsedResp)
+
+		if i == 0 {
+			// Recovery key should only be generated for first credential
+			suite.Require().NotNil(finalizeParsedResp.RecoveryKey)
+			suite.Len(*finalizeParsedResp.RecoveryKey, 32)
+			recoveryKey = finalizeParsedResp.RecoveryKey
+		} else {
+			// No recovery key for subsequent credentials
+			suite.Nil(finalizeParsedResp.RecoveryKey)
+		}
+
+		// Verify correct number of credentials after each registration
+		credentials, err := suite.ds.GetWebAuthnCredentials(account.ID)
+		suite.Require().NoError(err)
+		suite.Require().Len(credentials, i+1)
+	}
+
+	// Verify WebAuthn is enabled and recovery key is set
+	updatedAccount, err := suite.ds.GetAccount(nil, account.Email)
+	suite.Require().NoError(err)
+	suite.True(updatedAccount.WebAuthnEnabled)
+	suite.NotNil(updatedAccount.RecoveryKeyHash)
+	suite.True(util.VerifyRecoveryKeyHash(*recoveryKey, updatedAccount.RecoveryKeyHash))
+
+	// Verify both credentials are saved with correct names
+	credentials, err := suite.ds.GetWebAuthnCredentials(account.ID)
+	suite.Require().NoError(err)
+	suite.Require().Len(credentials, 2)
+
+	savedNames := []string{credentials[0].Name, credentials[1].Name}
+	for _, expectedName := range credentialNames {
+		suite.Contains(savedNames, expectedName)
+	}
+}
+
+func (suite *AccountsTestSuite) TestDeleteWebAuthnCredential() {
+	token, account := suite.createAuthSession()
+
+	authenticator := virtualwebauthn.NewAuthenticator()
+
+	// Add two WebAuthn credentials directly via service
+	credential1 := suite.addWebAuthnCredential(authenticator, account, "YubiKey 5C")
+	credential2 := suite.addWebAuthnCredential(authenticator, account, "Touch ID")
+
+	// Verify both credentials exist
+	credentials, err := suite.ds.GetWebAuthnCredentials(account.ID)
+	suite.Require().NoError(err)
+	suite.Require().Len(credentials, 2)
+
+	// Verify WebAuthn is enabled
+	account, err = suite.ds.GetAccount(nil, account.Email)
+	suite.Require().NoError(err)
+	suite.True(account.WebAuthnEnabled)
+
+	// Delete the first credential via endpoint
+	credential1IDHex := hex.EncodeToString(credential1.ID)
+	deleteReq := httptest.NewRequest("DELETE", "/v2/accounts/2fa/webauthn/"+credential1IDHex, nil)
+	deleteReq.Header.Set("Authorization", "Bearer "+token)
+	deleteResp := util.ExecuteTestRequest(deleteReq, suite.router)
+	suite.Equal(http.StatusNoContent, deleteResp.Code)
+
+	// Verify first credential was deleted
+	credentials, err = suite.ds.GetWebAuthnCredentials(account.ID)
+	suite.Require().NoError(err)
+	suite.Require().Len(credentials, 1)
+
+	// Verify WebAuthn is still enabled
+	account, err = suite.ds.GetAccount(nil, account.Email)
+	suite.Require().NoError(err)
+	suite.True(account.WebAuthnEnabled)
+
+	// Delete the second credential via endpoint
+	credential2IDHex := hex.EncodeToString(credential2.ID)
+	deleteReq = httptest.NewRequest("DELETE", "/v2/accounts/2fa/webauthn/"+credential2IDHex, nil)
+	deleteReq.Header.Set("Authorization", "Bearer "+token)
+	deleteResp = util.ExecuteTestRequest(deleteReq, suite.router)
+	suite.Equal(http.StatusNoContent, deleteResp.Code)
+
+	// Verify second credential was deleted
+	credentials, err = suite.ds.GetWebAuthnCredentials(account.ID)
+	suite.Require().NoError(err)
+	suite.Require().Len(credentials, 0)
+
+	// Verify WebAuthn is now disabled
+	account, err = suite.ds.GetAccount(nil, account.Email)
+	suite.Require().NoError(err)
+	suite.False(account.WebAuthnEnabled)
 }
 
 func (suite *AccountsTestSuite) TestDisableTOTP() {

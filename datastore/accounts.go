@@ -340,13 +340,15 @@ func (d *Datastore) GetTwoFAConfiguration(accountID uuid.UUID) (*TwoFAConfigurat
 		return nil, fmt.Errorf("error fetching 2FA details: %w", result.Error)
 	}
 
-	// Fetch WebAuthn credentials
-	credentials, err := d.GetWebAuthnCredentials(accountID)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching WebAuthn credentials: %w", err)
-	}
+	if details.WebAuthn {
+		// Fetch WebAuthn credentials
+		credentials, err := d.GetWebAuthnCredentials(accountID)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching WebAuthn credentials: %w", err)
+		}
 
-	details.WebAuthnCredentials = credentials
+		details.WebAuthnCredentials = credentials
+	}
 
 	return &details, nil
 }

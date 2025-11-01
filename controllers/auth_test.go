@@ -2,6 +2,7 @@ package controllers_test
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,7 +14,9 @@ import (
 	"github.com/brave/accounts/services"
 	"github.com/brave/accounts/util"
 	"github.com/bytemare/opaque"
+	"github.com/descope/virtualwebauthn"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/pquerna/otp"
@@ -27,6 +30,7 @@ type AuthTestSuite struct {
 	ds            *datastore.Datastore
 	keyServiceDs  *datastore.Datastore
 	jwtService    *services.JWTService
+	twoFAService  *services.TwoFAService
 	account       *datastore.Account
 	controller    *controllers.AuthController
 	router        *chi.Mux
@@ -65,8 +69,8 @@ func (suite *AuthTestSuite) SetupTest() {
 	suite.Require().NoError(err)
 	opaqueService, err := services.NewOpaqueService(suite.ds, false)
 	suite.Require().NoError(err)
-	twoFAService := services.NewTwoFAService(suite.ds, false)
-	suite.controller = controllers.NewAuthController(opaqueService, suite.jwtService, twoFAService, suite.ds, &MockSESService{})
+	suite.twoFAService = services.NewTwoFAService(suite.ds, false)
+	suite.controller = controllers.NewAuthController(opaqueService, suite.jwtService, suite.twoFAService, suite.ds, &MockSESService{})
 
 	suite.account, err = suite.ds.GetOrCreateAccount("test@example.com")
 	suite.Require().NoError(err)
@@ -623,6 +627,78 @@ func (suite *AuthTestSuite) TestAuth2FAWithRecoveryKey() {
 	validateReq = httptest.NewRequest("GET", "/v2/auth/validate", nil)
 	validateReq.Header.Add("Authorization", "Bearer "+*finalizeResp.AuthToken)
 	validateResp = util.ExecuteTestRequest(validateReq, suite.router)
+	suite.Equal(http.StatusOK, validateResp.Code)
+}
+
+func (suite *AuthTestSuite) TestAuth2FAWithWebAuthn() {
+	// Add a WebAuthn credential for the account
+	authenticator := virtualwebauthn.NewAuthenticator()
+	registeredCredential := addWebAuthnCredential(suite.T(), suite.twoFAService, suite.ds, authenticator, suite.account, "YubiKey 5C")
+
+	// Create an unregistered credential for testing failure case
+	unregisteredCredential := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
+
+	// Perform login initialization and finalization
+	finalizeResp, loginToken := suite.performLoginSteps()
+
+	// Verify we need 2FA
+	suite.Require().NotNil(finalizeResp.TwoFAOptions)
+	suite.Require().NotNil(finalizeResp.TwoFAOptions.WebAuthnRequest)
+	suite.Nil(finalizeResp.AuthToken)
+
+	// Try with unregistered credential first
+	rp := createWebAuthnRelyingParty()
+
+	assertionOptionsJSON, err := json.Marshal(finalizeResp.TwoFAOptions.WebAuthnRequest)
+	suite.Require().NoError(err)
+
+	parsedAssertionOptions, err := virtualwebauthn.ParseAssertionOptions(string(assertionOptionsJSON))
+	suite.Require().NoError(err)
+
+	// Use unregistered credential - should fail
+	unregisteredAssertionResponse := virtualwebauthn.CreateAssertionResponse(rp, authenticator, unregisteredCredential, *parsedAssertionOptions)
+
+	var unregisteredWebAuthnResponse protocol.CredentialAssertionResponse
+	err = json.Unmarshal([]byte(unregisteredAssertionResponse), &unregisteredWebAuthnResponse)
+	suite.Require().NoError(err)
+
+	invalidRequest := services.TwoFAAuthRequest{
+		WebAuthnResponse: &unregisteredWebAuthnResponse,
+	}
+	req := util.CreateJSONTestRequest("/v2/auth/login/finalize_2fa", invalidRequest)
+	req.Header.Set("Authorization", "Bearer "+loginToken)
+	resp := util.ExecuteTestRequest(req, suite.router)
+
+	// Should get unauthorized with unregistered credential
+	suite.Equal(http.StatusUnauthorized, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrBadWebAuthnResponse.Code)
+
+	// Now use the registered credential - should succeed
+	registeredAssertionResponse := virtualwebauthn.CreateAssertionResponse(rp, authenticator, registeredCredential, *parsedAssertionOptions)
+
+	var registeredWebAuthnResponse protocol.CredentialAssertionResponse
+	err = json.Unmarshal([]byte(registeredAssertionResponse), &registeredWebAuthnResponse)
+	suite.Require().NoError(err)
+
+	validRequest := services.TwoFAAuthRequest{
+		WebAuthnResponse: &registeredWebAuthnResponse,
+	}
+	req = util.CreateJSONTestRequest("/v2/auth/login/finalize_2fa", validRequest)
+	req.Header.Set("Authorization", "Bearer "+loginToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
+
+	// Should succeed with registered credential
+	suite.Equal(http.StatusOK, resp.Code)
+
+	var parsedTwoFAResp controllers.LoginFinalize2FAResponse
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedTwoFAResp)
+	suite.NotEmpty(parsedTwoFAResp.AuthToken)
+	suite.False(parsedTwoFAResp.TwoFADisabled)
+
+	// Verify the auth token works
+	validateReq := httptest.NewRequest("GET", "/v2/auth/validate", nil)
+	validateReq.Header.Add("Authorization", "Bearer "+parsedTwoFAResp.AuthToken)
+	validateResp := util.ExecuteTestRequest(validateReq, suite.router)
 	suite.Equal(http.StatusOK, validateResp.Code)
 }
 
