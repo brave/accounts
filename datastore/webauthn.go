@@ -11,6 +11,11 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+const (
+	webAuthnRegistrationStateExpiry  = 5 * time.Minute
+	maxWebAuthnCredentialsPerAccount = 10
+)
+
 type DBWebAuthnCredential struct {
 	AccountID  uuid.UUID            `gorm:"primaryKey" json:"-"`
 	ID         []byte               `gorm:"primaryKey" json:"id"`
@@ -35,27 +40,42 @@ func (InterimWebAuthnRegistrationState) TableName() string {
 }
 
 func (d *Datastore) SaveWebAuthnCredential(accountID uuid.UUID, credential *webauthn.Credential, credentialName *string) error {
-	dbCredential := DBWebAuthnCredential{
-		AccountID:  accountID,
-		ID:         credential.ID,
-		Credential: credential,
-	}
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		// Count existing credentials for this account that are NOT the one being saved
+		var count int64
+		if err := tx.Model(&DBWebAuthnCredential{}).
+			Where("account_id = ? AND id != ?", accountID, credential.ID).
+			Count(&count).Error; err != nil {
+			return fmt.Errorf("failed to count webauthn credentials: %w", err)
+		}
 
-	// Only set name if provided (for new credentials)
-	if credentialName != nil {
-		dbCredential.Name = *credentialName
-	}
+		// Check if adding this credential would exceed the limit
+		if count >= maxWebAuthnCredentialsPerAccount {
+			return util.ErrMaxWebAuthnCredentialsExceeded
+		}
 
-	err := d.DB.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "account_id"}, {Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"credential"}),
-	}).Create(&dbCredential).Error
+		dbCredential := DBWebAuthnCredential{
+			AccountID:  accountID,
+			ID:         credential.ID,
+			Credential: credential,
+		}
 
-	if err != nil {
-		return fmt.Errorf("failed to save webauthn credential: %w", err)
-	}
+		// Only set name if provided (for new credentials)
+		if credentialName != nil {
+			dbCredential.Name = *credentialName
+		}
 
-	return nil
+		err := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "account_id"}, {Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"credential"}),
+		}).Create(&dbCredential).Error
+
+		if err != nil {
+			return fmt.Errorf("failed to save webauthn credential: %w", err)
+		}
+
+		return nil
+	})
 }
 
 func (d *Datastore) GetWebAuthnCredentials(accountID uuid.UUID) ([]DBWebAuthnCredential, error) {
@@ -118,9 +138,14 @@ func (d *Datastore) GetAndDeleteInterimWebAuthnState(accountID uuid.UUID, stateI
 		return nil, fmt.Errorf("failed to get interim webauthn state: %w", err)
 	}
 
-	// Delete it
+	expired := time.Since(state.CreatedAt) > webAuthnRegistrationStateExpiry
+
 	if err := d.DB.Delete(&state).Error; err != nil {
 		return nil, fmt.Errorf("failed to delete interim webauthn state: %w", err)
+	}
+
+	if expired {
+		return nil, util.ErrInterimWebAuthnStateExpired
 	}
 
 	return &state, nil

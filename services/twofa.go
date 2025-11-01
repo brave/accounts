@@ -470,7 +470,7 @@ func (t *TwoFAService) FinalizeWebAuthnCredentialRegistration(accountID uuid.UUI
 	// Load the session data
 	state, err := t.ds.GetAndDeleteInterimWebAuthnState(accountID, registrationID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load registration state: %w", err)
+		return nil, err
 	}
 
 	user, err := newWebAuthnUser(t.ds, accountID, email)
@@ -491,7 +491,7 @@ func (t *TwoFAService) FinalizeWebAuthnCredentialRegistration(accountID uuid.UUI
 
 	// Save the credential
 	if err := t.ds.SaveWebAuthnCredential(accountID, credential, &credentialName); err != nil {
-		return nil, fmt.Errorf("failed to save credential: %w", err)
+		return nil, err
 	}
 
 	return credential, nil

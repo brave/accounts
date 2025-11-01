@@ -766,7 +766,10 @@ func (ac *AccountsController) SetupWebAuthnFinalize(w http.ResponseWriter, r *ht
 		requestData.Response,
 	)
 	if err != nil {
-		if errors.Is(err, util.ErrBadWebAuthnResponse) {
+		if errors.Is(err, util.ErrBadWebAuthnResponse) ||
+			errors.Is(err, util.ErrInterimWebAuthnStateNotFound) ||
+			errors.Is(err, util.ErrInterimWebAuthnStateExpired) ||
+			errors.Is(err, util.ErrMaxWebAuthnCredentialsExceeded) {
 			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
 		} else {
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)

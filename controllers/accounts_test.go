@@ -849,6 +849,95 @@ func (suite *AccountsTestSuite) TestWebAuthnSetupAndFinalize() {
 	}
 }
 
+func (suite *AccountsTestSuite) TestWebAuthnCredentialLimit() {
+	token, account := suite.createAuthSession()
+
+	authenticator := virtualwebauthn.NewAuthenticator()
+
+	// Add 10 credentials (the limit) using the helper function
+	for i := 0; i < 10; i++ {
+		suite.addWebAuthnCredential(authenticator, account, fmt.Sprintf("Key %d", i+1))
+	}
+
+	// Try to add an 11th credential via the endpoint - should fail
+	credential := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
+
+	initReq := httptest.NewRequest("POST", "/v2/accounts/2fa/webauthn/init", nil)
+	initReq.Header.Set("Authorization", "Bearer "+token)
+	initResp := util.ExecuteTestRequest(initReq, suite.router)
+	suite.Equal(http.StatusOK, initResp.Code)
+
+	var initParsedResp controllers.WebAuthnRegistrationInitResponse
+	util.DecodeJSONTestResponse(suite.T(), initResp.Body, &initParsedResp)
+	suite.Require().NotNil(initParsedResp.Request)
+
+	credentialCreationResponse := createWebAuthnCredentialResponse(suite.T(), authenticator, credential, initParsedResp.Request)
+
+	finalizeReq := util.CreateJSONTestRequest("/v2/accounts/2fa/webauthn/finalize", controllers.WebAuthnRegistrationFinalizeRequest{
+		RegistrationID: initParsedResp.RegistrationID,
+		Name:           "Key 11",
+		Response:       credentialCreationResponse,
+	})
+	finalizeReq.Header.Set("Authorization", "Bearer "+token)
+	finalizeResp := util.ExecuteTestRequest(finalizeReq, suite.router)
+	suite.Equal(http.StatusBadRequest, finalizeResp.Code)
+	util.AssertErrorResponseCode(suite.T(), finalizeResp, util.ErrMaxWebAuthnCredentialsExceeded.Code)
+
+	// Verify we still have only 10 credentials
+	credentials, err := suite.ds.GetWebAuthnCredentials(account.ID)
+	suite.Require().NoError(err)
+	suite.Require().Len(credentials, 10)
+}
+
+func (suite *AccountsTestSuite) TestWebAuthnRegistrationStateErrors() {
+	token, _ := suite.createAuthSession()
+
+	authenticator := virtualwebauthn.NewAuthenticator()
+	credential := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
+
+	// Create an init request to get a registration state
+	initReq := httptest.NewRequest("POST", "/v2/accounts/2fa/webauthn/init", nil)
+	initReq.Header.Set("Authorization", "Bearer "+token)
+	initResp := util.ExecuteTestRequest(initReq, suite.router)
+	suite.Equal(http.StatusOK, initResp.Code)
+
+	var initParsedResp controllers.WebAuthnRegistrationInitResponse
+	util.DecodeJSONTestResponse(suite.T(), initResp.Body, &initParsedResp)
+
+	credentialCreationResponse := createWebAuthnCredentialResponse(suite.T(), authenticator, credential, initParsedResp.Request)
+
+	// Test with non-existing registration ID
+	nonExistingID := uuid.New()
+	finalizeReq := util.CreateJSONTestRequest("/v2/accounts/2fa/webauthn/finalize", controllers.WebAuthnRegistrationFinalizeRequest{
+		RegistrationID: nonExistingID.String(),
+		Name:           "Test Key",
+		Response:       credentialCreationResponse,
+	})
+	finalizeReq.Header.Set("Authorization", "Bearer "+token)
+	finalizeResp := util.ExecuteTestRequest(finalizeReq, suite.router)
+	suite.Equal(http.StatusBadRequest, finalizeResp.Code)
+	util.AssertErrorResponseCode(suite.T(), finalizeResp, util.ErrInterimWebAuthnStateNotFound.Code)
+
+	// Update the created_at timestamp to make it expired using raw SQL
+	err := suite.ds.DB.Exec(
+		"UPDATE interim_webauthn_registration_states SET created_at = $1 WHERE id = $2",
+		time.Now().UTC().Add(-10*time.Minute),
+		initParsedResp.RegistrationID,
+	).Error
+	suite.Require().NoError(err)
+
+	// Try to finalize with the expired state
+	finalizeReq = util.CreateJSONTestRequest("/v2/accounts/2fa/webauthn/finalize", controllers.WebAuthnRegistrationFinalizeRequest{
+		RegistrationID: initParsedResp.RegistrationID,
+		Name:           "Test Key",
+		Response:       credentialCreationResponse,
+	})
+	finalizeReq.Header.Set("Authorization", "Bearer "+token)
+	finalizeResp = util.ExecuteTestRequest(finalizeReq, suite.router)
+	suite.Equal(http.StatusBadRequest, finalizeResp.Code)
+	util.AssertErrorResponseCode(suite.T(), finalizeResp, util.ErrInterimWebAuthnStateExpired.Code)
+}
+
 func (suite *AccountsTestSuite) TestDeleteWebAuthnCredential() {
 	token, account := suite.createAuthSession()
 
