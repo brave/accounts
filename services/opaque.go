@@ -201,7 +201,7 @@ func (o *OpaqueService) SetupPasswordInit(email string, request *opaqueMsg.Regis
 		return nil, fmt.Errorf("failed to get account when setting password: %w", err)
 	}
 
-	if err = o.ds.CreateRegistrationState(account.ID, account.Email, seedID, account.IsTwoFAEnabled()); err != nil {
+	if err = o.ds.CreateRegistrationState(account.ID, account.Email, seedID, account.TOTPEnabled, account.WebAuthnEnabled); err != nil {
 		return nil, err
 	}
 
@@ -214,7 +214,7 @@ func (o *OpaqueService) SetupPasswordFinalize(email string, registration *opaque
 		return nil, err
 	}
 
-	if registrationState.RequiresTwoFA {
+	if registrationState.IsTwoFAEnabled() {
 		if err = o.ds.UpdateInterimPasswordState(registrationState.ID, registration.Serialize()); err != nil {
 			// nolint:errcheck
 			o.ds.DeleteInterimPasswordState(registrationState.ID)
@@ -298,12 +298,14 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1) (*opaqueMsg.
 	}
 
 	var accountID *uuid.UUID
-	isTwoFAEnabled := false
+	totpEnabled := false
+	webAuthnEnabled := false
 	if !useFakeRecord {
 		accountID = &account.ID
-		isTwoFAEnabled = account.IsTwoFAEnabled()
+		totpEnabled = account.TOTPEnabled
+		webAuthnEnabled = account.WebAuthnEnabled
 	}
-	akeState, err := o.ds.CreateLoginState(accountID, email, server.SerializeState(), *seedID, isTwoFAEnabled)
+	akeState, err := o.ds.CreateLoginState(accountID, email, server.SerializeState(), *seedID, totpEnabled, webAuthnEnabled)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to store AKE state: %w", err)
 	}
@@ -347,7 +349,7 @@ func (o *OpaqueService) LoginFinalize(loginStateID uuid.UUID, ke3 *opaqueMsg.KE3
 	}
 
 	// If 2FA is required, mark the state as awaiting 2FA
-	if loginState.RequiresTwoFA {
+	if loginState.IsTwoFAEnabled() {
 		if err := o.ds.MarkInterimPasswordStateAsAwaitingTwoFA(loginState.ID); err != nil {
 			// nolint:errcheck
 			o.ds.DeleteInterimPasswordState(loginState.ID)
