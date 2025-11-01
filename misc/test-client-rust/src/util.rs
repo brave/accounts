@@ -106,14 +106,6 @@ pub fn display_account_details(args: &CliArgs, auth_token: &str) {
     );
 }
 
-pub fn prompt_for_input(prompt: &str) -> String {
-    print!("{prompt}");
-    std::io::stdout().flush().unwrap();
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input).unwrap();
-    input.trim().to_string()
-}
-
 pub fn validate_key_name(name: Option<&str>) -> &str {
     let name = name.expect("key name is required");
     assert!(!name.is_empty(), "Key name cannot be empty");
