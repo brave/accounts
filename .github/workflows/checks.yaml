@@ -31,7 +31,7 @@ jobs:
       with:
         go-version: '1.25'
     - name: Generate swagger
-      run: go install github.com/swaggo/swag/cmd/swag@latest && swag init
+      run: go install github.com/swaggo/swag/cmd/swag@latest && swag init --parseDependency
     - name: Install dependencies
       run: go get .
     - name: Lint
