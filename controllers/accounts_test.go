@@ -339,7 +339,7 @@ func (suite *AccountsTestSuite) TestRegistration() {
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedFinalizeResp)
 	suite.Nil(parsedFinalizeResp.AuthToken) // No auth token until email is verified
 	suite.True(parsedFinalizeResp.RequiresEmailVerification)
-	suite.False(parsedFinalizeResp.RequiresTwoFA)
+	suite.Nil(parsedFinalizeResp.TwoFAOptions)
 	suite.False(parsedFinalizeResp.SessionsInvalidated)
 
 	// Verify account was created but not verified
@@ -490,7 +490,7 @@ func (suite *AccountsTestSuite) TestChangePassword() {
 
 		var changeFinalizeResp controllers.PasswordFinalizeResponse
 		util.DecodeJSONTestResponse(suite.T(), resp.Body, &changeFinalizeResp)
-		suite.False(changeFinalizeResp.RequiresTwoFA)
+		suite.Nil(changeFinalizeResp.TwoFAOptions)
 		suite.False(changeFinalizeResp.RequiresEmailVerification)
 		suite.Equal(sessionInvalidation, changeFinalizeResp.SessionsInvalidated)
 
