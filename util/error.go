@@ -29,6 +29,8 @@ var (
 	ErrAccountDoesNotExist            = NewExposedError(13005, "account does not exist")
 	ErrEmailDomainNotSupported        = NewExposedError(13006, "email domain is not supported")
 	ErrFailedToSendEmailInvalidFormat = NewExposedError(13007, "failed to send email due to invalid format")
+	ErrMaxEmailAttempts               = NewExposedError(13008, "maximum email send attempts exceeded")
+	ErrEmailAlreadyVerified           = NewExposedError(13009, "email already verified")
 
 	// Auth errors, prefixed with '14'
 	ErrInterimPasswordStateNotFound = NewExposedError(14001, "interim password state not found")

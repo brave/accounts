@@ -28,6 +28,8 @@ type Verification struct {
 	Intent string
 	// NewSessionID stores the session ID after verification with a registration/auth token intent is complete
 	NewSessionID *uuid.UUID
+	// EmailAttempts tracks the number of times the verification email has been sent
+	EmailAttempts int16
 	// CreatedAt records when the verification was initiated
 	CreatedAt time.Time `gorm:"<-:update"`
 }
@@ -63,12 +65,13 @@ func (d *Datastore) CreateVerification(email string, service string, intent stri
 
 	email = util.CanonicalizeEmail(email)
 	verification := Verification{
-		ID:       id,
-		Email:    email,
-		Code:     code,
-		Service:  service,
-		Intent:   intent,
-		Verified: false,
+		ID:            id,
+		Email:         email,
+		Code:          code,
+		Service:       service,
+		Intent:        intent,
+		EmailAttempts: 1,
+		Verified:      false,
 	}
 
 	var existingCount int64
@@ -268,6 +271,22 @@ func (d *Datastore) DeleteVerificationsByNewSessionID(sessionID uuid.UUID) error
 	result := d.DB.Delete(&Verification{}, "new_session_id = ?", sessionID)
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete verifications by session id: %w", result.Error)
+	}
+
+	return nil
+}
+
+func (d *Datastore) IncrementVerificationEmailAttempts(id uuid.UUID) error {
+	result := d.DB.Model(&Verification{}).
+		Where("id = ?", id).
+		Update("email_attempts", gorm.Expr("email_attempts + 1"))
+
+	if result.Error != nil {
+		return fmt.Errorf("error incrementing email attempts: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return util.ErrVerificationNotFound
 	}
 
 	return nil
