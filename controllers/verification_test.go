@@ -553,6 +553,69 @@ func (suite *VerificationTestSuite) TestVerifyInitChangePasswordRequiresAuth() {
 	suite.sesMock.AssertExpectations(suite.T())
 }
 
+func (suite *VerificationTestSuite) TestVerifyResend() {
+	suite.SetupController(false, true)
+
+	initBody := controllers.VerifyInitRequest{
+		Email:   "test@example.com",
+		Intent:  "verification",
+		Service: "email-aliases",
+		Locale:  "en-US",
+	}
+
+	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Times(4)
+
+	initResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", initBody), suite.router)
+	suite.Equal(http.StatusOK, initResp.Code)
+
+	var parsedInitResp controllers.VerifyInitResponse
+	util.DecodeJSONTestResponse(suite.T(), initResp.Body, &parsedInitResp)
+	suite.Require().NotNil(parsedInitResp.VerificationToken)
+
+	verificationToken := *parsedInitResp.VerificationToken
+	verificationID, err := suite.jwtService.ValidateVerificationToken(verificationToken)
+	suite.Require().NoError(err)
+
+	verification, err := suite.ds.GetVerificationStatus(verificationID)
+	suite.NoError(err)
+	suite.Equal(int16(1), verification.EmailAttempts)
+
+	resendBody := controllers.VerifyResendRequest{
+		Locale: "en-US",
+	}
+
+	for i := 2; i <= 6; i++ {
+		req := util.CreateJSONTestRequest("/v2/verify/resend", resendBody)
+		req.Header.Set("Authorization", "Bearer "+verificationToken)
+		resp := util.ExecuteTestRequest(req, suite.router)
+
+		if i <= 4 {
+			suite.Equal(http.StatusNoContent, resp.Code)
+			verification, err = suite.ds.GetVerificationStatus(verificationID)
+			suite.NoError(err)
+			suite.Equal(int16(i), verification.EmailAttempts)
+		} else {
+			suite.Equal(http.StatusBadRequest, resp.Code)
+			util.AssertErrorResponseCode(suite.T(), resp, util.ErrMaxEmailAttempts.Code)
+		}
+	}
+
+	completeBody := controllers.VerifyCompleteRequest{
+		ID:   verification.ID,
+		Code: verification.Code,
+	}
+	completeResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/complete", completeBody), suite.router)
+	suite.Equal(http.StatusOK, completeResp.Code)
+
+	req := util.CreateJSONTestRequest("/v2/verify/resend", resendBody)
+	req.Header.Set("Authorization", "Bearer "+verificationToken)
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailAlreadyVerified.Code)
+
+	suite.sesMock.AssertExpectations(suite.T())
+}
+
 func TestVerificationTestSuite(t *testing.T) {
 	t.Run("NoKeyService", func(t *testing.T) {
 		suite.Run(t, NewVerificationTestSuite(false))
