@@ -400,9 +400,9 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 	}
 
 	response := LoginFinalizeResponse{
-		RequiresTwoFA: loginState.RequiresTwoFA,
+		RequiresTwoFA: loginState.IsTwoFAEnabled(),
 	}
-	if !loginState.RequiresTwoFA {
+	if !loginState.IsTwoFAEnabled() {
 		// Create a session and return an auth token
 		authToken, err := ac.createSessionAndToken(*loginState.AccountID, r.UserAgent())
 		if err != nil {

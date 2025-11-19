@@ -13,9 +13,13 @@ import (
 
 var (
 	// Account errors, prefixed with '11'
-	ErrEmailNotVerified            = NewExposedError(11003, "email not verified")
-	ErrIncorrectVerificationIntent = NewExposedError(11004, "incorrect verification intent")
-	ErrNewAccountEmailRequired     = NewExposedError(11005, "newAccountEmail is required when no verification token is provided")
+	ErrEmailNotVerified               = NewExposedError(11003, "email not verified")
+	ErrIncorrectVerificationIntent    = NewExposedError(11004, "incorrect verification intent")
+	ErrNewAccountEmailRequired        = NewExposedError(11005, "newAccountEmail is required when no verification token is provided")
+	ErrWebAuthnCredentialNotFound     = NewExposedError(11006, "webauthn credential not found")
+	ErrInterimWebAuthnStateNotFound   = NewExposedError(11007, "interim webauthn registration state not found")
+	ErrInterimWebAuthnStateExpired    = NewExposedError(11008, "webauthn registration state has expired")
+	ErrMaxWebAuthnCredentialsExceeded = NewExposedError(11009, "maximum number of webauthn credentials exceeded")
 
 	// Key errors, prefixed with '12'
 	ErrKeyNotFound         = NewExposedError(12001, "key not found")
@@ -45,6 +49,7 @@ var (
 	ErrBadRecoveryKey               = NewExposedError(14010, "invalid recovery key")
 	ErrTOTPAlreadyEnabled           = NewExposedError(14011, "TOTP authentication is already enabled for this account")
 	ErrTOTPCodeAlreadyUsed          = NewExposedError(14012, "TOTP code has already been used")
+	ErrBadWebAuthnResponse          = NewExposedError(14013, "invalid webauthn response")
 
 	// Misc errors, prefixed with '15'
 	ErrInvalidServicesKey = NewExposedError(15001, "invalid services key")

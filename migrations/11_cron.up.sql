@@ -8,3 +8,4 @@ SELECT cron.schedule('clean-job-history', '0 0 * * *', $$DELETE
 
 SELECT cron.schedule('remove-old-totp-used-codes', '0 0 * * *', $$DELETE FROM totp_used_codes WHERE created_at < CURRENT_TIMESTAMP - interval '1 hours'$$);
 SELECT cron.schedule('delete-unverified-accounts', '0,15,30,45 * * * *', $$DELETE FROM accounts WHERE last_email_verified_at IS NULL AND created_at < CURRENT_TIMESTAMP - interval '30 minutes'$$);
+SELECT cron.schedule('remove-old-webauthn-registration-states', '0 * * * *', $$DELETE FROM interim_webauthn_registration_states WHERE created_at < CURRENT_TIMESTAMP - interval '10 minutes'$$);

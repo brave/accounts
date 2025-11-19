@@ -561,7 +561,7 @@ func (suite *AuthTestSuite) TestAuth2FAWithTOTPCode() {
 
 	account, err := suite.ds.GetOrCreateAccount(suite.account.Email)
 	suite.Require().NoError(err)
-	suite.True(account.IsTwoFAEnabled())
+	suite.True(account.TOTPEnabled)
 	suite.NotNil(account.RecoveryKeyHash)
 }
 
@@ -626,7 +626,7 @@ func (suite *AuthTestSuite) TestAuth2FAWithRecoveryKey() {
 	// 2FA should now be disabled because we used recovery key
 	account, err := suite.ds.GetOrCreateAccount(suite.account.Email)
 	suite.Require().NoError(err)
-	suite.False(account.IsTwoFAEnabled())
+	suite.False(account.TOTPEnabled)
 	suite.Nil(account.RecoveryKeyHash)
 
 	finalizeResp, _ = suite.performLoginSteps()

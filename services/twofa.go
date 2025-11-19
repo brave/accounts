@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"image/png"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -16,6 +17,8 @@ import (
 
 	"github.com/brave/accounts/datastore"
 	"github.com/brave/accounts/util"
+	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
@@ -23,10 +26,13 @@ import (
 )
 
 const (
-	totpIssuerEnv = "TOTP_ISSUER"
-	totpQRSizeEnv = "TOTP_QR_SIZE"
-	defaultIssuer = "Brave Account"
-	defaultQRSize = 256
+	twoFAIssuerEnv               = "TWOFA_ISSUER"
+	totpQRSizeEnv                = "TOTP_QR_SIZE"
+	webAuthnRPIDEnv              = "WEBAUTHN_RP_ID"
+	webAuthnOriginsEnv           = "WEBAUTHN_ORIGINS"
+	defaultIssuer                = "Brave Account"
+	defaultQRSize                = 256
+	webAuthnMediationRequirement = protocol.MediationDefault
 )
 
 var totpCodeRegex = regexp.MustCompile(`^\d{6}$`)
@@ -53,11 +59,39 @@ type TwoFAService struct {
 	keyServiceClient *util.KeyServiceClient
 	// isKeyService indicates whether this instance is the key service
 	isKeyService bool
+	// webAuthn is the WebAuthn instance for credential operations
+	webAuthn *webauthn.WebAuthn
+}
+
+// GetWebAuthnRPID returns the WebAuthn Relying Party ID from environment or derives it from BASE_URL
+func GetWebAuthnRPID() string {
+	if envRPID := os.Getenv(webAuthnRPIDEnv); envRPID != "" {
+		return envRPID
+	}
+
+	baseURL := util.GetBaseURL()
+	parsedURL, err := url.Parse(baseURL)
+	if err != nil {
+		log.Panic().Err(err).Msg("failed to parse base URL for WebAuthn RP ID")
+	}
+	hostname := parsedURL.Hostname()
+	if hostname == "" {
+		log.Panic().Msg("no hostname found in base URL for WebAuthn RP ID")
+	}
+	return hostname
+}
+
+// GetWebAuthnOrigins returns the WebAuthn origins from environment or defaults to BASE_URL
+func GetWebAuthnOrigins() []string {
+	if originsStr := os.Getenv(webAuthnOriginsEnv); originsStr != "" {
+		return strings.Split(strings.TrimSpace(originsStr), ",")
+	}
+	return []string{util.GetBaseURL()}
 }
 
 // NewTwoFAService creates a new TwoFAService instance with configuration from environment
 func NewTwoFAService(ds *datastore.Datastore, isKeyService bool) *TwoFAService {
-	issuer := os.Getenv(totpIssuerEnv)
+	issuer := os.Getenv(twoFAIssuerEnv)
 	if issuer == "" {
 		issuer = defaultIssuer
 	}
@@ -77,17 +111,33 @@ func NewTwoFAService(ds *datastore.Datastore, isKeyService bool) *TwoFAService {
 		client = util.NewKeyServiceClient()
 	}
 
+	rpID := GetWebAuthnRPID()
+	origins := GetWebAuthnOrigins()
+
+	webAuthnConfig := &webauthn.Config{
+		RPDisplayName: issuer,
+		RPID:          rpID,
+		RPOrigins:     origins,
+	}
+
+	wa, err := webauthn.New(webAuthnConfig)
+	if err != nil {
+		log.Panic().Err(err).Msg("failed to initialize WebAuthn")
+	}
+
 	return &TwoFAService{
 		issuer:           issuer,
 		qrSize:           qrSize,
 		ds:               ds,
 		keyServiceClient: client,
 		isKeyService:     isKeyService,
+		webAuthn:         wa,
 	}
 }
 
 // DisableTwoFA disables two-factor authentication for an account
 func (t *TwoFAService) DisableTwoFA(accountID uuid.UUID) error {
+	// Disable TOTP
 	if err := t.ds.SetTOTPSetting(accountID, false); err != nil {
 		return err
 	}
@@ -96,6 +146,16 @@ func (t *TwoFAService) DisableTwoFA(accountID uuid.UUID) error {
 		return err
 	}
 
+	// Disable WebAuthn
+	if err := t.ds.SetWebAuthnSetting(accountID, false); err != nil {
+		return err
+	}
+
+	if err := t.ds.DeleteAllWebAuthnCredentials(accountID); err != nil {
+		return err
+	}
+
+	// Delete recovery key
 	if err := t.ds.SetRecoveryKey(accountID, nil); err != nil {
 		return err
 	}
@@ -299,4 +359,108 @@ func (t *TwoFAService) GenerateAndStoreRecoveryKey(accountID uuid.UUID) (string,
 	}
 
 	return recoveryKey, nil
+}
+
+// webAuthnUser implements the webauthn.User interface for WebAuthn operations
+type webAuthnUser struct {
+	id          []byte
+	email       string
+	credentials []webauthn.Credential
+}
+
+func newWebAuthnUser(ds *datastore.Datastore, accountID uuid.UUID, email string) (*webAuthnUser, error) {
+	webauthnID, err := ds.GetOrCreateWebAuthnID(accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	dbCredentials, err := ds.GetWebAuthnCredentials(accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	credentials := make([]webauthn.Credential, len(dbCredentials))
+	for i, dbCred := range dbCredentials {
+		credentials[i] = *dbCred.Credential
+	}
+
+	return &webAuthnUser{
+		id:          webauthnID,
+		email:       email,
+		credentials: credentials,
+	}, nil
+}
+
+func (u *webAuthnUser) WebAuthnID() []byte {
+	return u.id
+}
+
+func (u *webAuthnUser) WebAuthnName() string {
+	return u.email
+}
+
+func (u *webAuthnUser) WebAuthnDisplayName() string {
+	return u.email
+}
+
+func (u *webAuthnUser) WebAuthnCredentials() []webauthn.Credential {
+	return u.credentials
+}
+
+// CreateWebAuthnRegistrationChallenge creates a new WebAuthn registration challenge
+func (t *TwoFAService) CreateWebAuthnRegistrationChallenge(accountID uuid.UUID, email string) (*protocol.CredentialCreation, uuid.UUID, error) {
+	user, err := newWebAuthnUser(t.ds, accountID, email)
+	if err != nil {
+		return nil, uuid.Nil, err
+	}
+
+	opts := []webauthn.RegistrationOption{
+		webauthn.WithExclusions(webauthn.Credentials(user.credentials).CredentialDescriptors()),
+		webauthn.WithExtensions(map[string]any{"credProps": true}),
+	}
+
+	creation, session, err := t.webAuthn.BeginMediatedRegistration(user, webAuthnMediationRequirement, opts...)
+	if err != nil {
+		return nil, uuid.Nil, fmt.Errorf("failed to begin registration: %w", err)
+	}
+
+	// Store the session data
+	registrationID, err := t.ds.CreateInterimWebAuthnState(accountID, session)
+	if err != nil {
+		return nil, uuid.Nil, fmt.Errorf("failed to store registration state: %w", err)
+	}
+
+	return creation, registrationID, nil
+}
+
+// FinalizeWebAuthnCredentialRegistration completes the WebAuthn registration process
+func (t *TwoFAService) FinalizeWebAuthnCredentialRegistration(accountID uuid.UUID, email string, registrationID uuid.UUID, credentialName string, response *protocol.CredentialCreationResponse) (*webauthn.Credential, error) {
+	// Load the session data
+	state, err := t.ds.GetAndDeleteInterimWebAuthnState(accountID, registrationID)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := newWebAuthnUser(t.ds, accountID, email)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the credential creation response
+	parsedResponse, err := response.Parse()
+	if err != nil {
+		return nil, util.ErrBadWebAuthnResponse
+	}
+
+	credential, err := t.webAuthn.CreateCredential(user, *state.SessionData, parsedResponse)
+	if err != nil {
+		return nil, util.ErrBadWebAuthnResponse
+	}
+
+	// Save the credential
+	if err := t.ds.SaveWebAuthnCredential(accountID, credential, &credentialName); err != nil {
+		return nil, err
+	}
+
+	return credential, nil
 }

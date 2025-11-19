@@ -34,13 +34,13 @@ jobs:
       with:
         go-version: '1.25'
     - name: Generate swagger
-      run: go install github.com/swaggo/swag/cmd/swag@latest && swag init
+      run: go install github.com/swaggo/swag/cmd/swag@latest && swag init --parseDependency
     - name: Install dependencies
       run: go get .
     - name: Lint
       uses: golangci/golangci-lint-action@9fae48acfc02a90574d7c304a1758ef9895495fa # v7.0.1
       with:
-        version: v2.0
+        version: latest
         args: --timeout=10m
     - name: Test
       run: go test -p 1 -v ./...
