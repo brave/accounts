@@ -377,18 +377,16 @@ func (vc *VerificationController) VerifyResend(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	locale := util.GetRequestLocale(requestData.Locale, r)
-	if err := vc.verificationService.SendVerificationEmail(r.Context(), verification, locale); err != nil {
-		if errors.Is(err, util.ErrFailedToSendEmailInvalidFormat) {
-			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
-			return
-		}
+	if err := vc.datastore.IncrementVerificationEmailAttempts(verification.ID); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
 
-	if err := vc.datastore.IncrementVerificationEmailAttempts(verification.ID); err != nil {
-		if errors.Is(err, util.ErrMaxEmailAttempts) {
+	locale := util.GetRequestLocale(requestData.Locale, r)
+	if err := vc.verificationService.SendVerificationEmail(r.Context(), verification, locale); err != nil {
+		_ = vc.datastore.DecrementVerificationEmailAttempts(verification.ID)
+
+		if errors.Is(err, util.ErrFailedToSendEmailInvalidFormat) {
 			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
 			return
 		}

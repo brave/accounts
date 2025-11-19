@@ -291,3 +291,19 @@ func (d *Datastore) IncrementVerificationEmailAttempts(id uuid.UUID) error {
 
 	return nil
 }
+
+func (d *Datastore) DecrementVerificationEmailAttempts(id uuid.UUID) error {
+	result := d.DB.Model(&Verification{}).
+		Where("id = ?", id).
+		Update("email_attempts", gorm.Expr("email_attempts - 1"))
+
+	if result.Error != nil {
+		return fmt.Errorf("error decrementing email attempts: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return util.ErrVerificationNotFound
+	}
+
+	return nil
+}
