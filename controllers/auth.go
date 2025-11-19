@@ -211,6 +211,7 @@ func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler,
 
 	r.With(validateAuthMiddleware).Get("/validate", ac.Validate)
 	r.With(authMiddleware).Post("/service_token", ac.CreateServiceToken)
+	r.With(authMiddleware).Post("/logout", ac.Logout)
 	if passwordAuthEnabled {
 		r.Post("/login/init", ac.LoginInit)
 		r.Post("/login/finalize", ac.LoginFinalize)
@@ -524,4 +525,24 @@ func (ac *AuthController) CreateServiceToken(w http.ResponseWriter, r *http.Requ
 
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, CreateServiceTokenResponse{AuthToken: token})
+}
+
+// @Summary Logout
+// @Description Logs out the current session by deleting it
+// @Tags Auth
+// @Param Authorization header string true "Bearer + auth token"
+// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Success 204 "No Content"
+// @Failure 401 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/auth/logout [post]
+func (ac *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
+	currentSession := r.Context().Value(middleware.ContextSession).(*datastore.SessionWithAccountInfo)
+
+	if err := ac.ds.DeleteSession(currentSession.ID, currentSession.AccountID); err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	render.NoContent(w, r)
 }

@@ -254,6 +254,27 @@ func (suite *AuthTestSuite) TestAuthLogin() {
 	suite.Equal(http.StatusOK, resp.Code)
 }
 
+func (suite *AuthTestSuite) TestAuthLogout() {
+	finalizeResp, _ := suite.performLoginSteps()
+	suite.NotEmpty(finalizeResp.AuthToken)
+	suite.False(finalizeResp.RequiresTwoFA)
+
+	req := util.CreateJSONTestRequest("/v2/auth/logout", nil)
+	req.Header.Set("Authorization", "Bearer "+*finalizeResp.AuthToken)
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusNoContent, resp.Code)
+
+	validateReq := httptest.NewRequest("GET", "/v2/auth/validate", nil)
+	validateReq.Header.Add("Authorization", "Bearer "+*finalizeResp.AuthToken)
+	validateResp := util.ExecuteTestRequest(validateReq, suite.router)
+	suite.Equal(http.StatusUnauthorized, validateResp.Code)
+
+	req = util.CreateJSONTestRequest("/v2/auth/logout", nil)
+	req.Header.Set("Authorization", "Bearer "+*finalizeResp.AuthToken)
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusUnauthorized, resp.Code)
+}
+
 func (suite *AuthTestSuite) TestAuthLoginNoLoginState() {
 	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
 	suite.Require().NoError(err)

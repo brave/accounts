@@ -44,10 +44,6 @@ struct CliArgs {
     #[arg(long)]
     token: Option<String>,
 
-    /// Session ID
-    #[arg(long)]
-    session: Option<String>,
-
     /// Verify intent (optional)
     #[arg(long)]
     verify_intent: Option<String>,
@@ -581,30 +577,10 @@ fn logout(args: &CliArgs) {
         .as_ref()
         .expect("auth token is required for logout");
 
-    let session_id = if let Some(session) = &args.session {
-        session.to_owned()
-    } else {
-        // Default to session ID from auth token
-        let (response, _) = make_request(
-            args,
-            reqwest::Method::GET,
-            "/v2/auth/validate",
-            Some(auth_token),
-            None,
-        );
-
-        response
-            .get("sessionId")
-            .expect("session id should be in validate response")
-            .as_str()
-            .expect("session id should be a string")
-            .to_string()
-    };
-
     let (resp, status) = make_request(
         args,
-        reqwest::Method::DELETE,
-        &format!("/v2/sessions/{session_id}"),
+        reqwest::Method::POST,
+        "/v2/auth/logout",
         Some(auth_token),
         None,
     );
