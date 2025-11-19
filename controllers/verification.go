@@ -21,6 +21,7 @@ import (
 
 const (
 	localStackSESEndpoint = "http://localhost:4566/_aws/ses"
+	maxEmailAttempts      = 4
 )
 
 type VerificationController struct {
@@ -80,6 +81,12 @@ type VerifyCompleteResponse struct {
 	Service string `json:"service"`
 }
 
+// @Description Request for resending verification email
+type VerifyResendRequest struct {
+	// Locale for verification email
+	Locale string `json:"locale" validate:"max=20" example:"en-US"`
+}
+
 type localStackEmails struct {
 	Messages []interface{} `json:"messages"`
 }
@@ -102,6 +109,7 @@ func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Ha
 		r.Get("/email_viewer", vc.EmailViewer)
 	}
 	r.With(servicesKeyMiddleware).With(verificationAuthMiddleware).Post("/result", vc.VerifyQueryResult)
+	r.With(servicesKeyMiddleware).With(verificationAuthMiddleware).Post("/resend", vc.VerifyResend)
 
 	return r
 }
@@ -338,4 +346,53 @@ func (vc *VerificationController) EmailViewer(w http.ResponseWriter, r *http.Req
 	}
 
 	render.HTML(w, r, bodyContent.String())
+}
+
+// @Summary Resend verification email
+// @Description Resends the verification email for a pending verification
+// @Tags Email verification
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer + verification token"
+// @Param request body VerifyResendRequest true "Resend request params"
+// @Success 204 "Email resent successfully"
+// @Failure 400 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/verify/resend [post]
+func (vc *VerificationController) VerifyResend(w http.ResponseWriter, r *http.Request) {
+	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
+
+	var requestData VerifyResendRequest
+	if !util.DecodeJSONAndValidate(w, r, &requestData) {
+		return
+	}
+
+	if verification.Verified {
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailAlreadyVerified)
+		return
+	}
+
+	if verification.EmailAttempts >= maxEmailAttempts {
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrMaxEmailAttempts)
+		return
+	}
+
+	if err := vc.datastore.IncrementVerificationEmailAttempts(verification.ID); err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	locale := util.GetRequestLocale(requestData.Locale, r)
+	if err := vc.verificationService.SendVerificationEmail(r.Context(), verification, locale); err != nil {
+		_ = vc.datastore.DecrementVerificationEmailAttempts(verification.ID)
+
+		if errors.Is(err, util.ErrFailedToSendEmailInvalidFormat) {
+			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+			return
+		}
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
