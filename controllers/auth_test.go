@@ -75,7 +75,7 @@ func (suite *AuthTestSuite) SetupTest() {
 	opaqueClient, err := opaque.NewClient(opaqueService.Config)
 	suite.Require().NoError(err)
 	registrationReq := opaqueClient.RegistrationInit([]byte("testtest1"))
-	registrationResp, err := opaqueService.SetupPasswordInit(suite.account.Email, registrationReq)
+	registrationResp, err := opaqueService.SetupPasswordInit(suite.account.Email, registrationReq, "127.0.0.1:12345")
 	suite.Require().NoError(err)
 	registrationRec, _ := opaqueClient.RegistrationFinalize(registrationResp, opaque.ClientRegistrationFinalizeOptions{
 		ClientIdentity: []byte(suite.account.Email),

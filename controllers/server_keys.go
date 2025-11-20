@@ -4,18 +4,23 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/brave/accounts/services"
 	"github.com/brave/accounts/util"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/httprate"
 	"github.com/go-chi/render"
 	"github.com/google/uuid"
 )
+
+const RateLimitMaxRequestsPerMinute = 10
 
 type ServerKeysController struct {
 	opaqueService *services.OpaqueService
 	jwtService    *services.JWTService
 	twoFAService  *services.TwoFAService
+	rateLimiter   *httprate.RateLimiter
 }
 
 // JWTCreateRequest represents the request body for creating a JWT token
@@ -36,6 +41,8 @@ type OPRFSeedRequest struct {
 	CredentialIdentifier string `json:"credentialIdentifier" validate:"required"`
 	// SeedID optionally specifies which server OPRF seed to use (defaults to latest)
 	SeedID *int `json:"seedId"`
+	// IP is the client IP address
+	IP string `json:"ip" validate:"required,ip"`
 }
 
 // OPRFSeedResponse represents the response body containing the derived OPRF client seed
@@ -66,13 +73,20 @@ type TOTPValidateRequest struct {
 	AccountID uuid.UUID `json:"accountId" validate:"required"`
 	// Code is the TOTP code to validate
 	Code string `json:"code" validate:"required"`
+	// IP is the client IP address
+	IP string `json:"ip" validate:"required,ip"`
 }
 
 func NewServerKeysController(opaqueService *services.OpaqueService, jwtService *services.JWTService, twoFAService *services.TwoFAService) *ServerKeysController {
+	rateLimitHandler := httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
+		util.RenderErrorResponse(w, r, http.StatusTooManyRequests, util.ErrRateLimitExceeded)
+	})
+
 	return &ServerKeysController{
 		opaqueService: opaqueService,
 		jwtService:    jwtService,
 		twoFAService:  twoFAService,
+		rateLimiter:   httprate.NewRateLimiter(RateLimitMaxRequestsPerMinute, time.Minute, rateLimitHandler),
 	}
 }
 
@@ -130,11 +144,16 @@ func (sc *ServerKeysController) CreateJWT(w http.ResponseWriter, r *http.Request
 // @Success 200 {object} OPRFSeedResponse
 // @Failure 400 {object} util.ErrorResponse
 // @Failure 401 {object} util.ErrorResponse
+// @Failure 429 {object} util.ErrorResponse
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/server_keys/oprf_seed [post]
 func (sc *ServerKeysController) DeriveOPRFKey(w http.ResponseWriter, r *http.Request) {
 	var request OPRFSeedRequest
 	if !util.DecodeJSONAndValidate(w, r, &request) {
+		return
+	}
+
+	if sc.rateLimiter.RespondOnLimit(w, r, request.IP) || sc.rateLimiter.RespondOnLimit(w, r, request.CredentialIdentifier) {
 		return
 	}
 
@@ -200,6 +219,7 @@ func (sc *ServerKeysController) CreateTOTPKey(w http.ResponseWriter, r *http.Req
 // @Failure 401 {object} util.ErrorResponse
 // @Failure 403 {object} util.ErrorResponse
 // @Failure 404 {object} util.ErrorResponse
+// @Failure 429 {object} util.ErrorResponse
 // @Failure 500 {object} util.ErrorResponse
 // @Router /v2/server_keys/totp/validate [post]
 func (sc *ServerKeysController) ValidateTOTPCode(w http.ResponseWriter, r *http.Request) {
@@ -208,8 +228,13 @@ func (sc *ServerKeysController) ValidateTOTPCode(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// Check rate limit
+	if sc.rateLimiter.RespondOnLimit(w, r, request.IP) || sc.rateLimiter.RespondOnLimit(w, r, request.AccountID.String()) {
+		return
+	}
+
 	// Validate TOTP code for the specified account
-	err := sc.twoFAService.ValidateTOTPCode(request.AccountID, request.Code)
+	err := sc.twoFAService.ValidateTOTPCode(request.AccountID, request.Code, nil)
 	if err != nil {
 		if errors.Is(err, util.ErrKeyNotFound) {
 			util.RenderErrorResponse(w, r, http.StatusNotFound, err)

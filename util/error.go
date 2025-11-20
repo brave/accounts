@@ -48,6 +48,7 @@ var (
 
 	// Misc errors, prefixed with '15'
 	ErrInvalidServicesKey = NewExposedError(15001, "invalid services key")
+	ErrRateLimitExceeded  = NewExposedError(15002, "rate limit exceeded")
 )
 
 // ExposedError represents an error that is safe to expose to API clients
