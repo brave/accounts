@@ -3,10 +3,14 @@ package services
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	_ "embed"
 	"errors"
 	"fmt"
 	htmlTemplate "html/template"
+	"io"
+	"mime"
+	"mime/quotedprintable"
 	"os"
 	"strconv"
 	textTemplate "text/template"
@@ -173,7 +177,61 @@ func NewSESService(i18nBundle *i18n.Bundle, env string) (*SESService, error) {
 	}, nil
 }
 
-func (s *SESService) sendEmail(ctx context.Context, email string, subject string, contents interface{}, htmlTemplate *htmlTemplate.Template, textTemplate *textTemplate.Template) error {
+func quotePrint(w io.Writer, content string) error {
+	qpw := quotedprintable.NewWriter(w)
+	if _, err := qpw.Write([]byte(content)); err != nil {
+		return err
+	}
+	return qpw.Close()
+}
+
+func buildRawEmail(to, subject, textContent, htmlContent string, headers map[string]string) ([]byte, error) {
+	boundaryBytes := make([]byte, 12)
+	if _, err := io.ReadFull(rand.Reader, boundaryBytes); err != nil {
+		return nil, fmt.Errorf("failed to generate boundary: %w", err)
+	}
+	boundary := fmt.Sprintf("----=_Part_%X", boundaryBytes)
+
+	var buf bytes.Buffer
+
+	// Write headers
+	buf.WriteString("To: " + to + "\r\n")
+	buf.WriteString("Subject: " + mime.QEncoding.Encode("UTF-8", subject) + "\r\n")
+	buf.WriteString("MIME-Version: 1.0\r\n")
+	buf.WriteString("Content-Type: multipart/alternative; boundary=\"" + boundary + "\"\r\n")
+
+	for k, v := range headers {
+		buf.WriteString(k + ": " + mime.QEncoding.Encode("UTF-8", v) + "\r\n")
+	}
+	buf.WriteString("\r\n")
+
+	// Text part
+	buf.WriteString("--" + boundary + "\r\n")
+	buf.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
+	buf.WriteString("Content-Transfer-Encoding: quoted-printable\r\n")
+	buf.WriteString("\r\n")
+	if err := quotePrint(&buf, textContent); err != nil {
+		return nil, fmt.Errorf("failed to encode text content: %w", err)
+	}
+	buf.WriteString("\r\n")
+
+	// HTML part
+	buf.WriteString("--" + boundary + "\r\n")
+	buf.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
+	buf.WriteString("Content-Transfer-Encoding: quoted-printable\r\n")
+	buf.WriteString("\r\n")
+	if err := quotePrint(&buf, htmlContent); err != nil {
+		return nil, fmt.Errorf("failed to encode HTML content: %w", err)
+	}
+	buf.WriteString("\r\n")
+
+	// End boundary
+	buf.WriteString("--" + boundary + "--\r\n")
+
+	return buf.Bytes(), nil
+}
+
+func (s *SESService) sendEmail(ctx context.Context, email string, subject string, contents interface{}, htmlTemplate *htmlTemplate.Template, textTemplate *textTemplate.Template, headers map[string]string) error {
 	var htmlContent, textContent bytes.Buffer
 	if err := htmlTemplate.Execute(&htmlContent, contents); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
@@ -181,25 +239,17 @@ func (s *SESService) sendEmail(ctx context.Context, email string, subject string
 	if err := textTemplate.Execute(&textContent, contents); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
-	htmlContentString := htmlContent.String()
-	textContentString := textContent.String()
 
-	input := &ses.SendEmailInput{
-		Destination: &types.Destination{
-			ToAddresses: []string{util.CanonicalizeEmail(email)},
-		},
-		Message: &types.Message{
-			Body: &types.Body{
-				Html: &types.Content{
-					Data: &htmlContentString,
-				},
-				Text: &types.Content{
-					Data: &textContentString,
-				},
-			},
-			Subject: &types.Content{
-				Data: &subject,
-			},
+	toEmail := util.CanonicalizeEmail(email)
+	rawMessage, err := buildRawEmail(toEmail, subject, textContent.String(), htmlContent.String(), headers)
+	if err != nil {
+		return fmt.Errorf("failed to build raw email: %w", err)
+	}
+
+	input := &ses.SendRawEmailInput{
+		Destinations: []string{toEmail},
+		RawMessage: &types.RawMessage{
+			Data: rawMessage,
 		},
 		Source: &s.fromAddress,
 	}
@@ -208,7 +258,7 @@ func (s *SESService) sendEmail(ctx context.Context, email string, subject string
 		input.ConfigurationSetName = &s.configSet
 	}
 
-	_, err := s.client.SendEmail(ctx, input)
+	_, err = s.client.SendRawEmail(ctx, input)
 	if err != nil {
 		var apiErr smithy.APIError
 		if errors.As(err, &apiErr) {
@@ -257,7 +307,7 @@ func (s *SESService) SendVerificationEmail(ctx context.Context, email string, ve
 		ExpiryDisclaimer:   localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailExpiryDisclaimer"}),
 	}
 
-	if err := s.sendEmail(ctx, email, data.Subject, &data, s.verifyHTMLTemplate, s.verifyTextTemplate); err != nil {
+	if err := s.sendEmail(ctx, email, data.Subject, &data, s.verifyHTMLTemplate, s.verifyTextTemplate, nil); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
@@ -274,7 +324,7 @@ func (s *SESService) SendSimilarEmailAlert(ctx context.Context, email string, lo
 		Message:     localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "SimilarEmailLoginMessage", TemplateData: map[string]string{"Email": email}}),
 	}
 
-	if err := s.sendEmail(ctx, email, data.Subject, &data, s.generalHTMLTemplate, s.generalTextTemplate); err != nil {
+	if err := s.sendEmail(ctx, email, data.Subject, &data, s.generalHTMLTemplate, s.generalTextTemplate, nil); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
@@ -289,7 +339,7 @@ func (s *SESService) SendPasswordChangeNotification(ctx context.Context, email s
 		Message:     localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "PasswordChangeNotificationMessage"}),
 	}
 
-	if err := s.sendEmail(ctx, email, data.Subject, &data, s.generalHTMLTemplate, s.generalTextTemplate); err != nil {
+	if err := s.sendEmail(ctx, email, data.Subject, &data, s.generalHTMLTemplate, s.generalTextTemplate, nil); err != nil {
 		return fmt.Errorf("failed to send password change notification email: %w", err)
 	}
 

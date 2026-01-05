@@ -31,24 +31,106 @@
   <script>
     const messages = {{.Messages}};
     const messagesContainer = document.getElementById('messages');
+
+    function decodeQuotedPrintable(str) {
+      // Quoted-printable uses =XX for hex bytes, similar to percent-encoding's %XX.
+      // We escape literal % chars, convert =XX to %XX, then let decodeURIComponent handle UTF-8 decoding.
+      return decodeURIComponent(str.replace(/=\r?\n/g, '').replace(/%/g, '%25').replace(/=([0-9A-Fa-f]{2})/g, '%$1'));
+    }
+
+    function parseRawEmail(rawData) {
+      const result = { to: '', subject: '', textPart: '', htmlPart: '' };
+
+      // Split headers from body at first blank line
+      const headerEndIdx = rawData.search(/\r?\n\r?\n/);
+      if (headerEndIdx === -1) return result;
+
+      const headerSection = rawData.substring(0, headerEndIdx);
+      const bodySection = rawData.substring(headerEndIdx).replace(/^\r?\n\r?\n/, '');
+
+      // Parse headers (handle folded headers)
+      const headerLines = headerSection.replace(/\r?\n[ \t]+/g, ' ').split(/\r?\n/);
+      const headers = {};
+      for (const line of headerLines) {
+        const colonIdx = line.indexOf(':');
+        if (colonIdx > 0) {
+          const key = line.substring(0, colonIdx).toLowerCase();
+          headers[key] = line.substring(colonIdx + 1).trim();
+        }
+      }
+
+      result.to = headers['to'] || '';
+      result.subject = headers['subject'] || '';
+      // Decode MIME encoded subject
+      if (result.subject.includes('=?')) {
+        result.subject = result.subject.replace(/=\?UTF-8\?Q\?(.*?)\?=/gi, (_, encoded) => decodeQuotedPrintable(encoded.replace(/_/g, ' ')));
+      }
+
+      // Find boundary
+      const contentType = headers['content-type'] || '';
+      const boundaryMatch = contentType.match(/boundary="([^"]+)"/);
+      if (!boundaryMatch) return result;
+      const boundary = boundaryMatch[1];
+
+      // Split into MIME parts
+      const parts = bodySection.split('--' + boundary);
+
+      for (const part of parts) {
+        const trimmed = part.trim();
+        if (trimmed === '' || trimmed === '--') continue;
+
+        // Split part headers from part body
+        const partHeaderEnd = part.search(/\r?\n\r?\n/);
+        if (partHeaderEnd === -1) continue;
+
+        const partHeaderSection = part.substring(0, partHeaderEnd);
+        const partBody = part.substring(partHeaderEnd).replace(/^\r?\n\r?\n/, '');
+
+        // Parse part headers
+        const partHeaderLines = partHeaderSection.replace(/\r?\n[ \t]+/g, ' ').split(/\r?\n/);
+        const partHeaders = {};
+        for (const line of partHeaderLines) {
+          const colonIdx = line.indexOf(':');
+          if (colonIdx > 0) {
+            const key = line.substring(0, colonIdx).toLowerCase();
+            partHeaders[key] = line.substring(colonIdx + 1).trim();
+          }
+        }
+
+        const partContentType = partHeaders['content-type'] || '';
+        const isQuotedPrintable = (partHeaders['content-transfer-encoding'] || '').toLowerCase().includes('quoted-printable');
+        const decoded = isQuotedPrintable ? decodeQuotedPrintable(partBody) : partBody;
+
+        if (partContentType.includes('text/html')) {
+          result.htmlPart = decoded;
+        } else if (partContentType.includes('text/plain')) {
+          result.textPart = decoded;
+        }
+      }
+
+      return result;
+    }
+
     messages.forEach(message => {
       const messageDiv = document.createElement('div');
       messageDiv.className = 'message';
 
+      const parsed = parseRawEmail(message.RawData);
+
       const info = document.createElement('p');
-      info.textContent = `Timestamp: ${message.Timestamp}, To: ${message.Destination.ToAddresses.join(', ')}, Subject: ${message.Subject}`;
+      info.textContent = `Timestamp: ${message.Timestamp}, To: ${parsed.to}, Subject: ${parsed.subject}`;
       messageDiv.appendChild(info);
 
-      if (message.Body.html_part) {
+      if (parsed.htmlPart) {
         const iframe = document.createElement('iframe');
-        iframe.srcdoc = message.Body.html_part;
+        iframe.srcdoc = parsed.htmlPart;
         messageDiv.appendChild(iframe);
       }
 
-      if (message.Body.text_part) {
+      if (parsed.textPart) {
         const textContent = document.createElement('div');
         textContent.className = 'text-content';
-        textContent.textContent = message.Body.text_part;
+        textContent.textContent = parsed.textPart;
         messageDiv.appendChild(textContent);
       }
 
