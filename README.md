@@ -6,7 +6,7 @@
 2. Run `make run`
 
 Visit http://localhost:8080/v2/verify/email_viewer to view sent verification emails.
-Use `make clean-emails` to delete all sent emails.
+Use `make clear-emails` to delete all sent emails.
 
 Run `make test` to run the test suites.
 
