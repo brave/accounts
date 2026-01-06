@@ -246,6 +246,7 @@ func (suite *AuthTestSuite) TestAuthLogin() {
 	finalizeResp, _ := suite.performLoginSteps()
 	suite.NotEmpty(finalizeResp.AuthToken)
 	suite.False(finalizeResp.RequiresTwoFA)
+	suite.Equal(suite.account.Email, finalizeResp.Email)
 
 	req := httptest.NewRequest("GET", "/v2/auth/validate", nil)
 	req.Header.Add("Authorization", "Bearer "+*finalizeResp.AuthToken)
@@ -258,6 +259,7 @@ func (suite *AuthTestSuite) TestAuthLogout() {
 	finalizeResp, _ := suite.performLoginSteps()
 	suite.NotEmpty(finalizeResp.AuthToken)
 	suite.False(finalizeResp.RequiresTwoFA)
+	suite.Equal(suite.account.Email, finalizeResp.Email)
 
 	req := util.CreateJSONTestRequest("/v2/auth/logout", nil)
 	req.Header.Set("Authorization", "Bearer "+*finalizeResp.AuthToken)
@@ -538,6 +540,7 @@ func (suite *AuthTestSuite) TestAuth2FAWithTOTPCode() {
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedTwoFAResp)
 	suite.NotEmpty(parsedTwoFAResp.AuthToken)
 	suite.False(parsedTwoFAResp.TwoFADisabled)
+	suite.Equal(suite.account.Email, parsedTwoFAResp.Email)
 
 	// Perform login steps again to get a new login state
 	finalizeResp, loginToken = suite.performLoginSteps()
@@ -616,6 +619,7 @@ func (suite *AuthTestSuite) TestAuth2FAWithRecoveryKey() {
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedRecoveryResp)
 	suite.NotEmpty(parsedRecoveryResp.AuthToken)
 	suite.True(parsedRecoveryResp.TwoFADisabled)
+	suite.Equal(suite.account.Email, parsedRecoveryResp.Email)
 
 	// Verify the auth token works
 	validateReq := httptest.NewRequest("GET", "/v2/auth/validate", nil)
@@ -632,6 +636,7 @@ func (suite *AuthTestSuite) TestAuth2FAWithRecoveryKey() {
 	finalizeResp, _ = suite.performLoginSteps()
 	suite.False(finalizeResp.RequiresTwoFA)
 	suite.NotNil(finalizeResp.AuthToken)
+	suite.Equal(suite.account.Email, finalizeResp.Email)
 
 	validateReq = httptest.NewRequest("GET", "/v2/auth/validate", nil)
 	validateReq.Header.Add("Authorization", "Bearer "+*finalizeResp.AuthToken)
