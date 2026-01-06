@@ -71,6 +71,8 @@ type LoginFinalizeResponse struct {
 	AuthToken *string `json:"authToken"`
 	// Indicates if 2FA verification is required before authentication is complete
 	RequiresTwoFA bool `json:"requiresTwoFA"`
+	// Email address associated with the account
+	Email string `json:"email"`
 }
 
 // @Description	Response containing validated token details
@@ -104,6 +106,8 @@ type LoginFinalize2FAResponse struct {
 	// Indicates to the client that 2FA was disabled as a result of using a recovery
 	// key (and should probably lead to the user being invited to re-enable 2FA)
 	TwoFADisabled bool `json:"twoFADisabled"`
+	// Email address associated with the account
+	Email string `json:"email"`
 }
 
 func (req *LoginInitRequest) ToOpaqueKE1(opaqueService *services.OpaqueService) (*opaqueMsg.KE1, error) {
@@ -409,6 +413,7 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 
 	response := LoginFinalizeResponse{
 		RequiresTwoFA: loginState.RequiresTwoFA,
+		Email:         loginState.Email,
 	}
 	if !loginState.RequiresTwoFA {
 		// Create a session and return an auth token
@@ -494,6 +499,7 @@ func (ac *AuthController) LoginFinalize2FA(w http.ResponseWriter, r *http.Reques
 	response := LoginFinalize2FAResponse{
 		AuthToken:     authToken,
 		TwoFADisabled: requestData.RecoveryKey != nil,
+		Email:         loginState.Email,
 	}
 
 	render.Status(r, http.StatusOK)
