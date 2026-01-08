@@ -12,7 +12,7 @@ require (
 	github.com/bytemare/ecc v0.9.0
 	github.com/bytemare/opaque v0.0.0
 	github.com/go-chi/chi/v5 v5.2.2
-	github.com/go-chi/cors v1.2.1
+	github.com/go-chi/cors v1.2.2
 	github.com/go-chi/docgen v1.3.0
 	github.com/go-chi/httprate v0.15.0
 	github.com/go-playground/validator/v10 v10.22.1
