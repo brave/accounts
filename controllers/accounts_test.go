@@ -357,6 +357,36 @@ func (suite *AccountsTestSuite) TestRegistrationUnsupportedEmail() {
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
 }
 
+func (suite *AccountsTestSuite) TestRegistrationStrictCountryCheck() {
+	// Test without initiatingServiceName - should succeed (no strict check)
+	email := "test1@example.ru"
+	registrationReq1 := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+	req := controllers.RegistrationRequest{
+		BlindedMessage:    hex.EncodeToString(registrationReq1.Serialize()),
+		SerializeResponse: true,
+		NewAccountEmail:   &email,
+	}
+
+	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/accounts/password/init", req), suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+
+	// Test with email-aliases initiating service - should fail (strict check enabled)
+	email = "test2@example.ru"
+	serviceName := util.EmailAliasesServiceName
+	req.InitiatingServiceName = &serviceName
+
+	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/accounts/password/init", req), suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
+
+	// Test with accounts initiating service - should succeed (no strict check)
+	email = "test3@example.ru"
+	serviceName = util.AccountsServiceName
+
+	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/accounts/password/init", req), suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+}
+
 func (suite *AccountsTestSuite) TestChangePassword() {
 	sessionInvalidationSettings := []bool{true, false}
 
