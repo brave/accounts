@@ -4,10 +4,10 @@ go 1.25.3
 
 require (
 	github.com/BurntSushi/toml v1.4.0
-	github.com/aws/aws-sdk-go-v2/config v1.31.13
-	github.com/aws/aws-sdk-go-v2/credentials v1.18.17
-	github.com/aws/aws-sdk-go-v2/feature/rds/auth v1.6.10
-	github.com/aws/aws-sdk-go-v2/service/sts v1.38.7
+	github.com/aws/aws-sdk-go-v2/config v1.32.7
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.7
+	github.com/aws/aws-sdk-go-v2/feature/rds/auth v1.6.17
+	github.com/aws/aws-sdk-go-v2/service/sts v1.41.6
 	github.com/aws/smithy-go v1.23.1
 	github.com/bytemare/ecc v0.9.0
 	github.com/bytemare/opaque v0.0.0
@@ -83,7 +83,7 @@ require (
 
 require (
 	github.com/ajg/form v1.5.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ses v1.34.6
+	github.com/aws/aws-sdk-go-v2/service/ses v1.34.18
 	github.com/go-chi/render v1.0.3
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
