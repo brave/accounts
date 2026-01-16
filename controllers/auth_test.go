@@ -217,8 +217,9 @@ func (suite *AuthTestSuite) performLoginSteps() (*controllers.LoginFinalizeRespo
 	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 	loginReq := controllers.LoginInitRequest{
-		Email:         suite.account.Email,
-		SerializedKE1: &serializedKE1,
+		Email:                 suite.account.Email,
+		SerializedKE1:         &serializedKE1,
+		InitiatingServiceName: util.AccountsServiceName,
 	}
 
 	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
@@ -282,8 +283,9 @@ func (suite *AuthTestSuite) TestAuthLoginNoLoginState() {
 	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 	loginReq := controllers.LoginInitRequest{
-		Email:         suite.account.Email,
-		SerializedKE1: &serializedKE1,
+		Email:                 suite.account.Email,
+		SerializedKE1:         &serializedKE1,
+		InitiatingServiceName: util.AccountsServiceName,
 	}
 
 	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
@@ -309,8 +311,9 @@ func (suite *AuthTestSuite) TestAuthLoginNonexistentEmail() {
 	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 	loginReq := controllers.LoginInitRequest{
-		Email:         "nonexistent@example.com",
-		SerializedKE1: &serializedKE1,
+		Email:                 "nonexistent@example.com",
+		SerializedKE1:         &serializedKE1,
+		InitiatingServiceName: util.AccountsServiceName,
 	}
 
 	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
@@ -329,8 +332,9 @@ func (suite *AuthTestSuite) TestAuthLoginEmailNotVerified() {
 	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 	loginReq := controllers.LoginInitRequest{
-		Email:         suite.account.Email,
-		SerializedKE1: &serializedKE1,
+		Email:                 suite.account.Email,
+		SerializedKE1:         &serializedKE1,
+		InitiatingServiceName: util.AccountsServiceName,
 	}
 
 	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
@@ -351,10 +355,11 @@ func (suite *AuthTestSuite) TestAuthLoginStrictCountryCheck() {
 	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 
-	// Test login without initiatingServiceName - should succeed (no strict check)
+	// Test login with accounts initiating service - should succeed (no strict check)
 	loginReq := controllers.LoginInitRequest{
-		Email:         email,
-		SerializedKE1: &serializedKE1,
+		Email:                 email,
+		SerializedKE1:         &serializedKE1,
+		InitiatingServiceName: util.AccountsServiceName,
 	}
 
 	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
@@ -362,8 +367,7 @@ func (suite *AuthTestSuite) TestAuthLoginStrictCountryCheck() {
 	suite.Equal(http.StatusOK, resp.Code)
 
 	// Test login with email-aliases initiating service - should fail (strict check enabled)
-	serviceName := util.EmailAliasesServiceName
-	loginReq.InitiatingServiceName = &serviceName
+	loginReq.InitiatingServiceName = util.EmailAliasesServiceName
 
 	req = util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
 	resp = util.ExecuteTestRequest(req, suite.router)
@@ -371,7 +375,7 @@ func (suite *AuthTestSuite) TestAuthLoginStrictCountryCheck() {
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
 
 	// Test login with accounts initiating service - should succeed (no strict check)
-	serviceName = util.AccountsServiceName
+	loginReq.InitiatingServiceName = util.AccountsServiceName
 
 	req = util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
 	resp = util.ExecuteTestRequest(req, suite.router)
@@ -385,8 +389,9 @@ func (suite *AuthTestSuite) TestAuthLoginExpiredLoginState() {
 	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 	loginReq := controllers.LoginInitRequest{
-		Email:         suite.account.Email,
-		SerializedKE1: &serializedKE1,
+		Email:                 suite.account.Email,
+		SerializedKE1:         &serializedKE1,
+		InitiatingServiceName: util.AccountsServiceName,
 	}
 
 	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)

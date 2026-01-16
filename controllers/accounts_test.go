@@ -147,8 +147,9 @@ func (suite *AccountsTestSuite) TestResetPassword() {
 
 	// Test password init
 	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-		BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
-		SerializeResponse: true,
+		BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse:     true,
+		InitiatingServiceName: util.AccountsServiceName,
 	})
 	req.Header.Set("Authorization", "Bearer "+token)
 
@@ -200,8 +201,9 @@ func (suite *AccountsTestSuite) TestResetPassword() {
 
 	// Should not be able to set password again
 	req = util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-		BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
-		SerializeResponse: true,
+		BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse:     true,
+		InitiatingServiceName: util.AccountsServiceName,
 	})
 	req.Header.Set("Authorization", "Bearer "+token)
 
@@ -226,9 +228,10 @@ func (suite *AccountsTestSuite) TestRegistration() {
 
 	// Test password init with newAccountEmail (no verification token)
 	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-		BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
-		SerializeResponse: true,
-		NewAccountEmail:   &email,
+		BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse:     true,
+		NewAccountEmail:       &email,
+		InitiatingServiceName: util.AccountsServiceName,
 	})
 	// No Authorization header for registration
 
@@ -329,9 +332,10 @@ func (suite *AccountsTestSuite) TestRegistrationAccountAlreadyExists() {
 
 	// Test password init with newAccountEmail for existing account
 	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-		BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
-		SerializeResponse: true,
-		NewAccountEmail:   &email,
+		BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse:     true,
+		NewAccountEmail:       &email,
+		InitiatingServiceName: util.AccountsServiceName,
 	})
 	// No Authorization header for registration
 
@@ -346,9 +350,10 @@ func (suite *AccountsTestSuite) TestRegistrationUnsupportedEmail() {
 
 	// Test password init with unsupported email domain
 	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-		BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
-		SerializeResponse: true,
-		NewAccountEmail:   &email,
+		BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse:     true,
+		NewAccountEmail:       &email,
+		InitiatingServiceName: util.AccountsServiceName,
 	})
 	// No Authorization header for registration
 
@@ -362,9 +367,10 @@ func (suite *AccountsTestSuite) TestRegistrationStrictCountryCheck() {
 	email := "test1@example.ru"
 	registrationReq1 := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
 	req := controllers.RegistrationRequest{
-		BlindedMessage:    hex.EncodeToString(registrationReq1.Serialize()),
-		SerializeResponse: true,
-		NewAccountEmail:   &email,
+		BlindedMessage:        hex.EncodeToString(registrationReq1.Serialize()),
+		SerializeResponse:     true,
+		NewAccountEmail:       &email,
+		InitiatingServiceName: util.AccountsServiceName,
 	}
 
 	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/accounts/password/init", req), suite.router)
@@ -372,8 +378,7 @@ func (suite *AccountsTestSuite) TestRegistrationStrictCountryCheck() {
 
 	// Test with email-aliases initiating service - should fail (strict check enabled)
 	email = "test2@example.ru"
-	serviceName := util.EmailAliasesServiceName
-	req.InitiatingServiceName = &serviceName
+	req.InitiatingServiceName = util.EmailAliasesServiceName
 
 	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/accounts/password/init", req), suite.router)
 	suite.Equal(http.StatusBadRequest, resp.Code)
@@ -381,7 +386,7 @@ func (suite *AccountsTestSuite) TestRegistrationStrictCountryCheck() {
 
 	// Test with accounts initiating service - should succeed (no strict check)
 	email = "test3@example.ru"
-	serviceName = util.AccountsServiceName
+	req.InitiatingServiceName = util.AccountsServiceName
 
 	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/accounts/password/init", req), suite.router)
 	suite.Equal(http.StatusOK, resp.Code)
@@ -424,8 +429,9 @@ func (suite *AccountsTestSuite) TestChangePassword() {
 		changeRegistrationReq := suite.opaqueClient.RegistrationInit([]byte("newpassword"))
 
 		req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-			BlindedMessage:    hex.EncodeToString(changeRegistrationReq.Serialize()),
-			SerializeResponse: true,
+			BlindedMessage:        hex.EncodeToString(changeRegistrationReq.Serialize()),
+			SerializeResponse:     true,
+			InitiatingServiceName: util.AccountsServiceName,
 		})
 		req.Header.Set("Authorization", "Bearer "+changeToken)
 
@@ -505,8 +511,9 @@ func (suite *AccountsTestSuite) TestSetPasswordBadIntents() {
 		registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
 
 		req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-			BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
-			SerializeResponse: true,
+			BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
+			SerializeResponse:     true,
+			InitiatingServiceName: util.AccountsServiceName,
 		})
 		req.Header.Set("Authorization", "Bearer "+token)
 
@@ -532,8 +539,9 @@ func (suite *AccountsTestSuite) TestSetPasswordUnverifiedEmail() {
 
 		// Test password init with unverified email
 		req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-			BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
-			SerializeResponse: true,
+			BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
+			SerializeResponse:     true,
+			InitiatingServiceName: util.AccountsServiceName,
 		})
 		req.Header.Set("Authorization", "Bearer "+token)
 

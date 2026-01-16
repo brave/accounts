@@ -38,7 +38,7 @@ type LoginInitRequest struct {
 	// Serialized KE1 message
 	SerializedKE1 *string `json:"serializedKE1" validate:"required_without_all=BlindedMessage EpkU NonceU"`
 	// Name of service that initiated the login flow
-	InitiatingServiceName *string `json:"initiatingServiceName" validate:"omitempty,oneof=accounts email-aliases premium"`
+	InitiatingServiceName string `json:"initiatingServiceName" validate:"required,oneof=accounts email-aliases premium"`
 }
 
 // @Description Response for account login
@@ -280,12 +280,10 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If initiating service name provided, perform email country check
-	if requestData.InitiatingServiceName != nil {
-		if !util.IsEmailAllowed(requestData.Email, *requestData.InitiatingServiceName) {
-			util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailDomainNotSupported)
-			return
-		}
+	// Perform email country check
+	if !util.IsEmailAllowed(requestData.Email, requestData.InitiatingServiceName) {
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailDomainNotSupported)
+		return
 	}
 
 	opaqueReq, err := requestData.ToOpaqueKE1(ac.opaqueService)
