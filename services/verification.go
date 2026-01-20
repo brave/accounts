@@ -87,8 +87,7 @@ func (vs *VerificationService) InitializeVerification(ctx context.Context, email
 	}
 
 	// Validate email
-	strictCountryBlock := service == util.EmailAliasesServiceName || service == util.PremiumServiceName
-	if !util.IsEmailAllowed(email, strictCountryBlock) {
+	if !util.IsEmailAllowed(email, service) {
 		return nil, nil, util.ErrEmailDomainNotSupported
 	}
 

@@ -37,6 +37,8 @@ type LoginInitRequest struct {
 	NonceU *string `json:"clientNonce" validate:"required_without=SerializedKE1"`
 	// Serialized KE1 message
 	SerializedKE1 *string `json:"serializedKE1" validate:"required_without_all=BlindedMessage EpkU NonceU"`
+	// Name of service that initiated the login flow
+	InitiatingServiceName string `json:"initiatingServiceName" validate:"required,oneof=accounts email-aliases premium"`
 }
 
 // @Description Response for account login
@@ -279,6 +281,12 @@ func (ac *AuthController) Validate(w http.ResponseWriter, r *http.Request) {
 func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 	var requestData LoginInitRequest
 	if !util.DecodeJSONAndValidate(w, r, &requestData) {
+		return
+	}
+
+	// Perform email country check
+	if !util.IsEmailAllowed(requestData.Email, requestData.InitiatingServiceName) {
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailDomainNotSupported)
 		return
 	}
 
@@ -527,11 +535,9 @@ func (ac *AuthController) CreateServiceToken(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if req.Service == util.EmailAliasesServiceName {
-		if !util.IsEmailAllowed(session.Email, true) {
-			util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailDomainNotSupported)
-			return
-		}
+	if !util.IsEmailAllowed(session.Email, req.Service) {
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailDomainNotSupported)
+		return
 	}
 
 	expirationDuration := services.ChildAuthTokenExpirationTime

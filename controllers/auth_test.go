@@ -217,8 +217,9 @@ func (suite *AuthTestSuite) performLoginSteps() (*controllers.LoginFinalizeRespo
 	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 	loginReq := controllers.LoginInitRequest{
-		Email:         suite.account.Email,
-		SerializedKE1: &serializedKE1,
+		Email:                 suite.account.Email,
+		SerializedKE1:         &serializedKE1,
+		InitiatingServiceName: util.AccountsServiceName,
 	}
 
 	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
@@ -284,8 +285,9 @@ func (suite *AuthTestSuite) TestAuthLoginNoLoginState() {
 	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 	loginReq := controllers.LoginInitRequest{
-		Email:         suite.account.Email,
-		SerializedKE1: &serializedKE1,
+		Email:                 suite.account.Email,
+		SerializedKE1:         &serializedKE1,
+		InitiatingServiceName: util.AccountsServiceName,
 	}
 
 	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
@@ -311,8 +313,9 @@ func (suite *AuthTestSuite) TestAuthLoginNonexistentEmail() {
 	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 	loginReq := controllers.LoginInitRequest{
-		Email:         "nonexistent@example.com",
-		SerializedKE1: &serializedKE1,
+		Email:                 "nonexistent@example.com",
+		SerializedKE1:         &serializedKE1,
+		InitiatingServiceName: util.AccountsServiceName,
 	}
 
 	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
@@ -331,8 +334,9 @@ func (suite *AuthTestSuite) TestAuthLoginEmailNotVerified() {
 	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 	loginReq := controllers.LoginInitRequest{
-		Email:         suite.account.Email,
-		SerializedKE1: &serializedKE1,
+		Email:                 suite.account.Email,
+		SerializedKE1:         &serializedKE1,
+		InitiatingServiceName: util.AccountsServiceName,
 	}
 
 	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
@@ -343,6 +347,43 @@ func (suite *AuthTestSuite) TestAuthLoginEmailNotVerified() {
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailNotVerified.Code)
 }
 
+func (suite *AuthTestSuite) TestAuthLoginStrictCountryCheck() {
+	// Update the existing account's email to a restricted country TLD (.ru)
+	email := "test@example.ru"
+	suite.Require().NoError(suite.ds.DB.Model(&datastore.Account{}).Where("id = ?", suite.account.ID).Update("email", email).Error)
+
+	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
+	suite.Require().NoError(err)
+	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
+	serializedKE1 := hex.EncodeToString(ke1.Serialize())
+
+	// Test login with accounts initiating service - should succeed (no strict check)
+	loginReq := controllers.LoginInitRequest{
+		Email:                 email,
+		SerializedKE1:         &serializedKE1,
+		InitiatingServiceName: util.AccountsServiceName,
+	}
+
+	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+
+	// Test login with email-aliases initiating service - should fail (strict check enabled)
+	loginReq.InitiatingServiceName = util.EmailAliasesServiceName
+
+	req = util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
+
+	// Test login with accounts initiating service - should succeed (no strict check)
+	loginReq.InitiatingServiceName = util.AccountsServiceName
+
+	req = util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+}
+
 func (suite *AuthTestSuite) TestAuthLoginExpiredLoginState() {
 	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
 	suite.Require().NoError(err)
@@ -350,8 +391,9 @@ func (suite *AuthTestSuite) TestAuthLoginExpiredLoginState() {
 	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 	loginReq := controllers.LoginInitRequest{
-		Email:         suite.account.Email,
-		SerializedKE1: &serializedKE1,
+		Email:                 suite.account.Email,
+		SerializedKE1:         &serializedKE1,
+		InitiatingServiceName: util.AccountsServiceName,
 	}
 
 	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
