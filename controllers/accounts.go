@@ -173,9 +173,9 @@ func (rec *RegistrationRecord) ToOpaqueRecord(opaqueService *services.OpaqueServ
 	}
 
 	return &opaqueMsg.RegistrationRecord{
-		PublicKey:  publicKeyElement,
-		MaskingKey: maskingKey,
-		Envelope:   envelope,
+		ClientPublicKey: publicKeyElement,
+		MaskingKey:      maskingKey,
+		Envelope:        envelope,
 	}, nil
 }
 
@@ -190,16 +190,12 @@ func FromOpaqueRegistrationResponse(opaqueResp *opaqueMsg.RegistrationResponse, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize evaluated message: %w", err)
 	}
-	pksBin, err := opaqueResp.Pks.MarshalBinary()
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize pks: %w", err)
-	}
 	evalMsg := hex.EncodeToString(evalMsgBin)
-	pks := hex.EncodeToString(pksBin)
+	serverPublicKey := hex.EncodeToString(opaqueResp.ServerPublicKey)
 
 	return &RegistrationResponse{
 		EvaluatedMessage: &evalMsg,
-		Pks:              &pks,
+		Pks:              &serverPublicKey,
 	}, nil
 }
 
