@@ -11,7 +11,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.60.3
 	github.com/aws/aws-sdk-go-v2/service/sts v1.42.0
 	github.com/bytemare/ecc v0.9.0
-	github.com/bytemare/opaque v0.0.0
+	github.com/bytemare/hash v0.6.2
+	github.com/bytemare/opaque v0.18.0
 	github.com/getsentry/sentry-go v0.47.0
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-chi/cors v1.2.2
@@ -46,9 +47,8 @@ require (
 	github.com/aws/smithy-go v1.25.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/boombuler/barcode v1.1.0 // indirect
-	github.com/bytemare/hash v0.5.2 // indirect
 	github.com/bytemare/hash2curve v0.5.4 // indirect
-	github.com/bytemare/ksf v0.3.0 // indirect
+	github.com/bytemare/ksf v0.5.0 // indirect
 	github.com/bytemare/secp256k1 v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -106,5 +106,3 @@ require (
 	golang.org/x/text v0.37.0
 	gorm.io/driver/postgres v1.6.0
 )
-
-replace github.com/bytemare/opaque v0.0.0 => github.com/brave-experiments/opaque v0.0.0-20250509213350-9e222393c642

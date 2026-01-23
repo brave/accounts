@@ -157,7 +157,7 @@ func (sc *ServerKeysController) DeriveOPRFKey(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	derivedSeed, seedID, err := sc.opaqueService.DeriveOPRFClientSeed(request.CredentialIdentifier, request.SeedID)
+	clientKey, seedID, err := sc.opaqueService.DeriveOPRFClientKey(request.CredentialIdentifier, request.SeedID)
 	if err != nil {
 		if errors.Is(err, services.ErrOPRFSeedNotAvailable) {
 			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
@@ -169,7 +169,7 @@ func (sc *ServerKeysController) DeriveOPRFKey(w http.ResponseWriter, r *http.Req
 
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, OPRFSeedResponse{
-		ClientSeed: hex.EncodeToString(derivedSeed),
+		ClientSeed: hex.EncodeToString(clientKey.Encode()),
 		SeedID:     seedID,
 	})
 }
