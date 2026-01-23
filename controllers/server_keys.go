@@ -45,10 +45,10 @@ type OPRFSeedRequest struct {
 	IP string `json:"ip" validate:"required,ip"`
 }
 
-// OPRFSeedResponse represents the response body containing the derived OPRF client seed
+// OPRFSeedResponse represents the response body containing the derived OPRF client key
 type OPRFSeedResponse struct {
-	// ClientSeed is the hex-encoded derived OPRF client seed
-	ClientSeed string `json:"clientSeed"`
+	// ClientKey is the hex-encoded derived OPRF client key
+	ClientKey string `json:"clientKey"`
 	// SeedID is the ID of the server OPRF seed that was used
 	SeedID int `json:"seedId"`
 }
@@ -169,8 +169,8 @@ func (sc *ServerKeysController) DeriveOPRFKey(w http.ResponseWriter, r *http.Req
 
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, OPRFSeedResponse{
-		ClientSeed: hex.EncodeToString(clientKey.Encode()),
-		SeedID:     seedID,
+		ClientKey: hex.EncodeToString(clientKey.Encode()),
+		SeedID:    seedID,
 	})
 }
 

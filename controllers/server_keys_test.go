@@ -100,7 +100,7 @@ func (suite *ServerKeysTestSuite) TestDeriveOPRFKey() {
 	var firstResp controllers.OPRFSeedResponse
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &firstResp)
 
-	firstSeed, err := hex.DecodeString(firstResp.ClientSeed)
+	firstSeed, err := hex.DecodeString(firstResp.ClientKey)
 	suite.Require().NoError(err)
 	suite.NotEmpty(firstSeed)
 	suite.Equal(1, firstResp.SeedID)
@@ -114,7 +114,7 @@ func (suite *ServerKeysTestSuite) TestDeriveOPRFKey() {
 	var secondResp controllers.OPRFSeedResponse
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &secondResp)
 
-	secondSeed, err := hex.DecodeString(secondResp.ClientSeed)
+	secondSeed, err := hex.DecodeString(secondResp.ClientKey)
 	suite.Require().NoError(err)
 	suite.NotEmpty(secondSeed)
 	suite.Equal(1, secondResp.SeedID)
@@ -132,7 +132,7 @@ func (suite *ServerKeysTestSuite) TestDeriveOPRFKey() {
 	var thirdResp controllers.OPRFSeedResponse
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &thirdResp)
 
-	thirdSeed, err := hex.DecodeString(thirdResp.ClientSeed)
+	thirdSeed, err := hex.DecodeString(thirdResp.ClientKey)
 	suite.Require().NoError(err)
 	suite.NotEmpty(thirdSeed)
 	suite.Equal(1, thirdResp.SeedID)
@@ -156,7 +156,7 @@ func (suite *ServerKeysTestSuite) TestDeriveOPRFKeyWithSeedID() {
 	var parsedResp controllers.OPRFSeedResponse
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
 
-	decodedSeed, err := hex.DecodeString(parsedResp.ClientSeed)
+	decodedSeed, err := hex.DecodeString(parsedResp.ClientKey)
 	suite.NoError(err)
 	suite.NotEmpty(decodedSeed)
 	suite.Equal(1, parsedResp.SeedID)
