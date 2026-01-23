@@ -74,12 +74,12 @@ func (suite *AuthTestSuite) SetupTest() {
 	suite.opaqueConfig = opaqueService.Config
 	opaqueClient, err := opaque.NewClient(opaqueService.Config)
 	suite.Require().NoError(err)
-	registrationReq := opaqueClient.RegistrationInit([]byte("testtest1"))
+	registrationReq, err := opaqueClient.RegistrationInit([]byte("testtest1"))
+	suite.Require().NoError(err)
 	registrationResp, err := opaqueService.SetupPasswordInit(suite.account.Email, registrationReq, "127.0.0.1:12345")
 	suite.Require().NoError(err)
-	registrationRec, _ := opaqueClient.RegistrationFinalize(registrationResp, opaque.ClientRegistrationFinalizeOptions{
-		ClientIdentity: []byte(suite.account.Email),
-	})
+	registrationRec, _, err := opaqueClient.RegistrationFinalize(registrationResp, []byte(suite.account.Email), nil)
+	suite.Require().NoError(err)
 	_, err = opaqueService.SetupPasswordFinalize(suite.account.Email, registrationRec)
 	suite.Require().NoError(err)
 
@@ -110,9 +110,7 @@ func (suite *AuthTestSuite) createLoginFinalizeRequest(opaqueClient *opaque.Clie
 	suite.Require().NoError(err)
 	ke2, err := opaqueClient.Deserialize.KE2(serializedKE2)
 	suite.Require().NoError(err)
-	ke3, _, err := opaqueClient.GenerateKE3(ke2, opaque.GenerateKE3Options{
-		ClientIdentity: []byte(suite.account.Email),
-	})
+	ke3, _, _, err := opaqueClient.GenerateKE3(ke2, []byte(suite.account.Email), nil)
 	suite.Require().NoError(err)
 	serializedKE3 := hex.EncodeToString(ke3.Serialize())
 	return controllers.LoginFinalizeRequest{
@@ -214,7 +212,8 @@ func (suite *AuthTestSuite) performLoginSteps() (*controllers.LoginFinalizeRespo
 	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
 	suite.Require().NoError(err)
 
-	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
+	ke1, err := opaqueClient.GenerateKE1([]byte("testtest1"))
+	suite.Require().NoError(err)
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 	loginReq := controllers.LoginInitRequest{
 		Email:         suite.account.Email,
@@ -279,7 +278,8 @@ func (suite *AuthTestSuite) TestAuthLoginNoLoginState() {
 	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
 	suite.Require().NoError(err)
 
-	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
+	ke1, err := opaqueClient.GenerateKE1([]byte("testtest1"))
+	suite.Require().NoError(err)
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 	loginReq := controllers.LoginInitRequest{
 		Email:         suite.account.Email,
@@ -306,7 +306,8 @@ func (suite *AuthTestSuite) TestAuthLoginNonexistentEmail() {
 	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
 	suite.Require().NoError(err)
 
-	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
+	ke1, err := opaqueClient.GenerateKE1([]byte("testtest1"))
+	suite.Require().NoError(err)
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 	loginReq := controllers.LoginInitRequest{
 		Email:         "nonexistent@example.com",
@@ -326,7 +327,8 @@ func (suite *AuthTestSuite) TestAuthLoginEmailNotVerified() {
 	// Attempt to login
 	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
 	suite.Require().NoError(err)
-	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
+	ke1, err := opaqueClient.GenerateKE1([]byte("testtest1"))
+	suite.Require().NoError(err)
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 	loginReq := controllers.LoginInitRequest{
 		Email:         suite.account.Email,
@@ -345,7 +347,8 @@ func (suite *AuthTestSuite) TestAuthLoginExpiredLoginState() {
 	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
 	suite.Require().NoError(err)
 
-	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
+	ke1, err := opaqueClient.GenerateKE1([]byte("testtest1"))
+	suite.Require().NoError(err)
 	serializedKE1 := hex.EncodeToString(ke1.Serialize())
 	loginReq := controllers.LoginInitRequest{
 		Email:         suite.account.Email,
