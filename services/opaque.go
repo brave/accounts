@@ -21,7 +21,7 @@ const (
 	opaqueSecretKeyEnv  = "OPAQUE_SECRET_KEY"
 	opaquePublicKeyEnv  = "OPAQUE_PUBLIC_KEY"
 	opaqueFakeRecordEnv = "OPAQUE_FAKE_RECORD"
-	// seedLength is the default length used for seeds (internal.SeedLength from opaque)
+	// seedLength is the default length in bytes used for seeds (internal.SeedLength from opaque)
 	seedLength = 32
 	// deriveKeyPairTag is the OPRF hash-to-scalar dst (tag.DeriveKeyPair from opaque)
 	deriveKeyPairTag = "OPAQUE-DeriveKeyPair"
@@ -74,6 +74,8 @@ func newOpaqueServer(config *opaque.Configuration, oprfSeeds map[int][]byte, cur
 		return nil, fmt.Errorf("failed to init opaque server: %w", err)
 	}
 
+	// globalSeed will end up being nil if a key service is present,
+	// since the "frontend" web service does not have access to global seeds.
 	var globalSeed []byte
 	if currentSeedID != nil {
 		globalSeed = oprfSeeds[*currentSeedID]
@@ -142,6 +144,10 @@ func NewOpaqueService(ds *datastore.Datastore, isKeyService bool) (*OpaqueServic
 }
 
 func (o *OpaqueService) DeriveOPRFClientKey(credentialIdentifier string, oprfSeedID *int) (*ecc.Scalar, int, error) {
+	if credentialIdentifier == "" {
+		return nil, 0, errors.New("credentialIdentifier cannot be empty")
+	}
+
 	// If no seed ID provided, use current seed ID
 	seedID := o.currentSeedID
 	if oprfSeedID != nil {
@@ -180,8 +186,8 @@ func (o *OpaqueService) getKeyServiceClientOPRFKey(credIdentifier string, seedID
 	}
 
 	type oprfKeyResponse struct {
-		ClientSeed string `json:"clientSeed"`
-		SeedID     int    `json:"seedId"`
+		ClientKey string `json:"clientKey"`
+		SeedID    int    `json:"seedId"`
 	}
 
 	// Extract IP from addr (remove port if present)
@@ -202,7 +208,7 @@ func (o *OpaqueService) getKeyServiceClientOPRFKey(credIdentifier string, seedID
 		return nil, 0, err
 	}
 
-	clientKey, err := hex.DecodeString(response.ClientSeed)
+	clientKey, err := hex.DecodeString(response.ClientKey)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to decode key material: %w", err)
 	}
@@ -211,6 +217,10 @@ func (o *OpaqueService) getKeyServiceClientOPRFKey(credIdentifier string, seedID
 }
 
 func (o *OpaqueService) getOPRFKeyAndSeedID(credIdentifier string, storedSeedID *int, clientAddr string) (*ecc.Scalar, int, error) {
+	// storedSeedID will be nil if setting a new password, use the latest seed for the exchange.
+	// If a key service is utilized, the latest seed will not be available, since the "frontend" web service does not
+	// have access to seeds. The key service will return the latest seed ID when the client-specific OPRF
+	// key is derived.
 	if storedSeedID == nil && o.currentSeedID != nil {
 		storedSeedID = o.currentSeedID
 	}
