@@ -178,7 +178,7 @@ func (o *OpaqueService) BinaryDeserializer() (*opaque.Deserializer, error) {
 	return o.Config.Deserializer()
 }
 
-func (o *OpaqueService) getKeyServiceClientOPRFKey(credIdentifier string, seedID *int, clientAddr string) ([]byte, int, error) {
+func (o *OpaqueService) getKeyServiceClientOPRFKey(credIdentifier string, seedID *int, clientAddr string) (*ecc.Scalar, int, error) {
 	type oprfKeyRequest struct {
 		CredentialIdentifier string `json:"credentialIdentifier"`
 		SeedID               *int   `json:"seedId"`
@@ -208,9 +208,14 @@ func (o *OpaqueService) getKeyServiceClientOPRFKey(credIdentifier string, seedID
 		return nil, 0, err
 	}
 
-	clientKey, err := hex.DecodeString(response.ClientKey)
+	clientKeyBytes, err := hex.DecodeString(response.ClientKey)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to decode key material: %w", err)
+	}
+
+	clientKey, err := opaque.DeserializeScalar(o.Config.OPRF.Group(), clientKeyBytes)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to deserialize client OPRF key: %w", err)
 	}
 
 	return clientKey, response.SeedID, nil
@@ -230,15 +235,10 @@ func (o *OpaqueService) getOPRFKeyAndSeedID(credIdentifier string, storedSeedID 
 	var seedID int
 
 	if o.keyServiceClient != nil {
-		clientKey, serverSeedID, err := o.getKeyServiceClientOPRFKey(credIdentifier, storedSeedID, clientAddr)
+		clientOPRFKey, seedID, err = o.getKeyServiceClientOPRFKey(credIdentifier, storedSeedID, clientAddr)
 		if err != nil {
 			return nil, 0, err
 		}
-		clientOPRFKey, err = opaque.DeserializeScalar(o.Config.OPRF.Group(), clientKey)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to deserialize client OPRF key: %w", err)
-		}
-		seedID = serverSeedID
 	} else {
 		clientOPRFKey, _, err = o.DeriveOPRFClientKey(credIdentifier, storedSeedID)
 		if err != nil {
