@@ -110,6 +110,7 @@ func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Ha
 	}
 	r.With(servicesKeyMiddleware).With(verificationAuthMiddleware).Post("/result", vc.VerifyQueryResult)
 	r.With(servicesKeyMiddleware).With(verificationAuthMiddleware).Post("/resend", vc.VerifyResend)
+	r.With(servicesKeyMiddleware).With(verificationAuthMiddleware).Delete("/", vc.VerifyDelete)
 
 	return r
 }
@@ -212,6 +213,42 @@ func (vc *VerificationController) VerifyValidCheck(w http.ResponseWriter, r *htt
 			return
 		}
 		log.Err(err).Msg("failed to check verification status")
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// @Summary Delete verification for registration
+// @Description Deletes a pending verification.
+// @Description Also deletes any unverified account associated with the verification email.
+// @Tags Email verification
+// @Param Authorization header string true "Bearer + verification token"
+// @Success 204 "Verification deleted successfully"
+// @Failure 400 {object} util.ErrorResponse
+// @Failure 401 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/verify [delete]
+func (vc *VerificationController) VerifyDelete(w http.ResponseWriter, r *http.Request) {
+	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
+
+	if verification.Intent != datastore.RegistrationIntent || verification.Service != util.AccountsServiceName {
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrIntentNotAllowed)
+		return
+	}
+
+	if verification.Verified {
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailAlreadyVerified)
+		return
+	}
+
+	if err := vc.datastore.DeleteVerification(verification.ID); err != nil {
+		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
+		return
+	}
+
+	if err := vc.datastore.DeleteAccountIfUnverified(verification.Email); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}

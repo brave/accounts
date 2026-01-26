@@ -168,6 +168,15 @@ func (d *Datastore) DeleteAccount(accountID uuid.UUID) error {
 	return nil
 }
 
+func (d *Datastore) DeleteAccountIfUnverified(email string) error {
+	result := d.DB.Delete(&Account{}, "email = ? AND last_email_verified_at IS NULL", util.CanonicalizeEmail(email))
+	if result.Error != nil {
+		return fmt.Errorf("error deleting unverified account: %w", result.Error)
+	}
+
+	return nil
+}
+
 func (d *Datastore) MaybeUpdateAccountLastUsed(accountID uuid.UUID, lastUsedTime time.Time) error {
 	if time.Since(lastUsedTime) < lastUsedUpdateInterval {
 		return nil

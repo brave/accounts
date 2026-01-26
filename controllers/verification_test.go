@@ -21,12 +21,13 @@ import (
 
 type VerificationTestSuite struct {
 	suite.Suite
-	useKeyService bool
-	ds            *datastore.Datastore
-	keyServiceDs  *datastore.Datastore
-	sesMock       *MockSESService
-	jwtService    *services.JWTService
-	router        *chi.Mux
+	useKeyService       bool
+	ds                  *datastore.Datastore
+	keyServiceDs        *datastore.Datastore
+	sesMock             *MockSESService
+	jwtService          *services.JWTService
+	verificationService *services.VerificationService
+	router              *chi.Mux
 }
 
 func NewVerificationTestSuite(useKeyService bool) *VerificationTestSuite {
@@ -50,8 +51,8 @@ func (suite *VerificationTestSuite) SetupController(passwordAuthEnabled bool, em
 	suite.jwtService, err = services.NewJWTService(suite.ds, false)
 	suite.Require().NoError(err)
 	suite.sesMock = &MockSESService{}
-	verificationService := services.NewVerificationService(suite.ds, suite.jwtService, suite.sesMock, passwordAuthEnabled, emailAuthEnabled)
-	controller := controllers.NewVerificationController(suite.ds, verificationService)
+	suite.verificationService = services.NewVerificationService(suite.ds, suite.jwtService, suite.sesMock, passwordAuthEnabled, emailAuthEnabled)
+	controller := controllers.NewVerificationController(suite.ds, suite.verificationService)
 
 	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds, true)
 	servicesKeyMiddleware := middleware.ServicesKeyMiddleware(util.DevelopmentEnv)
@@ -614,6 +615,89 @@ func (suite *VerificationTestSuite) TestVerifyResend() {
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailAlreadyVerified.Code)
 
 	suite.sesMock.AssertExpectations(suite.T())
+}
+
+func (suite *VerificationTestSuite) TestVerifyDelete() {
+	suite.SetupController(true, true)
+
+	email := "test@example.com"
+	// Use InitializeVerification to create a registration verification
+	verification, verificationToken, err := suite.verificationService.InitializeVerification(
+		suite.T().Context(),
+		email,
+		"registration",
+		"accounts",
+		nil,
+	)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(verificationToken)
+
+	// Manually create an unverified account for this email
+	account, err := suite.ds.GetOrCreateAccount(email)
+	suite.Require().NoError(err)
+	suite.Nil(account.LastEmailVerifiedAt)
+
+	// Delete verification
+	req := httptest.NewRequest(http.MethodDelete, "/v2/verify", nil)
+	req.Header.Set("Authorization", "Bearer "+*verificationToken)
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusNoContent, resp.Code)
+
+	// Verify verification was deleted
+	_, err = suite.ds.GetVerificationStatus(verification.ID)
+	suite.ErrorIs(err, util.ErrVerificationNotFound)
+
+	// Verify account was deleted
+	_, err = suite.ds.GetAccount(nil, email)
+	suite.ErrorIs(err, datastore.ErrAccountNotFound)
+}
+
+func (suite *VerificationTestSuite) TestVerifyDeleteForbidden() {
+	suite.SetupController(true, false)
+
+	// Use InitializeVerification to create an auth_token verification
+	_, verificationToken, err := suite.verificationService.InitializeVerification(
+		suite.T().Context(),
+		"test@example.com",
+		"verification",
+		"email-aliases",
+		nil,
+	)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(*verificationToken)
+
+	// Delete verification - should be bad request for auth_token intent
+	req := httptest.NewRequest(http.MethodDelete, "/v2/verify", nil)
+	req.Header.Set("Authorization", "Bearer "+*verificationToken)
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrIntentNotAllowed.Code)
+}
+
+func (suite *VerificationTestSuite) TestVerifyDeleteAlreadyVerified() {
+	suite.SetupController(true, true)
+
+	// Use InitializeVerification to create a registration verification
+	verification, verificationToken, err := suite.verificationService.InitializeVerification(
+		suite.T().Context(),
+		"test@example.com",
+		"registration",
+		"accounts",
+		nil,
+	)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(verificationToken)
+
+	// Manually mark verification as verified in datastore
+	err = suite.ds.DB.Model(&datastore.Verification{}).Where("id = ?", verification.ID).Update("verified", true).Error
+	suite.Require().NoError(err)
+
+	// Delete verification - should be bad request for already verified
+	req := httptest.NewRequest(http.MethodDelete, "/v2/verify", nil)
+	req.Header.Set("Authorization", "Bearer "+*verificationToken)
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailAlreadyVerified.Code)
 }
 
 func TestVerificationTestSuite(t *testing.T) {
