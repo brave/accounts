@@ -15,15 +15,14 @@ services:
       - POSTGRES_PASSWORD=password
     volumes:
       - ./misc/create_additional_dbs.sql:/docker-entrypoint-initdb.d/create_additional_dbs.sql
-  localstack:
-    image: localstack/localstack
+  ses-local:
+    build:
+      context: ./misc/ses-v2-local
+      dockerfile: Dockerfile
     ports:
       - "127.0.0.1:4566:4566"
-      - "127.0.0.1:4510-4559:4510-4559"
     networks:
       - main
-    volumes:
-      - ./misc/add_verified_email.sh:/etc/localstack/init/ready.d/add_verified_email.sh
   app:
     build: .
     networks:
@@ -31,10 +30,10 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgres://accounts:password@postgres:5432/postgres?sslmode=disable
-      AWS_ENDPOINT: http://localstack:4566
+      AWS_ENDPOINT: http://ses-local:4566
     depends_on:
       - postgres
-      - localstack
+      - ses-local
     restart: on-failure
     ports:
       - "127.0.0.1:8080:8080"

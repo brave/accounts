@@ -14,8 +14,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
-	"github.com/aws/aws-sdk-go-v2/service/ses"
-	"github.com/aws/aws-sdk-go-v2/service/ses/types"
+	"github.com/aws/aws-sdk-go-v2/service/sesv2"
+	"github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go"
 	"github.com/brave/accounts/datastore"
@@ -39,7 +39,7 @@ const (
 )
 
 type SESService struct {
-	client              *ses.Client
+	client              *sesv2.Client
 	verifyHTMLTemplate  *htmlTemplate.Template
 	verifyTextTemplate  *textTemplate.Template
 	generalHTMLTemplate *htmlTemplate.Template
@@ -117,7 +117,7 @@ func NewSESService(i18nBundle *i18n.Bundle, env string) (*SESService, error) {
 	}
 
 	// Create SES client
-	client := ses.NewFromConfig(cfg, func(o *ses.Options) {
+	client := sesv2.NewFromConfig(cfg, func(o *sesv2.Options) {
 		awsEndpoint := os.Getenv(awsEndpointEnv)
 		if awsEndpoint != "" {
 			o.BaseEndpoint = &awsEndpoint
@@ -173,7 +173,7 @@ func NewSESService(i18nBundle *i18n.Bundle, env string) (*SESService, error) {
 	}, nil
 }
 
-func (s *SESService) sendEmail(ctx context.Context, email string, subject string, contents interface{}, htmlTemplate *htmlTemplate.Template, textTemplate *textTemplate.Template) error {
+func (s *SESService) sendEmail(ctx context.Context, email string, subject string, contents interface{}, htmlTemplate *htmlTemplate.Template, textTemplate *textTemplate.Template, headers map[string]string) error {
 	var htmlContent, textContent bytes.Buffer
 	if err := htmlTemplate.Execute(&htmlContent, contents); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
@@ -184,24 +184,38 @@ func (s *SESService) sendEmail(ctx context.Context, email string, subject string
 	htmlContentString := htmlContent.String()
 	textContentString := textContent.String()
 
-	input := &ses.SendEmailInput{
+	message := &types.Message{
+		Body: &types.Body{
+			Html: &types.Content{
+				Data: &htmlContentString,
+			},
+			Text: &types.Content{
+				Data: &textContentString,
+			},
+		},
+		Subject: &types.Content{
+			Data: &subject,
+		},
+	}
+
+	if len(headers) > 0 {
+		message.Headers = make([]types.MessageHeader, 0, len(headers))
+		for name, value := range headers {
+			message.Headers = append(message.Headers, types.MessageHeader{
+				Name:  &name,
+				Value: &value,
+			})
+		}
+	}
+
+	input := &sesv2.SendEmailInput{
+		Content: &types.EmailContent{
+			Simple: message,
+		},
 		Destination: &types.Destination{
 			ToAddresses: []string{util.CanonicalizeEmail(email)},
 		},
-		Message: &types.Message{
-			Body: &types.Body{
-				Html: &types.Content{
-					Data: &htmlContentString,
-				},
-				Text: &types.Content{
-					Data: &textContentString,
-				},
-			},
-			Subject: &types.Content{
-				Data: &subject,
-			},
-		},
-		Source: &s.fromAddress,
+		FromEmailAddress: &s.fromAddress,
 	}
 
 	if s.configSet != "" {
@@ -257,7 +271,7 @@ func (s *SESService) SendVerificationEmail(ctx context.Context, email string, ve
 		ExpiryDisclaimer:   localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailExpiryDisclaimer"}),
 	}
 
-	if err := s.sendEmail(ctx, email, data.Subject, &data, s.verifyHTMLTemplate, s.verifyTextTemplate); err != nil {
+	if err := s.sendEmail(ctx, email, data.Subject, &data, s.verifyHTMLTemplate, s.verifyTextTemplate, nil); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
@@ -274,7 +288,7 @@ func (s *SESService) SendSimilarEmailAlert(ctx context.Context, email string, lo
 		Message:     localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "SimilarEmailLoginMessage", TemplateData: map[string]string{"Email": email}}),
 	}
 
-	if err := s.sendEmail(ctx, email, data.Subject, &data, s.generalHTMLTemplate, s.generalTextTemplate); err != nil {
+	if err := s.sendEmail(ctx, email, data.Subject, &data, s.generalHTMLTemplate, s.generalTextTemplate, nil); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
@@ -289,7 +303,7 @@ func (s *SESService) SendPasswordChangeNotification(ctx context.Context, email s
 		Message:     localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "PasswordChangeNotificationMessage"}),
 	}
 
-	if err := s.sendEmail(ctx, email, data.Subject, &data, s.generalHTMLTemplate, s.generalTextTemplate); err != nil {
+	if err := s.sendEmail(ctx, email, data.Subject, &data, s.generalHTMLTemplate, s.generalTextTemplate, nil); err != nil {
 		return fmt.Errorf("failed to send password change notification email: %w", err)
 	}
 
