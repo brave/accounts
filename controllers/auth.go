@@ -232,7 +232,7 @@ func (ac *AuthController) Router(authMiddleware func(http.Handler) http.Handler,
 // @Tags Auth
 // @Produce json
 // @Param Authorization header string true "Bearer + auth token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Success 200 {object} ValidateTokenResponse
 // @Failure 401 {object} util.ErrorResponse
 // @Failure 403 {object} util.ErrorResponse
@@ -272,7 +272,7 @@ func (ac *AuthController) Validate(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param request body LoginInitRequest true "login init request"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Success 200 {object} LoginInitResponse
 // @Failure 400 {object} util.ErrorResponse
 // @Failure 401 {object} util.ErrorResponse
@@ -366,7 +366,7 @@ func (ac *AuthController) createSessionAndToken(accountID uuid.UUID, userAgent s
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + login state token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Param request body LoginFinalizeRequest true "login finalize request"
 // @Success 200 {object} LoginFinalizeResponse
 // @Failure 400 {object} util.ErrorResponse
@@ -443,7 +443,7 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + login state token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Param request body services.TwoFAAuthRequest true "2FA verification request"
 // @Success 200 {object} LoginFinalize2FAResponse
 // @Failure 400 {object} util.ErrorResponse
@@ -555,7 +555,7 @@ func (ac *AuthController) CreateServiceToken(w http.ResponseWriter, r *http.Requ
 // @Description Logs out the current session by deleting it
 // @Tags Auth
 // @Param Authorization header string true "Bearer + auth token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Success 204 "No Content"
 // @Failure 401 {object} util.ErrorResponse
 // @Failure 500 {object} util.ErrorResponse

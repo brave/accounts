@@ -255,7 +255,7 @@ func checkVerificationStatusAndIntent(w http.ResponseWriter, r *http.Request, ve
 // @Accept json
 // @Produce json
 // @Param Authorization header string false "Bearer + verification token (optional if newAccountEmail is provided)"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Param request body RegistrationRequest true "Registration request"
 // @Success 200 {object} RegistrationResponse
 // @Failure 400 {object} util.ErrorResponse
@@ -405,7 +405,7 @@ func (ac *AccountsController) postPasswordSetup(ctx context.Context, accountID u
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + verification token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Param request body RegistrationRecord true "Registration record"
 // @Success 200 {object} PasswordFinalizeResponse
 // @Failure 400 {object} util.ErrorResponse
@@ -485,7 +485,7 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + verification token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Param request body services.TwoFAAuthRequest true "2FA verification request"
 // @Success 200 {object} RegistrationFinalize2FAResponse
 // @Failure 400 {object} util.ErrorResponse
@@ -562,7 +562,7 @@ func (ac *AccountsController) SetupPasswordFinalize2FA(w http.ResponseWriter, r 
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + auth token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Param request body TwoFAInitRequest true "2FA initialization request"
 // @Success 200 {object} TwoFAInitResponse
 // @Failure 400 {object} util.ErrorResponse
@@ -618,7 +618,7 @@ func (ac *AccountsController) SetupTOTPInit(w http.ResponseWriter, r *http.Reque
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + auth token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Param request body TwoFAFinalizeRequest true "2FA finalization request"
 // @Success 200 {object} TwoFAFinalizeResponse
 // @Failure 400 {object} util.ErrorResponse
@@ -681,7 +681,7 @@ func (ac *AccountsController) SetupTOTPFinalize(w http.ResponseWriter, r *http.R
 // @Tags Accounts
 // @Produce json
 // @Param Authorization header string true "Bearer + auth token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Success 204 "No Content"
 // @Failure 401 {object} util.ErrorResponse
 // @Failure 403 {object} util.ErrorResponse
@@ -715,7 +715,7 @@ func (ac *AccountsController) DeleteAccount(w http.ResponseWriter, r *http.Reque
 // @Tags Accounts
 // @Produce json
 // @Param Authorization header string true "Bearer + auth token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Success 200 {object} datastore.TwoFADetails
 // @Failure 401 {object} util.ErrorResponse
 // @Failure 500 {object} util.ErrorResponse
@@ -738,7 +738,7 @@ func (ac *AccountsController) GetTwoFASettings(w http.ResponseWriter, r *http.Re
 // @Tags Accounts
 // @Produce json
 // @Param Authorization header string true "Bearer + auth token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Success 204 "No Content"
 // @Failure 401 {object} util.ErrorResponse
 // @Failure 500 {object} util.ErrorResponse
@@ -760,7 +760,7 @@ func (ac *AccountsController) DisableTOTP(w http.ResponseWriter, r *http.Request
 // @Tags Accounts
 // @Produce json
 // @Param Authorization header string true "Bearer + auth token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Success 200 {object} RecoveryKeyResponse
 // @Failure 401 {object} util.ErrorResponse
 // @Failure 500 {object} util.ErrorResponse
@@ -786,7 +786,7 @@ func (ac *AccountsController) RegenerateRecoveryKey(w http.ResponseWriter, r *ht
 // @Tags Accounts
 // @Produce json
 // @Param Authorization header string true "Bearer + auth token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Success 204 "No Content"
 // @Failure 401 {object} util.ErrorResponse
 // @Failure 500 {object} util.ErrorResponse
