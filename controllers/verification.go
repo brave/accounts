@@ -233,6 +233,7 @@ func (vc *VerificationController) VerifyValidCheck(w http.ResponseWriter, r *htt
 func (vc *VerificationController) VerifyDelete(w http.ResponseWriter, r *http.Request) {
 	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
 
+	// Accounts is the sole service that can create verifications with a registration intent
 	if verification.Intent != datastore.RegistrationIntent || verification.Service != util.AccountsServiceName {
 		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrIntentNotAllowed)
 		return
