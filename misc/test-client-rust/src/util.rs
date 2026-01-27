@@ -34,7 +34,7 @@ pub fn make_request(
         request_builder = request_builder.header("Authorization", format!("Bearer {token}"));
     }
     if let Some(key) = args.services_key.as_ref() {
-        request_builder = request_builder.header("brave-key", key)
+        request_builder = request_builder.header("braveservicekey", key)
     }
 
     let response = request_builder.send().expect("Failed to send request");

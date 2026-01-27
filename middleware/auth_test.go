@@ -152,13 +152,13 @@ func (suite *MiddlewareTestSuite) TestServicesKeyMiddleware() {
 
 	// Test valid key
 	req := httptest.NewRequest("GET", "/", nil)
-	req.Header.Set("brave-key", testKey)
+	req.Header.Set("braveservicekey", testKey)
 	resp := util.ExecuteTestRequest(req, mw(handler))
 	suite.Equal(http.StatusOK, resp.Code)
 
 	// Test invalid key
 	req = httptest.NewRequest("GET", "/", nil)
-	req.Header.Set("brave-key", "wrong-key")
+	req.Header.Set("braveservicekey", "wrong-key")
 	resp = util.ExecuteTestRequest(req, mw(handler))
 	suite.Equal(http.StatusUnauthorized, resp.Code)
 
@@ -173,13 +173,13 @@ func (suite *MiddlewareTestSuite) TestServicesKeyMiddleware() {
 
 	// Test first valid key
 	req = httptest.NewRequest("GET", "/", nil)
-	req.Header.Set("brave-key", "test-key1")
+	req.Header.Set("braveservicekey", "test-key1")
 	resp = util.ExecuteTestRequest(req, mw(handler))
 	suite.Equal(http.StatusOK, resp.Code)
 
 	// Test second valid key
 	req = httptest.NewRequest("GET", "/", nil)
-	req.Header.Set("brave-key", "test-key2")
+	req.Header.Set("braveservicekey", "test-key2")
 	resp = util.ExecuteTestRequest(req, mw(handler))
 	suite.Equal(http.StatusOK, resp.Code)
 

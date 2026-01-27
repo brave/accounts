@@ -128,7 +128,7 @@ func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Ha
 // @Accept json
 // @Produce json
 // @Param Authorization header string false "Bearer + auth token (required for change_password intent)"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Param request body VerifyInitRequest true "Verification request params"
 // @Success 200 {object} VerifyInitResponse
 // @Failure 400 {object} util.ErrorResponse
@@ -301,7 +301,7 @@ func (vc *VerificationController) VerifyComplete(w http.ResponseWriter, r *http.
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + verification token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Param request body VerifyResultRequest true "Auth token request params"
 // @Success 200 {object} VerifyResultResponse
 // @Failure 400 {object} util.ErrorResponse

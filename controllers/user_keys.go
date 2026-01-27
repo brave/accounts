@@ -96,7 +96,7 @@ func (uc *UserKeysController) Router(authMiddleware func(http.Handler) http.Hand
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + auth token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Success 200 {array} UserKey
 // @Failure 401 {object} util.ErrorResponse
 // @Failure 403 {object} util.ErrorResponse
@@ -125,7 +125,7 @@ func (uc *UserKeysController) ListKeys(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + auth token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Param service path string true "Service name"
 // @Param keyName path string true "Key name"
 // @Success 200 {object} UserKey
@@ -158,7 +158,7 @@ func (uc *UserKeysController) GetKey(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + auth token"
-// @Param Brave-Key header string false "Brave services key (if one is configured)"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Param key body UserKeyStoreRequest true "Key to save"
 // @Success 204 "Key saved"
 // @Failure 400 {object} util.ErrorResponse

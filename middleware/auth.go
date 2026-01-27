@@ -22,7 +22,7 @@ const (
 	ContextVerification       = contextKey("verification")
 
 	braveServicesKeyEnv    = "BRAVE_SERVICES_KEY"
-	braveServicesKeyHeader = "brave-key"
+	braveServicesKeyHeader = "braveservicekey"
 )
 
 func AuthMiddleware(jwtService *services.JWTService, ds *datastore.Datastore, minSessionVersion int, enforceAccountsServiceName bool, required bool) func(http.Handler) http.Handler {
