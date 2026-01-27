@@ -296,6 +296,7 @@ fn set_password(args: CliArgs) {
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("blindedMessage", registration_request_hex.into());
     body.insert("serializeResponse", true.into());
+    body.insert("initiatingServiceName", "accounts".into());
 
     // If registering, add newAccountEmail instead of using verification token
     if args.register {
@@ -402,6 +403,7 @@ fn login(args: CliArgs) {
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("serializedKE1", credential_request_hex.into());
     body.insert("email", args.email.clone().into());
+    body.insert("initiatingServiceName", "accounts".into());
 
     let (resp, _) = make_request(
         &args,
