@@ -36,19 +36,24 @@
       messageDiv.className = 'message';
 
       const info = document.createElement('p');
-      info.textContent = `Timestamp: ${message.Timestamp}, To: ${message.Destination.ToAddresses.join(', ')}, Subject: ${message.Subject}`;
+      let infoText = `Time: ${new Date(message.Timestamp)}, To: ${message.Destination.ToAddresses.join(', ')}, From: ${message.FromEmailAddress}, Subject: ${message.Content.Simple.Subject.Data}`;
+      if (message.Content.Simple.Headers && message.Content.Simple.Headers.length > 0) {
+        const headers = message.Content.Simple.Headers.map(h => `${h.Name}: ${h.Value}`).join(', ');
+        infoText += `, Headers: ${headers}`;
+      }
+      info.textContent = infoText;
       messageDiv.appendChild(info);
 
-      if (message.Body.html_part) {
+      if (message.Content.Simple.Body.Html.Data) {
         const iframe = document.createElement('iframe');
-        iframe.srcdoc = message.Body.html_part;
+        iframe.srcdoc = message.Content.Simple.Body.Html.Data;
         messageDiv.appendChild(iframe);
       }
 
-      if (message.Body.text_part) {
+      if (message.Content.Simple.Body.Text.Data) {
         const textContent = document.createElement('div');
         textContent.className = 'text-content';
-        textContent.textContent = message.Body.text_part;
+        textContent.textContent = message.Content.Simple.Body.Text.Data;
         messageDiv.appendChild(textContent);
       }
 
