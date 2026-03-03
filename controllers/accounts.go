@@ -465,6 +465,10 @@ func (ac *AccountsController) SetupPasswordFinalize(w http.ResponseWriter, r *ht
 	// Send verification email if this is a registration intent
 	if verification.Intent == datastore.RegistrationIntent {
 		if err := ac.verificationService.SendVerificationEmail(r.Context(), verification, locale); err != nil {
+			if errors.Is(err, util.ErrFailedToSendEmailInvalidFormat) {
+				util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
+				return
+			}
 			util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 			return
 		}
