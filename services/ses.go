@@ -17,7 +17,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
-	"github.com/aws/smithy-go"
 	"github.com/brave/accounts/datastore"
 	"github.com/brave/accounts/templates"
 	"github.com/brave/accounts/util"
@@ -224,11 +223,9 @@ func (s *SESService) sendEmail(ctx context.Context, email string, subject string
 
 	_, err := s.client.SendEmail(ctx, input)
 	if err != nil {
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			if apiErr.ErrorCode() == "InvalidParameterValue" {
-				return util.ErrFailedToSendEmailInvalidFormat
-			}
+		var badReqErr *types.BadRequestException
+		if errors.As(err, &badReqErr) {
+			return util.ErrFailedToSendEmailInvalidFormat
 		}
 		return fmt.Errorf("failed to send email: %w", err)
 	}
