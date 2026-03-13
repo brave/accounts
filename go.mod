@@ -4,11 +4,11 @@ go 1.25.3
 
 require (
 	github.com/BurntSushi/toml v1.4.0
-	github.com/aws/aws-sdk-go-v2/config v1.31.13
-	github.com/aws/aws-sdk-go-v2/credentials v1.18.17
-	github.com/aws/aws-sdk-go-v2/feature/rds/auth v1.6.10
-	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.59.1
-	github.com/aws/aws-sdk-go-v2/service/sts v1.38.7
+	github.com/aws/aws-sdk-go-v2/config v1.32.11
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.11
+	github.com/aws/aws-sdk-go-v2/feature/rds/auth v1.6.19
+	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.60.0
+	github.com/aws/aws-sdk-go-v2/service/sts v1.41.8
 	github.com/aws/smithy-go v1.24.0
 	github.com/bytemare/ecc v0.9.0
 	github.com/bytemare/opaque v0.0.0
