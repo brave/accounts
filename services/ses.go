@@ -90,9 +90,13 @@ type similarEmailFields struct {
 	Message string
 }
 
-func newEmailFields(localizer *i18n.Localizer, subjectMessageID string) emailFields {
+func newEmailFields(localizer *i18n.Localizer, subjectMessageID string) (emailFields, string) {
+	subject, tag, err := localizer.LocalizeWithTag(&i18n.LocalizeConfig{MessageID: subjectMessageID})
+	if err != nil {
+		panic(err)
+	}
 	return emailFields{
-		Subject:           localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: subjectMessageID}),
+		Subject:           subject,
 		Greeting:          localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailGreeting"}),
 		Disregard:         localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailDisregard"}),
 		Signature:         localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailSignature"}),
@@ -102,7 +106,7 @@ func newEmailFields(localizer *i18n.Localizer, subjectMessageID string) emailFie
 		TermsOfUse:        localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailTermsOfUse"}),
 		DownloadBrave:     localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailDownloadBrave"}),
 		ContactSupport:    localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "EmailContactSupport"}),
-	}
+	}, tag.String()
 }
 
 func NewSESService(i18nBundle *i18n.Bundle, env string) (*SESService, error) {
@@ -259,8 +263,9 @@ func (s *SESService) SendVerificationEmail(ctx context.Context, email string, ve
 		instructionsMessageID = "SetPasswordEmailInstructions"
 	}
 
+	fields, effectiveLocale := newEmailFields(localizer, subjectMessageID)
 	data := verifyEmailFields{
-		emailFields:        newEmailFields(localizer, subjectMessageID),
+		emailFields:        fields,
 		VerifyURL:          verifyURL,
 		Instructions:       localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: instructionsMessageID}),
 		Action:             localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailAction"}),
@@ -269,7 +274,7 @@ func (s *SESService) SendVerificationEmail(ctx context.Context, email string, ve
 		ExpiryDisclaimer:   localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailExpiryDisclaimer"}),
 	}
 
-	if err := s.sendEmail(ctx, email, locale, data.Subject, &data, s.verifyHTMLTemplate, s.verifyTextTemplate); err != nil {
+	if err := s.sendEmail(ctx, email, effectiveLocale, data.Subject, &data, s.verifyHTMLTemplate, s.verifyTextTemplate); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
@@ -281,12 +286,13 @@ func (s *SESService) SendVerificationEmail(ctx context.Context, email string, ve
 func (s *SESService) SendSimilarEmailAlert(ctx context.Context, email string, locale string) error {
 	localizer := i18n.NewLocalizer(s.i18nBundle, locale)
 
+	fields, effectiveLocale := newEmailFields(localizer, "SimilarEmailSubject")
 	data := similarEmailFields{
-		emailFields: newEmailFields(localizer, "SimilarEmailSubject"),
+		emailFields: fields,
 		Message:     localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "SimilarEmailLoginMessage", TemplateData: map[string]string{"Email": email}}),
 	}
 
-	if err := s.sendEmail(ctx, email, locale, data.Subject, &data, s.generalHTMLTemplate, s.generalTextTemplate); err != nil {
+	if err := s.sendEmail(ctx, email, effectiveLocale, data.Subject, &data, s.generalHTMLTemplate, s.generalTextTemplate); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
@@ -296,12 +302,13 @@ func (s *SESService) SendSimilarEmailAlert(ctx context.Context, email string, lo
 func (s *SESService) SendPasswordChangeNotification(ctx context.Context, email string, locale string) error {
 	localizer := i18n.NewLocalizer(s.i18nBundle, locale)
 
+	fields, effectiveLocale := newEmailFields(localizer, "PasswordChangeNotificationSubject")
 	data := similarEmailFields{
-		emailFields: newEmailFields(localizer, "PasswordChangeNotificationSubject"),
+		emailFields: fields,
 		Message:     localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "PasswordChangeNotificationMessage"}),
 	}
 
-	if err := s.sendEmail(ctx, email, locale, data.Subject, &data, s.generalHTMLTemplate, s.generalTextTemplate); err != nil {
+	if err := s.sendEmail(ctx, email, effectiveLocale, data.Subject, &data, s.generalHTMLTemplate, s.generalTextTemplate); err != nil {
 		return fmt.Errorf("failed to send password change notification email: %w", err)
 	}
 
