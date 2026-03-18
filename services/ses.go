@@ -80,7 +80,6 @@ type verifyEmailFields struct {
 	VerifyURL          string
 	Instructions       string
 	Action             string
-	ShortAction        string
 	VerifyActionBackup string
 	ExpiryDisclaimer   string
 }
@@ -269,7 +268,6 @@ func (s *SESService) SendVerificationEmail(ctx context.Context, email string, ve
 		VerifyURL:          verifyURL,
 		Instructions:       localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: instructionsMessageID}),
 		Action:             localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailAction"}),
-		ShortAction:        localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailShortAction"}),
 		VerifyActionBackup: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailActionBackup"}),
 		ExpiryDisclaimer:   localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailExpiryDisclaimer"}),
 	}
