@@ -20,31 +20,27 @@ other = "Hello,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Click the link below to verify your email and set a new password for your account. (You can also paste the link in your browser.) Note that this email contains a private access link that can only be used once."
+other = "Enter the code below to verify your email and set a new password for your account."
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Click the link below to verify your email and create your Brave account. (You can also paste the link in your browser.) Note that this email contains a private access link that can only be used once."
+other = "Enter the code below to verify your email and create your Brave account."
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Click the link below to verify your email. (You can also paste the link in your browser.) Note that this email contains a private access link that can only be used once."
+other = "Enter the code below to verify your email."
 
 [LoginEmailInstructions]
 description = "Instruction to verify an email address and login to an account"
-other = "Click the link below to access your Brave account. (You can also paste the link in your browser.) Note that this email contains a private access link that can only be used once."
+other = "Enter the code below to access your Brave account."
 
-[VerifyEmailAction]
-description = "Text on the email verification button"
-other = "Confirm your email"
-
-[VerifyEmailActionBackup]
-description = "Instructions for manual link usage if button doesn't work"
-other = "Don’t see a button? Click this link to confirm your email."
+[VerifyEmailCode]
+description = "Label preceding the verification code displayed in the email"
+other = "Your verification code:"
 
 [VerifyEmailExpiryDisclaimer]
-description = "Informs the user that the link expires after 30 minutes"
-other = "Note: This confirmation prompt will expire within 30 minutes."
+description = "Informs the user that the verification code expires after 30 minutes"
+other = "Note: This code will expire within 30 minutes."
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"

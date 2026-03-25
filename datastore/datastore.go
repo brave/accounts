@@ -7,13 +7,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/brave/accounts/migrations"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -31,12 +29,10 @@ const defaultTestDatabaseURLEnv = "postgres://accounts:password@localhost:5435/t
 const defaultTestKeyServiceDatabaseURLEnv = "postgres://accounts:password@localhost:5435/keys_test?sslmode=disable"
 
 type Datastore struct {
-	listenPool                   *pgxpool.Pool
-	DB                           *gorm.DB
-	minSessionVersion            int
-	webhookUrls                  map[string]interface{}
-	verificationEventWaitMap     map[uuid.UUID]*verificationWaitRequest
-	verificationEventWaitMapLock sync.Mutex
+	listenPool        *pgxpool.Pool
+	DB                *gorm.DB
+	minSessionVersion int
+	webhookUrls       map[string]interface{}
 }
 
 func NewDatastore(minSessionVersion int, isKeyService bool, isTesting bool) (*Datastore, error) {

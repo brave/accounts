@@ -2,9 +2,9 @@ package controllers_test
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,7 +14,6 @@ import (
 	"github.com/brave/accounts/services"
 	"github.com/brave/accounts/util"
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
@@ -109,6 +108,7 @@ func (suite *VerificationTestSuite) TestVerifyInit() {
 	var parsedResp controllers.VerifyInitResponse
 	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
 	suite.Require().NotNil(parsedResp.VerificationToken)
+	suite.WithinDuration(time.Now().Add(datastore.VerificationExpiration), parsedResp.VerificationTokenExpiresAt, 5*time.Second)
 
 	_, err := suite.jwtService.ValidateVerificationToken(*parsedResp.VerificationToken)
 	suite.NoError(err)
@@ -228,117 +228,7 @@ func (suite *VerificationTestSuite) TestVerifyInitBadIntent() {
 	suite.Equal(http.StatusBadRequest, resp.Code)
 }
 
-func (suite *VerificationTestSuite) TestVerifyValidCheck() {
-	suite.SetupController(true, false)
-
-	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
-
-	// Initialize verification
-	initBody := controllers.VerifyInitRequest{
-		Email:   "test@example.com",
-		Intent:  "verification",
-		Service: "accounts",
-		Locale:  "en-US",
-	}
-
-	initResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", initBody), suite.router)
-	suite.Equal(http.StatusOK, initResp.Code)
-
-	var parsedInitResp controllers.VerifyInitResponse
-	util.DecodeJSONTestResponse(suite.T(), initResp.Body, &parsedInitResp)
-	suite.Require().NotNil(parsedInitResp.VerificationToken)
-
-	verificationID, err := suite.jwtService.ValidateVerificationToken(*parsedInitResp.VerificationToken)
-	suite.NoError(err)
-
-	verification, err := suite.ds.GetVerificationStatus(verificationID)
-	suite.NoError(err)
-
-	// Check valid verification - should return 204
-	checkURL := fmt.Sprintf("/v2/verify/complete?id=%s&code=%s", verification.ID, verification.Code)
-	checkReq := httptest.NewRequest(http.MethodGet, checkURL, nil)
-	checkResp := util.ExecuteTestRequest(checkReq, suite.router)
-	suite.Equal(http.StatusNoContent, checkResp.Code)
-
-	// Should not be able to check with invalid code - should return 404
-	badCheckURL := fmt.Sprintf("/v2/verify/complete?id=%s&code=%s", verification.ID, "abc123")
-	checkReq = httptest.NewRequest(http.MethodGet, badCheckURL, nil)
-	checkResp = util.ExecuteTestRequest(checkReq, suite.router)
-	suite.Equal(http.StatusNotFound, checkResp.Code)
-
-	// Complete verification
-	completeBody := controllers.VerifyCompleteRequest{
-		ID:   verification.ID,
-		Code: verification.Code,
-	}
-	completeResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/complete", completeBody), suite.router)
-	suite.Equal(http.StatusOK, completeResp.Code)
-
-	// Check after completion - should return 404
-	checkReq = httptest.NewRequest(http.MethodGet, checkURL, nil)
-	checkResp = util.ExecuteTestRequest(checkReq, suite.router)
-	suite.Equal(http.StatusNotFound, checkResp.Code)
-	util.AssertErrorResponseCode(suite.T(), checkResp, util.ErrVerificationNotFound.Code)
-
-	// Check with invalid ID - should return 400
-	checkURL = fmt.Sprintf("/v2/verify/complete?id=invalid&code=%s", verification.Code)
-	checkReq = httptest.NewRequest(http.MethodGet, checkURL, nil)
-	checkResp = util.ExecuteTestRequest(checkReq, suite.router)
-	suite.Equal(http.StatusBadRequest, checkResp.Code)
-
-	// Check with missing code - should return 400
-	checkURL = fmt.Sprintf("/v2/verify/complete?id=%s", verification.ID)
-	checkReq = httptest.NewRequest(http.MethodGet, checkURL, nil)
-	checkResp = util.ExecuteTestRequest(checkReq, suite.router)
-	suite.Equal(http.StatusBadRequest, checkResp.Code)
-}
-
 func (suite *VerificationTestSuite) TestVerifyComplete() {
-	suite.SetupController(true, false)
-
-	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
-
-	initBody := controllers.VerifyInitRequest{
-		Email:   "test@example.com",
-		Intent:  "verification",
-		Service: "accounts",
-		Locale:  "en-US",
-	}
-
-	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
-
-	initResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", initBody), suite.router)
-	suite.Equal(http.StatusOK, initResp.Code)
-
-	var parsedInitResp controllers.VerifyInitResponse
-	util.DecodeJSONTestResponse(suite.T(), initResp.Body, &parsedInitResp)
-	suite.Require().NotNil(parsedInitResp.VerificationToken)
-
-	verificationID, err := suite.jwtService.ValidateVerificationToken(*parsedInitResp.VerificationToken)
-	suite.NoError(err)
-
-	verification, err := suite.ds.GetVerificationStatus(verificationID)
-	suite.NoError(err)
-
-	// First attempt - should succeed
-	completeBody := controllers.VerifyCompleteRequest{
-		ID:   verification.ID,
-		Code: verification.Code,
-	}
-
-	completeResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/complete", completeBody), suite.router)
-	suite.Equal(http.StatusOK, completeResp.Code)
-	var parsedResp controllers.VerifyCompleteResponse
-	util.DecodeJSONTestResponse(suite.T(), completeResp.Body, &parsedResp)
-	suite.Equal(verification.Service, parsedResp.Service)
-
-	// Second attempt - should fail
-	completeResp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/complete", completeBody), suite.router)
-	suite.Equal(http.StatusNotFound, completeResp.Code)
-	util.AssertErrorResponseCode(suite.T(), completeResp, util.ErrVerificationNotFound.Code)
-}
-
-func (suite *VerificationTestSuite) TestVerifyQueryResult() {
 	suite.SetupController(false, true)
 
 	testCases := []struct {
@@ -359,7 +249,6 @@ func (suite *VerificationTestSuite) TestVerifyQueryResult() {
 	}
 
 	for _, tc := range testCases {
-
 		suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
 
 		initBody := controllers.VerifyInitRequest{
@@ -382,89 +271,191 @@ func (suite *VerificationTestSuite) TestVerifyQueryResult() {
 		verification, err := suite.ds.GetVerificationStatus(verificationID)
 		suite.NoError(err)
 
-		// First query - should be unverified
-		req := controllers.VerifyResultRequest{
-			Wait: false,
-		}
-		request := util.CreateJSONTestRequest("/v2/verify/result", req)
-		request.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
-		resp := util.ExecuteTestRequest(request, suite.router)
-		suite.Equal(http.StatusOK, resp.Code)
-
-		var result controllers.VerifyResultResponse
-		util.DecodeJSONTestResponse(suite.T(), resp.Body, &result)
-		suite.False(result.Verified)
-		suite.Nil(result.Email)
-		suite.Equal(tc.service, result.Service)
-		suite.Nil(result.AuthToken)
-
-		// Complete verification
-		completeReq := controllers.VerifyCompleteRequest{
-			ID:   verification.ID,
+		// First attempt - should succeed
+		completeBody := controllers.VerifyCompleteRequest{
 			Code: verification.Code,
 		}
-		completeResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/complete", completeReq), suite.router)
+		completeReq := util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
+		completeReq.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
+		completeResp := util.ExecuteTestRequest(completeReq, suite.router)
 		suite.Equal(http.StatusOK, completeResp.Code)
 
-		// Second query - should be verified
-		request = util.CreateJSONTestRequest("/v2/verify/result", req)
-		request.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
-		resp = util.ExecuteTestRequest(request, suite.router)
-		suite.Equal(http.StatusOK, resp.Code)
-
-		expectedEmail := "test@example.com"
-		util.DecodeJSONTestResponse(suite.T(), resp.Body, &result)
-		suite.True(result.Verified)
-		suite.Equal(&expectedEmail, result.Email)
+		var result controllers.VerifyCompleteResponse
+		util.DecodeJSONTestResponse(suite.T(), completeResp.Body, &result)
 		suite.Equal(tc.service, result.Service)
+		expectedEmail := "test@example.com"
+		suite.Equal(&expectedEmail, result.Email)
 
-		var firstSessionID uuid.UUID
 		if tc.shouldHaveAuthToken {
 			suite.Require().NotNil(result.AuthToken)
-
 			sessionID, _, err := suite.jwtService.ValidateAuthToken(*result.AuthToken)
 			suite.NoError(err)
-			firstSessionID = sessionID
 			session, err := suite.ds.GetSession(sessionID)
 			suite.NoError(err)
 			suite.Require().NotNil(session)
-			suite.Equal(session.Version, 1)
+			suite.Equal(datastore.EmailAuthSessionVersion, session.Version)
 		} else {
 			suite.Nil(result.AuthToken)
 		}
 
-		// Third query
-		request = util.CreateJSONTestRequest("/v2/verify/result", req)
-		request.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
-		resp = util.ExecuteTestRequest(request, suite.router)
-		suite.Equal(http.StatusOK, resp.Code)
-
-		util.DecodeJSONTestResponse(suite.T(), resp.Body, &result)
-		suite.True(result.Verified)
-		suite.Equal(&expectedEmail, result.Email)
-		suite.Equal(tc.service, result.Service)
-
+		// Second attempt - auth_token record is deleted after completion, so 404; verification record stays verified, so 400
+		completeReq = util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
+		completeReq.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
+		completeResp = util.ExecuteTestRequest(completeReq, suite.router)
 		if tc.shouldHaveAuthToken {
-			suite.Require().NotNil(result.AuthToken)
-
-			// Ensure session ID is the same as the one from second query
-			sessionID, _, err := suite.jwtService.ValidateAuthToken(*result.AuthToken)
-			suite.NoError(err)
-			suite.Equal(firstSessionID, sessionID)
-
-			// Delete verifications by session ID (simulating what validate endpoint does)
-			err = suite.ds.DeleteVerificationsByNewSessionID(sessionID)
-			suite.NoError(err)
-
-			// Fourth query - verification should be deleted after validate
-			request = util.CreateJSONTestRequest("/v2/verify/result", req)
-			request.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
-			resp = util.ExecuteTestRequest(request, suite.router)
-			suite.Equal(http.StatusNotFound, resp.Code)
+			suite.Equal(http.StatusNotFound, completeResp.Code)
 		} else {
-			suite.Nil(result.AuthToken)
+			suite.Equal(http.StatusBadRequest, completeResp.Code)
+			util.AssertErrorResponseCode(suite.T(), completeResp, util.ErrEmailAlreadyVerified.Code)
 		}
 	}
+
+	suite.sesMock.AssertExpectations(suite.T())
+}
+
+func (suite *VerificationTestSuite) TestVerifyCompleteCaseInsensitive() {
+	suite.SetupController(false, true)
+
+	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
+
+	initBody := controllers.VerifyInitRequest{
+		Email:   "test@example.com",
+		Intent:  "auth_token",
+		Service: "email-aliases",
+		Locale:  "en-US",
+	}
+
+	initResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", initBody), suite.router)
+	suite.Equal(http.StatusOK, initResp.Code)
+
+	var parsedInitResp controllers.VerifyInitResponse
+	util.DecodeJSONTestResponse(suite.T(), initResp.Body, &parsedInitResp)
+	suite.Require().NotNil(parsedInitResp.VerificationToken)
+
+	verificationID, err := suite.jwtService.ValidateVerificationToken(*parsedInitResp.VerificationToken)
+	suite.NoError(err)
+
+	verification, err := suite.ds.GetVerificationStatus(verificationID)
+	suite.NoError(err)
+
+	// Submit code in lowercase - should still succeed
+	completeBody := controllers.VerifyCompleteRequest{Code: strings.ToLower(verification.Code)}
+	completeReq := util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
+	completeReq.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
+	completeResp := util.ExecuteTestRequest(completeReq, suite.router)
+	suite.Equal(http.StatusOK, completeResp.Code)
+
+	suite.sesMock.AssertExpectations(suite.T())
+}
+
+func (suite *VerificationTestSuite) TestVerifyResult() {
+	suite.SetupController(false, true)
+
+	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
+
+	initBody := controllers.VerifyInitRequest{
+		Email:   "test@example.com",
+		Intent:  "verification",
+		Service: "email-aliases",
+		Locale:  "en-US",
+	}
+
+	initResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", initBody), suite.router)
+	suite.Equal(http.StatusOK, initResp.Code)
+
+	var parsedInitResp controllers.VerifyInitResponse
+	util.DecodeJSONTestResponse(suite.T(), initResp.Body, &parsedInitResp)
+	suite.Require().NotNil(parsedInitResp.VerificationToken)
+
+	verificationToken := *parsedInitResp.VerificationToken
+	verificationID, err := suite.jwtService.ValidateVerificationToken(verificationToken)
+	suite.Require().NoError(err)
+
+	verification, err := suite.ds.GetVerificationStatus(verificationID)
+	suite.Require().NoError(err)
+
+	// Before completion - result should show not verified
+	resultReq := httptest.NewRequest(http.MethodGet, "/v2/verify/result", nil)
+	resultReq.Header.Set("Authorization", "Bearer "+verificationToken)
+	resultResp := util.ExecuteTestRequest(resultReq, suite.router)
+	suite.Equal(http.StatusOK, resultResp.Code)
+
+	var result controllers.VerifyResultResponse
+	util.DecodeJSONTestResponse(suite.T(), resultResp.Body, &result)
+	suite.False(result.Verified)
+	suite.Equal("test@example.com", result.Email)
+	suite.Equal("email-aliases", result.Service)
+
+	// Complete verification
+	completeBody := controllers.VerifyCompleteRequest{Code: verification.Code}
+	completeReq := util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
+	completeReq.Header.Set("Authorization", "Bearer "+verificationToken)
+	completeResp := util.ExecuteTestRequest(completeReq, suite.router)
+	suite.Equal(http.StatusOK, completeResp.Code)
+
+	// After completion - result should show verified
+	resultReq = httptest.NewRequest(http.MethodGet, "/v2/verify/result", nil)
+	resultReq.Header.Set("Authorization", "Bearer "+verificationToken)
+	resultResp = util.ExecuteTestRequest(resultReq, suite.router)
+	suite.Equal(http.StatusOK, resultResp.Code)
+
+	util.DecodeJSONTestResponse(suite.T(), resultResp.Body, &result)
+	suite.True(result.Verified)
+	suite.Equal("test@example.com", result.Email)
+	suite.Equal("email-aliases", result.Service)
+
+	suite.sesMock.AssertExpectations(suite.T())
+}
+
+func (suite *VerificationTestSuite) TestVerifyCompleteWrongCode() {
+	suite.SetupController(false, true)
+
+	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
+
+	initBody := controllers.VerifyInitRequest{
+		Email:   "test@example.com",
+		Intent:  "auth_token",
+		Service: "email-aliases",
+		Locale:  "en-US",
+	}
+
+	initResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", initBody), suite.router)
+	suite.Equal(http.StatusOK, initResp.Code)
+
+	var parsedInitResp controllers.VerifyInitResponse
+	util.DecodeJSONTestResponse(suite.T(), initResp.Body, &parsedInitResp)
+	suite.Require().NotNil(parsedInitResp.VerificationToken)
+
+	verificationID, err := suite.jwtService.ValidateVerificationToken(*parsedInitResp.VerificationToken)
+	suite.NoError(err)
+
+	verification, err := suite.ds.GetVerificationStatus(verificationID)
+	suite.NoError(err)
+
+	// Submit 10 wrong codes - each should increment code_attempts
+	for i := 1; i <= 10; i++ {
+		completeBody := controllers.VerifyCompleteRequest{Code: "AAAAAA"}
+		completeReq := util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
+		completeReq.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
+		completeResp := util.ExecuteTestRequest(completeReq, suite.router)
+
+		suite.Equal(http.StatusBadRequest, completeResp.Code)
+		util.AssertErrorResponseCode(suite.T(), completeResp, util.ErrInvalidCode.Code)
+
+		updated, err := suite.ds.GetVerificationStatus(verification.ID)
+		suite.Require().NoError(err)
+		suite.Equal(int16(i), updated.CodeAttempts)
+	}
+
+	// Any further attempt should be rejected once max attempts is reached
+	completeBody := controllers.VerifyCompleteRequest{Code: verification.Code}
+	completeReq := util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
+	completeReq.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
+	completeResp := util.ExecuteTestRequest(completeReq, suite.router)
+	suite.Equal(http.StatusBadRequest, completeResp.Code)
+	util.AssertErrorResponseCode(suite.T(), completeResp, util.ErrMaxCodeAttempts.Code)
+
+	suite.sesMock.AssertExpectations(suite.T())
 }
 
 func (suite *VerificationTestSuite) TestVerificationExpiry() {
@@ -497,15 +488,13 @@ func (suite *VerificationTestSuite) TestVerificationExpiry() {
 	suite.NoError(err)
 
 	// Query verification status - should be expired
-	req := controllers.VerifyResultRequest{
-		Wait: false,
-	}
-	request := util.CreateJSONTestRequest("/v2/verify/result", req)
-	request.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
-	resp := util.ExecuteTestRequest(request, suite.router)
+	completeBody := controllers.VerifyCompleteRequest{Code: "AAAAAA"}
+	completeReq := util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
+	completeReq.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
+	completeResp := util.ExecuteTestRequest(completeReq, suite.router)
 
 	// Should return not found due to expired verification
-	suite.Equal(http.StatusNotFound, resp.Code)
+	suite.Equal(http.StatusNotFound, completeResp.Code)
 }
 
 func (suite *VerificationTestSuite) TestVerifyInitChangePasswordRequiresAuth() {
@@ -601,11 +590,11 @@ func (suite *VerificationTestSuite) TestVerifyResend() {
 		}
 	}
 
-	completeBody := controllers.VerifyCompleteRequest{
-		ID:   verification.ID,
-		Code: verification.Code,
-	}
-	completeResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/complete", completeBody), suite.router)
+	// Complete verification then attempt resend
+	completeBody := controllers.VerifyCompleteRequest{Code: verification.Code}
+	completeReq := util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
+	completeReq.Header.Set("Authorization", "Bearer "+verificationToken)
+	completeResp := util.ExecuteTestRequest(completeReq, suite.router)
 	suite.Equal(http.StatusOK, completeResp.Code)
 
 	req := util.CreateJSONTestRequest("/v2/verify/resend", resendBody)

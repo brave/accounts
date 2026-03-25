@@ -42,16 +42,25 @@ pub fn make_request(
 
     if !status.is_success() {
         let error_body = response.text().unwrap();
-        panic!(
-            "Request failed with status: {status}, body: {error_body}"
-        );
+
+        // Don't panic for 400 or 404 on complete endpoint - let caller handle it
+        if (status == StatusCode::BAD_REQUEST || status == StatusCode::NOT_FOUND)
+            && path == "/v2/verify/complete"
+        {
+            let response_value = serde_json::from_str(&error_body).unwrap_or(serde_json::json!({}));
+            return (response_value, status);
+        }
+
+        panic!("Request failed with status: {status}, body: {error_body}");
     }
 
     if status == StatusCode::NO_CONTENT {
         return (serde_json::json!({}), status);
     }
 
-    let response_value = response.json::<Value>().expect("Failed to parse JSON response");
+    let response_value = response
+        .json::<Value>()
+        .expect("Failed to parse JSON response");
     verbose_log(args, format!("response: {response_value:?}").as_str());
 
     (response_value, status)

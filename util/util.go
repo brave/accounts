@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -50,14 +49,6 @@ const (
 	recoveryKeyArgonSaltLength = 16
 	recoveryKeyFullHashLength  = recoveryKeyArgonKeyLength + recoveryKeyArgonSaltLength
 )
-
-func GenerateRandomString(length int) string {
-	b := make([]byte, length)
-	if _, err := rand.Read(b); err != nil {
-		panic(fmt.Errorf("failed to generate random string: %w", err))
-	}
-	return base64.URLEncoding.EncodeToString(b)
-}
 
 func generateRecoveryKeyHash(recoveryKey string, salt []byte) []byte {
 	uppercaseKey := strings.TrimSpace(strings.ToUpper(recoveryKey))

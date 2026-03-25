@@ -8,6 +8,7 @@ use opaque_ke::{
     RegistrationResponse,
 };
 use rand::rngs::OsRng;
+use reqwest::StatusCode;
 use serde_json::Value;
 use std::{collections::HashMap, thread};
 use totp_rs::TOTP;
@@ -162,48 +163,43 @@ fn maybe_handle_twofa(args: &CliArgs, resp: Value, token: &str, endpoint: &str) 
         endpoint,
         Some(token),
         Some(twofa_body),
-    ).0
+    )
+    .0
 }
 
-fn wait_for_verification(args: &CliArgs, verification_token: &str) -> Option<String> {
-    println!("Click on the verification link...");
-
+fn complete_verification(args: &CliArgs, verification_token: &str) -> Option<String> {
     loop {
-        let mut result_body = HashMap::new();
-        result_body.insert("wait", true.into());
+        let code = prompt_for_input("Enter the verification code from your email: ");
 
-        let (result, _) = make_request(
+        let mut body = HashMap::new();
+        body.insert("code", Value::String(code));
+
+        let (response, status) = make_request(
             args,
             reqwest::Method::POST,
-            "/v2/verify/result",
+            "/v2/verify/complete",
             Some(verification_token),
-            Some(result_body),
+            Some(body),
         );
 
-        if result
-            .get("verified")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false)
-        {
-            let auth_token = result
-                .get("authToken")
-                .and_then(|v| v.as_str())
-                .map(String::from);
-            let email = result
-                .get("email")
-                .expect("email should be in result response")
-                .as_str()
-                .expect("email should be a string");
-            let service_name = result
-                .get("service")
-                .expect("service should be in result response")
-                .as_str()
-                .expect("service should be a string");
-            println!("verification token: {verification_token}");
-            println!("email: {email}");
-            println!("service: {service_name}");
-            return auth_token;
+        if status == StatusCode::BAD_REQUEST || status == StatusCode::NOT_FOUND {
+            eprintln!("Error: {response}");
+            continue;
         }
+
+        let auth_token = response
+            .get("authToken")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let email = response.get("email").and_then(|v| v.as_str()).unwrap_or("");
+        let service_name = response
+            .get("service")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        println!("verification token: {verification_token}");
+        println!("email: {email}");
+        println!("service: {service_name}");
+        return auth_token;
     }
 }
 
@@ -270,7 +266,7 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
         .and_then(|v| v.as_str())
         .expect("Failed to get verification token");
 
-    let auth_token = wait_for_verification(args, verification_token);
+    let auth_token = complete_verification(args, verification_token);
     (verification_token.to_string(), auth_token)
 }
 
@@ -377,10 +373,14 @@ fn set_password(args: CliArgs) {
 
     // If this was a registration, wait for email verification after password setup
     let auth_token = if args.register {
-        wait_for_verification(&args, &token).expect("Failed to get auth token after verification")
+        complete_verification(&args, &token).expect("Failed to get auth token after verification")
     } else if args.change_password && !resp.get("sessionsInvalidated").unwrap().as_bool().unwrap() {
         // Reuse existing auth token since it's still valid
-        args.token.as_ref().expect("change password requires auth").trim().to_string()
+        args.token
+            .as_ref()
+            .expect("change password requires auth")
+            .trim()
+            .to_string()
     } else {
         resp.get("authToken").unwrap().as_str().unwrap().to_string()
     };
@@ -575,7 +575,8 @@ fn enable_totp(args: &CliArgs) {
 fn logout(args: &CliArgs) {
     println!("Logging out...");
 
-    let auth_token = args.token
+    let auth_token = args
+        .token
         .as_ref()
         .expect("auth token is required for logout");
 
@@ -600,7 +601,8 @@ fn logout(args: &CliArgs) {
 fn list_keys(args: &CliArgs) {
     println!("Listing user keys...");
 
-    let auth_token = args.token
+    let auth_token = args
+        .token
         .as_ref()
         .expect("auth token is required for listing keys");
 
@@ -618,12 +620,8 @@ fn list_keys(args: &CliArgs) {
         } else {
             println!("Found {} key(s):", keys_array.len());
             for (i, key) in keys_array.iter().enumerate() {
-                let service = key.get("service")
-                    .and_then(|v| v.as_str())
-                    .unwrap();
-                let key_name = key.get("keyName")
-                    .and_then(|v| v.as_str())
-                    .unwrap();
+                let service = key.get("service").and_then(|v| v.as_str()).unwrap();
+                let key_name = key.get("keyName").and_then(|v| v.as_str()).unwrap();
                 println!("  {}. {}/{}", i + 1, service, key_name);
                 if let Some(material) = key.get("keyMaterial").and_then(|v| v.as_str()) {
                     println!("     Material: {material}");
@@ -644,11 +642,13 @@ fn list_keys(args: &CliArgs) {
 fn store_key(args: &CliArgs) {
     println!("Storing user key...");
 
-    let auth_token = args.token
+    let auth_token = args
+        .token
         .as_ref()
         .expect("auth token is required for storing keys");
 
-    let service_name = args.service_name
+    let service_name = args
+        .service_name
         .as_ref()
         .expect("service name is required for storing keys");
 
@@ -682,11 +682,13 @@ fn store_key(args: &CliArgs) {
 fn get_key(args: &CliArgs) {
     println!("Getting user key...");
 
-    let auth_token = args.token
+    let auth_token = args
+        .token
         .as_ref()
         .expect("auth token is required for getting keys");
 
-    let service_name = args.service_name
+    let service_name = args
+        .service_name
         .as_ref()
         .expect("service name is required for getting keys");
 

@@ -1,7 +1,6 @@
 package controllers_test
 
 import (
-	"context"
 	"encoding/base32"
 	"encoding/hex"
 	"fmt"
@@ -136,7 +135,7 @@ func (suite *AccountsTestSuite) TestResetPassword() {
 	// Create verification with reset_password intent
 	verification, err := suite.ds.CreateVerification("test@example.com", "accounts", "reset_password")
 	suite.Require().NoError(err)
-	_, err = suite.ds.UpdateAndGetVerificationStatus(verification.ID, verification.Code)
+	err = suite.ds.MarkVerificationAsComplete(verification.ID)
 	suite.Require().NoError(err)
 
 	// Get verification token
@@ -243,6 +242,7 @@ func (suite *AccountsTestSuite) TestRegistration() {
 	suite.NotNil(parsedResp.SerializedResponse)
 	suite.NotNil(parsedResp.VerificationToken) // Verification token should be present for registration
 	suite.NotEmpty(*parsedResp.VerificationToken)
+	suite.False(parsedResp.VerificationTokenExpiresAt.IsZero()) // Expiry should be present alongside verification token
 
 	// Validate the verification token
 	verificationID, err := suite.jwtService.ValidateVerificationToken(*parsedResp.VerificationToken)
@@ -294,21 +294,19 @@ func (suite *AccountsTestSuite) TestRegistration() {
 	suite.Nil(account.LastEmailVerifiedAt) // Email not verified yet
 
 	// Simulate email verification using verification service
-	_, err = suite.verificationService.CompleteVerification(verification.ID, verification.Code)
+	verificationResult, err := suite.verificationService.CompleteVerification(verification, verification.Code, "test-user-agent")
 	suite.Require().NoError(err)
+	suite.NotNil(verificationResult.AuthToken)
 
 	// Check that account is now verified
 	account, err = suite.ds.GetAccount(nil, email)
 	suite.Require().NoError(err)
 	suite.NotNil(account.LastEmailVerifiedAt) // Email should now be verified
 
-	// Get verification result to trigger session creation (simulates the verification result endpoint)
-	verification, err = suite.ds.GetVerificationStatus(verification.ID)
+	// Check that account is now verified
+	account, err = suite.ds.GetAccount(nil, email)
 	suite.Require().NoError(err)
-	verificationResult, err := suite.verificationService.GetVerificationResult(context.Background(), verification, false, "test-user-agent")
-	suite.Require().NoError(err)
-	suite.True(verificationResult.Verified)
-	suite.NotNil(verificationResult.AuthToken)
+	suite.NotNil(account.LastEmailVerifiedAt) // Email should now be verified
 
 	// Check that the session created has the correct version (PasswordAuthSessionVersion)
 	sessionID, _, err := suite.jwtService.ValidateAuthToken(*verificationResult.AuthToken)
@@ -420,7 +418,7 @@ func (suite *AccountsTestSuite) TestChangePassword() {
 
 		changeVerification, err := suite.ds.CreateVerification(email, "accounts", "change_password")
 		suite.Require().NoError(err)
-		_, err = suite.ds.UpdateAndGetVerificationStatus(changeVerification.ID, changeVerification.Code)
+		err = suite.ds.MarkVerificationAsComplete(changeVerification.ID)
 		suite.Require().NoError(err)
 
 		changeToken, err := suite.jwtService.CreateVerificationToken(changeVerification.ID, time.Minute*30, changeVerification.Service)
@@ -502,7 +500,7 @@ func (suite *AccountsTestSuite) TestSetPasswordBadIntents() {
 	for _, intent := range intents {
 		verification, err := suite.ds.CreateVerification("test@example.com", "accounts", intent)
 		suite.Require().NoError(err)
-		_, err = suite.ds.UpdateAndGetVerificationStatus(verification.ID, verification.Code)
+		err = suite.ds.MarkVerificationAsComplete(verification.ID)
 		suite.Require().NoError(err)
 
 		token, err := suite.jwtService.CreateVerificationToken(verification.ID, time.Minute*30, verification.Service)

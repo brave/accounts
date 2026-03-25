@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/brave/accounts/datastore"
 	"github.com/brave/accounts/middleware"
@@ -15,7 +16,6 @@ import (
 	"github.com/brave/accounts/util"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -45,46 +45,40 @@ type VerifyInitRequest struct {
 type VerifyInitResponse struct {
 	// JWT token for checking verification status
 	VerificationToken *string `json:"verificationToken"`
-}
-
-// @Description	Request for getting auth token after verification
-type VerifyResultRequest struct {
-	// Whether to wait for verification to complete
-	Wait bool `json:"wait"`
+	// Expiry timestamp of the verification token
+	VerificationTokenExpiresAt time.Time `json:"verificationTokenExpiresAt"`
 }
 
 // @Description	Response containing auth token
-type VerifyResultResponse struct {
+type VerifyCompleteResponse struct {
 	// JWT auth token, null if verification incomplete or if password setup is required
 	AuthToken *string `json:"authToken"`
-	// Email verification status
-	Verified bool `json:"verified"`
-	// Email associated wiith the verification
+	// Email associated with the verification
 	Email *string `json:"email,omitempty"`
 	// Name of service requesting verification
 	Service string `json:"service"`
 }
 
-// @Description Request parameters for verification completion
+// @Description Request body for verification completion
 type VerifyCompleteRequest struct {
-	// Unique verification identifier
-	ID uuid.UUID `json:"id" validate:"required"`
-	// Verification code sent to user
-	Code string `json:"code" validate:"required,ascii"`
-}
-
-// @Description Response for verification completion
-type VerifyCompleteResponse struct {
-	// JWT token for checking verification status
-	VerificationToken *string `json:"verificationToken"`
-	// Name of service requesting verification
-	Service string `json:"service"`
+	// 6-character base32 verification code
+	Code string `json:"code" validate:"required,len=6"`
 }
 
 // @Description Request for resending verification email
 type VerifyResendRequest struct {
 	// Locale for verification email
 	Locale string `json:"locale" validate:"max=20" example:"en-US"`
+}
+
+// @Description Response containing the result of a verification
+type VerifyResultResponse struct {
+	// Whether the email has been verified
+	Verified bool `json:"verified"`
+	// Email associated with the verification
+	Email string `json:"email"`
+	// Name of service requesting verification
+	Service string `json:"service"`
 }
 
 type localStackEmails struct {
@@ -102,13 +96,11 @@ func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Ha
 	r := chi.NewRouter()
 
 	r.With(servicesKeyMiddleware).With(optionalAuthMiddleware).Post("/init", vc.VerifyInit)
-	r.Get("/complete", vc.VerifyValidCheck)
-	r.Post("/complete", vc.VerifyComplete)
+	r.With(servicesKeyMiddleware).With(verificationAuthMiddleware).Post("/complete", vc.VerifyComplete)
+	r.With(servicesKeyMiddleware).With(verificationAuthMiddleware).Get("/result", vc.VerifyResult)
 	if devEndpointsEnabled {
-		r.Get("/complete_fe", vc.VerifyCompleteFrontend)
 		r.Get("/email_viewer", vc.EmailViewer)
 	}
-	r.With(servicesKeyMiddleware).With(verificationAuthMiddleware).Post("/result", vc.VerifyQueryResult)
 	r.With(servicesKeyMiddleware).With(verificationAuthMiddleware).Post("/resend", vc.VerifyResend)
 	r.With(servicesKeyMiddleware).With(verificationAuthMiddleware).Delete("/", vc.VerifyDelete)
 
@@ -177,47 +169,9 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, &VerifyInitResponse{
-		VerificationToken: verificationToken,
+		VerificationToken:          verificationToken,
+		VerificationTokenExpiresAt: time.Now().Add(datastore.VerificationExpiration),
 	})
-}
-
-// @Summary Check verification code validity
-// @Description Checks if email verification code is valid and still pending
-// @Tags Email verification
-// @Accept json
-// @Produce json
-// @Param id query string true "Verification ID"
-// @Param code query string true "Verification code"
-// @Success 204 "Verification is pending"
-// @Failure 400 {string} string "Missing/invalid verification parameters"
-// @Failure 404 {string} string "Verification not found or expired"
-// @Failure 500 {string} string "Internal server error"
-// @Router /v2/verify/complete [get]
-func (vc *VerificationController) VerifyValidCheck(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(r.URL.Query().Get("id"))
-	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, errors.New("invalid verification id"))
-		return
-	}
-
-	code := r.URL.Query().Get("code")
-	if code == "" {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, errors.New("missing verification code"))
-		return
-	}
-
-	err = vc.datastore.EnsureVerificationCodeIsPending(id, code)
-	if err != nil {
-		if errors.Is(err, util.ErrVerificationNotFound) {
-			util.RenderErrorResponse(w, r, http.StatusNotFound, err)
-			return
-		}
-		log.Err(err).Msg("failed to check verification status")
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
 }
 
 // @Summary Delete verification for registration
@@ -262,6 +216,7 @@ func (vc *VerificationController) VerifyDelete(w http.ResponseWriter, r *http.Re
 // @Tags Email verification
 // @Accept json
 // @Produce json
+// @Param Authorization header string true "Bearer + verification token"
 // @Param request body VerifyCompleteRequest true "Verify completion params"
 // @Success 200 {object} VerifyCompleteResponse
 // @Failure 400 {string} string "Missing/invalid verification parameters"
@@ -269,84 +224,52 @@ func (vc *VerificationController) VerifyDelete(w http.ResponseWriter, r *http.Re
 // @Failure 500 {string} string "Internal server error"
 // @Router /v2/verify/complete [post]
 func (vc *VerificationController) VerifyComplete(w http.ResponseWriter, r *http.Request) {
+	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
+
 	var requestData VerifyCompleteRequest
 	if !util.DecodeJSONAndValidate(w, r, &requestData) {
 		return
 	}
 
-	result, err := vc.verificationService.CompleteVerification(requestData.ID, requestData.Code)
+	result, err := vc.verificationService.CompleteVerification(verification, requestData.Code, r.UserAgent())
 
 	if err != nil {
-		if errors.Is(err, util.ErrVerificationNotFound) {
-			util.RenderErrorResponse(w, r, http.StatusNotFound, err)
+		if errors.Is(err, util.ErrMaxCodeAttempts) || errors.Is(err, util.ErrInvalidCode) || errors.Is(err, util.ErrEmailAlreadyVerified) {
+			util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
 			return
 		}
-		log.Err(err).Msg("failed to update verification status")
+		log.Err(err).Msg("failed to complete verification")
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
 
 	render.Status(r, http.StatusOK)
-	render.JSON(w, r, &VerifyCompleteResponse{
-		VerificationToken: result.VerificationToken,
-		Service:           result.Verification.Service,
-	})
-}
-
-// @Summary Query result of verification
-// @Description Provides the status of a pending or successful verification.
-// @Description If the wait option is set to true, the server will up to 20 seconds for verification. Feel free
-// @Description to call this endpoint repeatedly to wait for verification.
-// @Tags Email verification
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer + verification token"
-// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
-// @Param request body VerifyResultRequest true "Auth token request params"
-// @Success 200 {object} VerifyResultResponse
-// @Failure 400 {object} util.ErrorResponse
-// @Failure 401 {object} util.ErrorResponse
-// @Failure 500 {object} util.ErrorResponse
-// @Router /v2/verify/result [post]
-func (vc *VerificationController) VerifyQueryResult(w http.ResponseWriter, r *http.Request) {
-	var requestData VerifyResultRequest
-	if err := render.DecodeJSON(r.Body, &requestData); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
-		return
-	}
-
-	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
-
-	// Delegate to service
-	result, err := vc.verificationService.GetVerificationResult(
-		r.Context(),
-		verification,
-		requestData.Wait,
-		r.UserAgent(),
-	)
-
-	if err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
-
-	render.Status(r, http.StatusOK)
-	render.JSON(w, r, VerifyResultResponse{
+	render.JSON(w, r, VerifyCompleteResponse{
 		AuthToken: result.AuthToken,
-		Verified:  result.Verified,
 		Email:     result.Email,
 		Service:   result.Service,
 	})
 }
 
-// @Summary Display default verification completion frontend
-// @Description Returns the HTML page for completing email verification
-// @Tags Development
-// @Produce html
-// @Success 200 {string} string "HTML content"
-// @Router /v2/verify/complete_fe [get]
-func (vc *VerificationController) VerifyCompleteFrontend(w http.ResponseWriter, r *http.Request) {
-	render.HTML(w, r, templates.DefaultVerifyFrontendContent)
+// @Summary Query result of verification
+// @Description Returns the current verification status and associated details
+// @Tags Email verification
+// @Produce json
+// @Param Authorization header string true "Bearer + verification token"
+// @Success 200 {object} VerifyResultResponse
+// @Failure 401 {object} util.ErrorResponse
+// @Failure 404 {object} util.ErrorResponse
+// @Failure 500 {object} util.ErrorResponse
+// @Router /v2/verify/result [get]
+func (vc *VerificationController) VerifyResult(w http.ResponseWriter, r *http.Request) {
+	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
+
+	render.Status(r, http.StatusOK)
+	render.JSON(w, r, VerifyResultResponse{
+		Verified: verification.Verified,
+		Email:    verification.Email,
+		Service:  verification.Service,
+	})
 }
 
 // @Summary View sent emails in LocalStack SES
