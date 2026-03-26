@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/brave/accounts/datastore"
 	"github.com/brave/accounts/util"
@@ -133,13 +132,13 @@ func (vs *VerificationService) CompleteVerification(verification *datastore.Veri
 		}
 	}
 
-	if strings.ToUpper(code) != verification.Code {
+	if util.NormalizeVerificationCode(code) != verification.Code {
 		return nil, util.ErrInvalidCode
 	}
 
 	result := VerificationResult{
 		Service: verification.Service,
-		Email: &verification.Email,
+		Email:   &verification.Email,
 	}
 
 	var err error

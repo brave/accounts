@@ -322,7 +322,7 @@ func (suite *VerificationTestSuite) TestVerifyComplete() {
 	suite.sesMock.AssertExpectations(suite.T())
 }
 
-func (suite *VerificationTestSuite) TestVerifyCompleteCaseInsensitive() {
+func (suite *VerificationTestSuite) TestVerifyCompleteWithHyphen() {
 	suite.SetupController(false, true)
 
 	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
@@ -347,8 +347,9 @@ func (suite *VerificationTestSuite) TestVerifyCompleteCaseInsensitive() {
 	verification, err := suite.ds.GetVerificationStatus(verificationID)
 	suite.NoError(err)
 
-	// Submit code in lowercase - should still succeed
-	completeBody := controllers.VerifyCompleteRequest{Code: strings.ToLower(verification.Code)}
+	// Insert a hyphen in the middle and lowercase to exercise normalization.
+	mangled := strings.ToLower(verification.Code[:3]) + "-" + strings.ToLower(verification.Code[3:])
+	completeBody := controllers.VerifyCompleteRequest{Code: mangled}
 	completeReq := util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
 	completeReq.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
 	completeResp := util.ExecuteTestRequest(completeReq, suite.router)

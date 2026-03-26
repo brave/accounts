@@ -55,7 +55,7 @@ func (d *Datastore) CreateVerification(email string, service string, intent stri
 	if _, err := rand.Read(b); err != nil {
 		return nil, fmt.Errorf("failed to generate random code: %w", err)
 	}
-	code := base32.StdEncoding.EncodeToString(b)[:codeLength]
+	code := util.NormalizeVerificationCode(base32.StdEncoding.EncodeToString(b)[:codeLength])
 
 	id, err := uuid.NewV7()
 	if err != nil {

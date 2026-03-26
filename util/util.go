@@ -312,6 +312,20 @@ func (k *KeyServiceClient) MakeRequest(method string, path string, body interfac
 	return nil
 }
 
+// NormalizeVerificationCode applies canonical cleanup rules to a verification
+// code to tolerate common user input mistakes before comparison or storage.
+func NormalizeVerificationCode(code string) string {
+	code = strings.ToUpper(code)
+	code = strings.ReplaceAll(code, " ", "")
+	code = strings.ReplaceAll(code, "\t", "")
+	code = strings.ReplaceAll(code, "\n", "")
+	code = strings.ReplaceAll(code, "-", "")
+	code = strings.ReplaceAll(code, "1", "I")
+	code = strings.ReplaceAll(code, "8", "B")
+	code = strings.ReplaceAll(code, "0", "O")
+	return code
+}
+
 func GetRequestLocale(explicitLocale string, r *http.Request) string {
 	locale := explicitLocale
 	if locale == "" {

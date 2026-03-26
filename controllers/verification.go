@@ -62,7 +62,7 @@ type VerifyCompleteResponse struct {
 // @Description Request body for verification completion
 type VerifyCompleteRequest struct {
 	// 6-character base32 verification code
-	Code string `json:"code" validate:"required,len=6"`
+	Code string `json:"code" validate:"required,min=6,max=10"`
 }
 
 // @Description Request for resending verification email
