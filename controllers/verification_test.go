@@ -298,12 +298,21 @@ func (suite *VerificationTestSuite) TestVerifyComplete() {
 			suite.Nil(result.AuthToken)
 		}
 
-		// Second attempt - auth_token record is deleted after completion, so 404; verification record stays verified, so 400
+		// Second attempt
 		completeReq = util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
 		completeReq.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
 		completeResp = util.ExecuteTestRequest(completeReq, suite.router)
 		if tc.shouldHaveAuthToken {
-			suite.Equal(http.StatusNotFound, completeResp.Code)
+			// auth_token/registration: re-issues auth token from existing session
+			suite.Equal(http.StatusOK, completeResp.Code)
+			var result2 controllers.VerifyCompleteResponse
+			util.DecodeJSONTestResponse(suite.T(), completeResp.Body, &result2)
+			suite.Require().NotNil(result2.AuthToken)
+			sessionID2, _, err := suite.jwtService.ValidateAuthToken(*result2.AuthToken)
+			suite.NoError(err)
+			// Same session as the first attempt
+			firstSessionID, _, _ := suite.jwtService.ValidateAuthToken(*result.AuthToken)
+			suite.Equal(firstSessionID, sessionID2)
 		} else {
 			suite.Equal(http.StatusBadRequest, completeResp.Code)
 			util.AssertErrorResponseCode(suite.T(), completeResp, util.ErrEmailAlreadyVerified.Code)

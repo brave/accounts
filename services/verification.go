@@ -117,16 +117,20 @@ func (vs *VerificationService) SendVerificationEmail(ctx context.Context, verifi
 }
 
 func (vs *VerificationService) CompleteVerification(verification *datastore.Verification, code string, userAgent string) (*VerificationResult, error) {
-	if verification.Verified {
+	producesAuthToken := verification.Intent == datastore.AuthTokenIntent || verification.Intent == datastore.RegistrationIntent
+
+	if verification.Verified && !producesAuthToken {
 		return nil, util.ErrEmailAlreadyVerified
 	}
 
-	if verification.CodeAttempts >= datastore.MaxCodeAttempts {
-		return nil, util.ErrMaxCodeAttempts
-	}
+	if !verification.Verified {
+		if verification.CodeAttempts >= datastore.MaxCodeAttempts {
+			return nil, util.ErrMaxCodeAttempts
+		}
 
-	if err := vs.datastore.IncrementVerificationCodeAttempts(verification.ID); err != nil {
-		return nil, err
+		if err := vs.datastore.IncrementVerificationCodeAttempts(verification.ID); err != nil {
+			return nil, err
+		}
 	}
 
 	if strings.ToUpper(code) != verification.Code {
@@ -135,43 +139,52 @@ func (vs *VerificationService) CompleteVerification(verification *datastore.Veri
 
 	result := VerificationResult{
 		Service: verification.Service,
+		Email: &verification.Email,
 	}
 
 	var err error
-	var authToken *string
 	var account *datastore.Account
-	if verification.Intent == datastore.AuthTokenIntent || verification.Intent == datastore.RegistrationIntent {
-		if err := vs.datastore.DeleteVerification(verification.ID); err != nil {
-			return nil, err
-		}
+	if producesAuthToken {
+		sessionID := verification.NewSessionID
+		if sessionID == nil {
+			account, err = vs.datastore.GetOrCreateAccount(verification.Email)
+			if err != nil {
+				return nil, err
+			}
 
-		account, err = vs.datastore.GetOrCreateAccount(verification.Email)
-		if err != nil {
-			return nil, err
-		}
+			sessionVersion := datastore.EmailAuthSessionVersion
+			if verification.Intent == datastore.RegistrationIntent {
+				sessionVersion = datastore.PasswordAuthSessionVersion
+			}
+			session, err := vs.datastore.CreateSession(account.ID, sessionVersion, userAgent)
+			if err != nil {
+				return nil, err
+			}
 
-		sessionVersion := datastore.EmailAuthSessionVersion
-		if verification.Intent == datastore.RegistrationIntent {
-			sessionVersion = datastore.PasswordAuthSessionVersion
-		}
-		session, err := vs.datastore.CreateSession(account.ID, sessionVersion, userAgent)
-		if err != nil {
-			return nil, err
+			// save the session ID so that the client can regenerate the auth token
+			// in the event of a network server/error
+			if err = vs.datastore.SetVerificationNewSessionID(verification.ID, session.ID); err != nil {
+				return nil, err
+			}
+
+			sessionID = &session.ID
 		}
 
 		expirationDuration := ChildAuthTokenExpirationTime
-		authTokenResult, err := vs.jwtService.CreateAuthToken(session.ID, &expirationDuration, verification.Service)
+		authTokenResult, err := vs.jwtService.CreateAuthToken(*sessionID, &expirationDuration, verification.Service)
 		if err != nil {
 			return nil, err
 		}
-		authToken = &authTokenResult
+		result.AuthToken = &authTokenResult
 	} else {
-		if err := vs.datastore.MarkVerificationAsComplete(verification.ID); err != nil {
-			return nil, err
-		}
-
 		account, err = vs.datastore.GetAccount(nil, verification.Email)
 		if err != nil && err != datastore.ErrAccountNotFound {
+			return nil, err
+		}
+	}
+
+	if !verification.Verified {
+		if err = vs.datastore.MarkVerificationAsComplete(verification.ID); err != nil {
 			return nil, err
 		}
 	}
@@ -181,9 +194,6 @@ func (vs *VerificationService) CompleteVerification(verification *datastore.Veri
 			return nil, err
 		}
 	}
-
-	result.AuthToken = authToken
-	result.Email = &verification.Email
 
 	return &result, nil
 }

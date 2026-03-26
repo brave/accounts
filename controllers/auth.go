@@ -247,6 +247,10 @@ func (ac *AuthController) Validate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := ac.ds.DeleteVerificationsByNewSessionID(session.ID); err != nil {
+		log.Error().Err(err).Msg("failed to delete verifications by session id")
+	}
+
 	response := ValidateTokenResponse{
 		Email:     session.Email,
 		AccountID: session.AccountID.String(),
