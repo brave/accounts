@@ -20,15 +20,15 @@ other = "Hello,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Enter the code below to verify your email and set a new password for your account."
+other = "Here is the code you will need to verify your email address and set a new password for your Brave account."
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Enter the code below to verify your email and create your Brave account."
+other = "Here is the code you will need to verify your email address and create your Brave account."
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Enter the code below to verify your email."
+other = "Here is the code you will need to verify your email address."
 
 [LoginEmailInstructions]
 description = "Instruction to verify an email address and login to an account"
