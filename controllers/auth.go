@@ -520,6 +520,7 @@ func (ac *AuthController) LoginFinalize2FA(w http.ResponseWriter, r *http.Reques
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + auth token"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Param request body CreateServiceTokenRequest true "Service token request"
 // @Success 200 {object} CreateServiceTokenResponse
 // @Failure 400 {object} util.ErrorResponse

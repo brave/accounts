@@ -179,6 +179,7 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 // @Description Also deletes any unverified account associated with the verification email.
 // @Tags Email verification
 // @Param Authorization header string true "Bearer + verification token"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Success 204 "Verification deleted successfully"
 // @Failure 400 {object} util.ErrorResponse
 // @Failure 401 {object} util.ErrorResponse
@@ -217,11 +218,12 @@ func (vc *VerificationController) VerifyDelete(w http.ResponseWriter, r *http.Re
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + verification token"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Param request body VerifyCompleteRequest true "Verify completion params"
 // @Success 200 {object} VerifyCompleteResponse
-// @Failure 400 {string} string "Missing/invalid verification parameters"
-// @Failure 404 {string} string "Verification not found"
-// @Failure 500 {string} string "Internal server error"
+// @Failure 400 {object} util.ErrorResponse "Missing/invalid verification parameters"
+// @Failure 404 {object} util.ErrorResponse "Verification not found"
+// @Failure 500 {object} util.ErrorResponse "Internal server error"
 // @Router /v2/verify/complete [post]
 func (vc *VerificationController) VerifyComplete(w http.ResponseWriter, r *http.Request) {
 	verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
@@ -256,6 +258,7 @@ func (vc *VerificationController) VerifyComplete(w http.ResponseWriter, r *http.
 // @Tags Email verification
 // @Produce json
 // @Param Authorization header string true "Bearer + verification token"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Success 200 {object} VerifyResultResponse
 // @Failure 401 {object} util.ErrorResponse
 // @Failure 404 {object} util.ErrorResponse
@@ -277,7 +280,7 @@ func (vc *VerificationController) VerifyResult(w http.ResponseWriter, r *http.Re
 // @Tags Development
 // @Produce html
 // @Success 200 {string} string "HTML page displaying emails"
-// @Failure 500 {string} string "Internal Server Error"
+// @Failure 500 {object} util.ErrorResponse "Internal Server Error"
 // @Router /v2/verify/email_viewer [get]
 func (vc *VerificationController) EmailViewer(w http.ResponseWriter, r *http.Request) {
 	resp, err := http.Get(localStackSESEndpoint)
@@ -315,6 +318,7 @@ func (vc *VerificationController) EmailViewer(w http.ResponseWriter, r *http.Req
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer + verification token"
+// @Param BraveServiceKey header string false "Brave services key (if one is configured)"
 // @Param request body VerifyResendRequest true "Resend request params"
 // @Success 204 "Email resent successfully"
 // @Failure 400 {object} util.ErrorResponse
