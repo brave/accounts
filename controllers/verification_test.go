@@ -699,6 +699,61 @@ func (suite *VerificationTestSuite) TestVerifyDeleteAlreadyVerified() {
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailAlreadyVerified.Code)
 }
 
+func (suite *VerificationTestSuite) TestVerifyCompleteRegistrationIntentAfterWrongCodes() {
+	suite.SetupController(true, false)
+
+	verification, err := suite.ds.CreateVerification("test@example.com", util.AccountsServiceName, datastore.RegistrationIntent)
+	suite.Require().NoError(err)
+
+	token, err := suite.jwtService.CreateVerificationToken(verification.ID, time.Minute*30, verification.Service)
+	suite.Require().NoError(err)
+
+	// First completion with correct code - should succeed and produce an auth token
+	completeBody := controllers.VerifyCompleteRequest{Code: verification.Code}
+	completeReq := util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
+	completeReq.Header.Set("Authorization", "Bearer "+token)
+	completeResp := util.ExecuteTestRequest(completeReq, suite.router)
+	suite.Require().Equal(http.StatusOK, completeResp.Code)
+
+	var firstResult controllers.VerifyCompleteResponse
+	util.DecodeJSONTestResponse(suite.T(), completeResp.Body, &firstResult)
+	suite.Require().NotNil(firstResult.AuthToken)
+
+	// Submit 15 wrong codes - verification is already complete so code_attempts must not increment
+	for i := 0; i < 15; i++ {
+		wrongReq := util.CreateJSONTestRequest("/v2/verify/complete", controllers.VerifyCompleteRequest{Code: "AAAAAA"})
+		wrongReq.Header.Set("Authorization", "Bearer "+token)
+		wrongResp := util.ExecuteTestRequest(wrongReq, suite.router)
+		suite.Equal(http.StatusBadRequest, wrongResp.Code)
+		util.AssertErrorResponseCode(suite.T(), wrongResp, util.ErrInvalidCode.Code)
+	}
+
+	updated, err := suite.ds.GetVerificationStatus(verification.ID)
+	suite.Require().NoError(err)
+	// code_attempts was incremented once during the initial successful completion (before the
+	// code is checked), but not during any of the 15 wrong-code attempts (verification is
+	// already marked complete at that point).
+	suite.Equal(int16(1), updated.CodeAttempts)
+	suite.True(updated.Verified)
+
+	// Complete again with the correct code - should still succeed
+	retryReq := util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
+	retryReq.Header.Set("Authorization", "Bearer "+token)
+	retryResp := util.ExecuteTestRequest(retryReq, suite.router)
+	suite.Require().Equal(http.StatusOK, retryResp.Code)
+
+	var retryResult controllers.VerifyCompleteResponse
+	util.DecodeJSONTestResponse(suite.T(), retryResp.Body, &retryResult)
+	suite.Require().NotNil(retryResult.AuthToken)
+
+	// Both completions should reference the same session
+	firstSessionID, _, err := suite.jwtService.ValidateAuthToken(*firstResult.AuthToken)
+	suite.Require().NoError(err)
+	retrySessionID, _, err := suite.jwtService.ValidateAuthToken(*retryResult.AuthToken)
+	suite.Require().NoError(err)
+	suite.Equal(firstSessionID, retrySessionID)
+}
+
 func TestVerificationTestSuite(t *testing.T) {
 	t.Run("NoKeyService", func(t *testing.T) {
 		suite.Run(t, NewVerificationTestSuite(false))

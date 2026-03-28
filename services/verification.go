@@ -123,12 +123,13 @@ func (vs *VerificationService) CompleteVerification(verification *datastore.Veri
 	}
 
 	if !verification.Verified {
-		if verification.CodeAttempts >= datastore.MaxCodeAttempts {
-			return nil, util.ErrMaxCodeAttempts
+		codeAttempts, err := vs.datastore.IncrementVerificationCodeAttempts(verification.ID)
+		if err != nil {
+			return nil, err
 		}
 
-		if err := vs.datastore.IncrementVerificationCodeAttempts(verification.ID); err != nil {
-			return nil, err
+		if codeAttempts > datastore.MaxCodeAttempts {
+			return nil, util.ErrMaxCodeAttempts
 		}
 	}
 

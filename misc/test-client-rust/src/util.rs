@@ -120,7 +120,7 @@ pub fn prompt_for_input(prompt: &str) -> String {
     std::io::stdout().flush().unwrap();
     let mut input = String::new();
     std::io::stdin().read_line(&mut input).unwrap();
-    input.trim().to_string()
+    input
 }
 
 pub fn validate_key_name(name: Option<&str>) -> &str {

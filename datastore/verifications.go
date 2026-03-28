@@ -10,6 +10,7 @@ import (
 	"github.com/brave/accounts/util"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Verification represents an email verification record and its status
@@ -199,18 +200,20 @@ func (d *Datastore) DecrementVerificationEmailAttempts(id uuid.UUID) error {
 	return nil
 }
 
-func (d *Datastore) IncrementVerificationCodeAttempts(id uuid.UUID) error {
-	result := d.DB.Model(&Verification{}).
+func (d *Datastore) IncrementVerificationCodeAttempts(id uuid.UUID) (int16, error) {
+	var verification Verification
+	result := d.DB.Model(&verification).
+		Clauses(clause.Returning{Columns: []clause.Column{{Name: "code_attempts"}}}).
 		Where("id = ?", id).
 		Update("code_attempts", gorm.Expr("code_attempts + 1"))
 
 	if result.Error != nil {
-		return fmt.Errorf("error incrementing code attempts: %w", result.Error)
+		return 0, fmt.Errorf("error incrementing code attempts: %w", result.Error)
 	}
 
 	if result.RowsAffected == 0 {
-		return util.ErrVerificationNotFound
+		return 0, util.ErrVerificationNotFound
 	}
 
-	return nil
+	return verification.CodeAttempts, nil
 }
