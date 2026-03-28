@@ -32,7 +32,7 @@ other = "Here is the code you will need to verify your email address."
 
 [LoginEmailInstructions]
 description = "Instruction to verify an email address and login to an account"
-other = "Enter the code below to access your Brave account."
+other = "Here is the code you will need to access your Brave account."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
