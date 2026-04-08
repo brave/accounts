@@ -1,11 +1,9 @@
 package services
 
 import (
-	"crypto/sha512"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -13,16 +11,22 @@ import (
 	"github.com/brave/accounts/datastore"
 	"github.com/brave/accounts/util"
 	"github.com/bytemare/ecc"
+	"github.com/bytemare/hash"
 	"github.com/bytemare/opaque"
 	opaqueMsg "github.com/bytemare/opaque/message"
 	"github.com/google/uuid"
-	"golang.org/x/crypto/hkdf"
 )
 
 const (
 	opaqueSecretKeyEnv  = "OPAQUE_SECRET_KEY"
 	opaquePublicKeyEnv  = "OPAQUE_PUBLIC_KEY"
 	opaqueFakeRecordEnv = "OPAQUE_FAKE_RECORD"
+	// seedLength is the default length in bytes used for seeds (internal.SeedLength from opaque)
+	seedLength = 32
+	// deriveKeyPairTag is the OPRF hash-to-scalar dst (tag.DeriveKeyPair from opaque)
+	deriveKeyPairTag = "OPAQUE-DeriveKeyPair"
+	// expandOPRFTag is the tag for KDF expand (tag.ExpandOPRF from opaque)
+	expandOPRFTag = "OprfKey"
 )
 
 var (
@@ -33,15 +37,13 @@ type OpaqueService struct {
 	ds                *datastore.Datastore
 	oprfSeeds         map[int][]byte
 	currentSeedID     *int
-	secretKey         []byte
-	publicKey         []byte
 	Config            *opaque.Configuration
 	fakeRecordEnabled bool
 	keyServiceClient  *util.KeyServiceClient
-	isKeyService      bool
+	server            *opaque.Server
 }
 
-func NewOpaqueService(ds *datastore.Datastore, isKeyService bool) (*OpaqueService, error) {
+func newOpaqueServer(config *opaque.Configuration, oprfSeeds map[int][]byte, currentSeedID *int) (*opaque.Server, error) {
 	secretKeyHex := os.Getenv(opaqueSecretKeyEnv)
 	if secretKeyHex == "" {
 		return nil, fmt.Errorf("%s environment variable not set", opaqueSecretKeyEnv)
@@ -62,11 +64,44 @@ func NewOpaqueService(ds *datastore.Datastore, isKeyService bool) (*OpaqueServic
 		return nil, fmt.Errorf("failed to decode public key hex: %w", err)
 	}
 
+	secretKeyScalar, err := opaque.DeserializeScalar(config.AKE.Group(), secretKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize secret key: %w", err)
+	}
+
+	server, err := opaque.NewServer(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init opaque server: %w", err)
+	}
+
+	// globalSeed will end up being nil if a key service is present,
+	// since the "frontend" web service does not have access to global seeds.
+	var globalSeed []byte
+	if currentSeedID != nil {
+		globalSeed = oprfSeeds[*currentSeedID]
+	}
+
+	serverKeyMaterial := &opaque.ServerKeyMaterial{
+		PrivateKey:     secretKeyScalar,
+		PublicKeyBytes: publicKey,
+		OPRFGlobalSeed: globalSeed,
+	}
+
+	if err := server.SetKeyMaterial(serverKeyMaterial); err != nil {
+		return nil, fmt.Errorf("failed to set key material: %w", err)
+	}
+
+	return server, nil
+}
+
+func NewOpaqueService(ds *datastore.Datastore, isKeyService bool) (*OpaqueService, error) {
 	config := opaque.DefaultConfiguration()
 
 	var keyServiceClient *util.KeyServiceClient
 	var oprfSeeds map[int][]byte
 	var currentSeedID *int
+	var server *opaque.Server
+	var err error
 
 	// Only create a client if we're not the key service and KEY_SERVICE_URL is set
 	if !isKeyService && os.Getenv(util.KeyServiceURLEnv) != "" {
@@ -88,22 +123,31 @@ func NewOpaqueService(ds *datastore.Datastore, isKeyService bool) (*OpaqueServic
 		}
 	}
 
+	if !isKeyService {
+		server, err = newOpaqueServer(config, oprfSeeds, currentSeedID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	fakeRecordEnabled := os.Getenv(opaqueFakeRecordEnv) == "true"
 
 	return &OpaqueService{
 		ds:                ds,
 		oprfSeeds:         oprfSeeds,
 		currentSeedID:     currentSeedID,
-		secretKey:         secretKey,
-		publicKey:         publicKey,
 		Config:            config,
 		fakeRecordEnabled: fakeRecordEnabled,
 		keyServiceClient:  keyServiceClient,
-		isKeyService:      isKeyService,
+		server:            server,
 	}, nil
 }
 
-func (o *OpaqueService) DeriveOPRFClientSeed(credentialIdentifier string, oprfSeedID *int) ([]byte, int, error) {
+func (o *OpaqueService) DeriveOPRFClientKey(credentialIdentifier string, oprfSeedID *int) (*ecc.Scalar, int, error) {
+	if credentialIdentifier == "" {
+		return nil, 0, errors.New("credentialIdentifier cannot be empty")
+	}
+
 	// If no seed ID provided, use current seed ID
 	seedID := o.currentSeedID
 	if oprfSeedID != nil {
@@ -111,17 +155,19 @@ func (o *OpaqueService) DeriveOPRFClientSeed(credentialIdentifier string, oprfSe
 	}
 
 	// Get OPRF seed for the specified ID
-	seed, ok := o.oprfSeeds[*seedID]
+	globalSeed, ok := o.oprfSeeds[*seedID]
 	if !ok {
 		return nil, *seedID, ErrOPRFSeedNotAvailable
 	}
 
-	h := hkdf.Expand(sha512.New, seed, []byte(credentialIdentifier))
-	derivedKey := make([]byte, 32)
-	if _, err := io.ReadFull(h, derivedKey); err != nil {
-		return nil, *seedID, fmt.Errorf("failed to derive key: %w", err)
-	}
-	return derivedKey, *seedID, nil
+	// Derive client-specific OPRF key using KDF.Expand and OPRF.DeriveKey
+	// This matches the logic in opaque/server.go deriveOPRFKey
+	kdf := hash.FromCrypto(o.Config.KDF).GetHashFunction()
+	info := append([]byte(credentialIdentifier), []byte(expandOPRFTag)...)
+	seed := kdf.HKDFExpand(globalSeed, info, seedLength)
+	clientKey := o.Config.OPRF.OPRF().DeriveKey(seed, []byte(deriveKeyPairTag))
+
+	return clientKey, *seedID, nil
 }
 
 func (o *OpaqueService) NewElement() *ecc.Element {
@@ -132,16 +178,16 @@ func (o *OpaqueService) BinaryDeserializer() (*opaque.Deserializer, error) {
 	return o.Config.Deserializer()
 }
 
-func (o *OpaqueService) getKeyServiceClientOPRFSeed(credIdentifier string, seedID *int, clientAddr string) ([]byte, int, error) {
-	type oprfSeedRequest struct {
+func (o *OpaqueService) getKeyServiceClientOPRFKey(credIdentifier string, seedID *int, clientAddr string) (*ecc.Scalar, int, error) {
+	type oprfKeyRequest struct {
 		CredentialIdentifier string `json:"credentialIdentifier"`
 		SeedID               *int   `json:"seedId"`
 		IP                   string `json:"ip"`
 	}
 
-	type oprfSeedResponse struct {
-		ClientSeed string `json:"clientSeed"`
-		SeedID     int    `json:"seedId"`
+	type oprfKeyResponse struct {
+		ClientKey string `json:"clientKey"`
+		SeedID    int    `json:"seedId"`
 	}
 
 	// Extract IP from addr (remove port if present)
@@ -151,59 +197,63 @@ func (o *OpaqueService) getKeyServiceClientOPRFSeed(credIdentifier string, seedI
 		ip = clientAddr
 	}
 
-	reqBody := oprfSeedRequest{
+	reqBody := oprfKeyRequest{
 		CredentialIdentifier: credIdentifier,
 		SeedID:               seedID,
 		IP:                   ip,
 	}
 
-	var response oprfSeedResponse
+	var response oprfKeyResponse
 	if err := o.keyServiceClient.MakeRequest(http.MethodPost, "/v2/server_keys/oprf_seed", reqBody, &response); err != nil {
 		return nil, 0, err
 	}
 
-	clientSeed, err := hex.DecodeString(response.ClientSeed)
+	clientKeyBytes, err := hex.DecodeString(response.ClientKey)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to decode key material: %w", err)
 	}
 
-	return clientSeed, response.SeedID, nil
+	clientKey, err := opaque.DeserializeScalar(o.Config.OPRF.Group(), clientKeyBytes)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to deserialize client OPRF key: %w", err)
+	}
+
+	return clientKey, response.SeedID, nil
 }
 
-func (o *OpaqueService) newOpaqueServer(credIdentifier string, seedID *int, clientAddr string) (*opaque.Server, int, error) {
-	if seedID == nil && o.currentSeedID != nil {
-		seedID = o.currentSeedID
+func (o *OpaqueService) getOPRFKeyAndSeedID(credIdentifier string, storedSeedID *int, clientAddr string) (*ecc.Scalar, int, error) {
+	// storedSeedID will be nil if setting a new password, use the latest seed for the exchange.
+	// If a key service is utilized, the latest seed will not be available, since the "frontend" web service does not
+	// have access to seeds. The key service will return the latest seed ID when the client-specific OPRF
+	// key is derived.
+	if storedSeedID == nil && o.currentSeedID != nil {
+		storedSeedID = o.currentSeedID
 	}
-	server, err := opaque.NewServer(o.Config)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to init opaque server: %w", err)
-	}
+
+	var clientOPRFKey *ecc.Scalar
+	var err error
+	var seedID int
+
 	if o.keyServiceClient != nil {
-		clientSeed, serverSeedID, err := o.getKeyServiceClientOPRFSeed(credIdentifier, seedID, clientAddr)
+		clientOPRFKey, seedID, err = o.getKeyServiceClientOPRFKey(credIdentifier, storedSeedID, clientAddr)
 		if err != nil {
 			return nil, 0, err
 		}
-		if err = server.SetKeyMaterial(nil, o.secretKey, o.publicKey, nil, clientSeed); err != nil {
-			return nil, 0, fmt.Errorf("failed to set key material for opaque server: %w", err)
-		}
-		seedID = &serverSeedID
 	} else {
-		if err = server.SetKeyMaterial(nil, o.secretKey, o.publicKey, o.oprfSeeds[*seedID], nil); err != nil {
-			return nil, 0, fmt.Errorf("failed to set key material for opaque server: %w", err)
+		clientOPRFKey, _, err = o.DeriveOPRFClientKey(credIdentifier, storedSeedID)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to derive client OPRF key: %w", err)
 		}
+		seedID = *storedSeedID
 	}
-	return server, *seedID, nil
+
+	return clientOPRFKey, seedID, nil
 }
 
 func (o *OpaqueService) SetupPasswordInit(email string, request *opaqueMsg.RegistrationRequest, clientAddr string) (*opaqueMsg.RegistrationResponse, error) {
-	server, seedID, err := o.newOpaqueServer(email, nil, clientAddr)
+	clientOPRFKey, seedID, err := o.getOPRFKeyAndSeedID(email, nil, clientAddr)
 	if err != nil {
 		return nil, err
-	}
-
-	publicKeyElement := o.NewElement()
-	if err = publicKeyElement.UnmarshalBinary(o.publicKey); err != nil {
-		return nil, fmt.Errorf("failed to decode public key during password init: %w", err)
 	}
 
 	account, err := o.ds.GetOrCreateAccount(email)
@@ -215,7 +265,12 @@ func (o *OpaqueService) SetupPasswordInit(email string, request *opaqueMsg.Regis
 		return nil, err
 	}
 
-	return server.RegistrationResponse(request, []byte(email))
+	response, err := o.server.RegistrationResponse(request, []byte(email), clientOPRFKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate registration response: %w", err)
+	}
+
+	return response, nil
 }
 
 func (o *OpaqueService) SetupPasswordFinalize(email string, registration *opaqueMsg.RegistrationRecord) (*datastore.InterimPasswordState, error) {
@@ -272,7 +327,7 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1, clientAddr s
 		seedID = account.OprfSeedID
 	}
 
-	server, serverSeedID, err := o.newOpaqueServer(email, seedID, clientAddr)
+	clientOPRFKey, serverSeedID, err := o.getOPRFKeyAndSeedID(email, seedID, clientAddr)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -302,7 +357,11 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1, clientAddr s
 		}
 	}
 
-	ke2, err := server.GenerateKE2(ke1, opaqueRecord)
+	serverOpts := &opaque.ServerOptions{
+		ClientOPRFKey: clientOPRFKey,
+	}
+
+	ke2, serverOutput, err := o.server.GenerateKE2(ke1, opaqueRecord, serverOpts)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate ke2: %w", err)
 	}
@@ -313,7 +372,8 @@ func (o *OpaqueService) LoginInit(email string, ke1 *opaqueMsg.KE1, clientAddr s
 		accountID = &account.ID
 		isTwoFAEnabled = account.IsTwoFAEnabled()
 	}
-	akeState, err := o.ds.CreateLoginState(accountID, email, server.SerializeState(), *seedID, isTwoFAEnabled)
+
+	akeState, err := o.ds.CreateLoginState(accountID, email, serverOutput.ClientMAC, *seedID, isTwoFAEnabled)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to store AKE state: %w", err)
 	}
@@ -327,20 +387,7 @@ func (o *OpaqueService) LoginFinalize(loginStateID uuid.UUID, ke3 *opaqueMsg.KE3
 		return nil, err
 	}
 
-	server, _, err := o.newOpaqueServer(loginState.Email, &loginState.OprfSeedID, clientAddr)
-	if err != nil {
-		// nolint:errcheck
-		o.ds.DeleteInterimPasswordState(loginState.ID)
-		return nil, err
-	}
-
-	if err = server.SetAKEState(loginState.State); err != nil {
-		// nolint:errcheck
-		o.ds.DeleteInterimPasswordState(loginState.ID)
-		return nil, fmt.Errorf("failed to set AKE state for login finalize: %w", err)
-	}
-
-	if err = server.LoginFinish(ke3); err != nil {
+	if err = o.server.LoginFinish(ke3, loginState.State); err != nil {
 		// nolint:errcheck
 		o.ds.DeleteInterimPasswordState(loginState.ID)
 		if o.fakeRecordEnabled {
