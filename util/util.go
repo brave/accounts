@@ -312,19 +312,20 @@ func (k *KeyServiceClient) MakeRequest(method string, path string, body interfac
 	return nil
 }
 
-// NormalizeVerificationCode applies canonical cleanup rules to a verification
-// code to tolerate common user input mistakes before comparison or storage.
-func NormalizeVerificationCode(code string) string {
-	code = strings.ToUpper(code)
-	code = strings.ReplaceAll(code, " ", "")
-	code = strings.ReplaceAll(code, "\t", "")
-	code = strings.ReplaceAll(code, "\n", "")
-	code = strings.ReplaceAll(code, "\r", "")
-	code = strings.ReplaceAll(code, "-", "")
-	code = strings.ReplaceAll(code, "1", "I")
-	code = strings.ReplaceAll(code, "8", "B")
-	code = strings.ReplaceAll(code, "0", "O")
-	return code
+// VerificationCodeEquals reports whether the user-supplied code matches the
+// stored normalized code, using a constant-time comparison to prevent timing
+// attacks.
+func VerificationCodeEquals(userInput, expected string) bool {
+	userInput = strings.ToUpper(userInput)
+	userInput = strings.ReplaceAll(userInput, " ", "")
+	userInput = strings.ReplaceAll(userInput, "\t", "")
+	userInput = strings.ReplaceAll(userInput, "\n", "")
+	userInput = strings.ReplaceAll(userInput, "\r", "")
+	userInput = strings.ReplaceAll(userInput, "-", "")
+	userInput = strings.ReplaceAll(userInput, "1", "I")
+	userInput = strings.ReplaceAll(userInput, "8", "B")
+	userInput = strings.ReplaceAll(userInput, "0", "O")
+	return subtle.ConstantTimeCompare([]byte(userInput), []byte(expected)) == 1
 }
 
 func GetRequestLocale(explicitLocale string, r *http.Request) string {

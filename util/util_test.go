@@ -62,22 +62,24 @@ func (suite *UtilTest) TestCanonicalizeEmail() {
 	suite.Equal("\"test@Foo\"@example.com", result)
 }
 
-func (suite *UtilTest) TestNormalizeVerificationCode() {
+func (suite *UtilTest) TestVerificationCodeEquals() {
 	// Uppercase
-	suite.Equal("ABCDEF", util.NormalizeVerificationCode("abcdef"))
+	suite.True(util.VerificationCodeEquals("abcdef", "ABCDEF"))
 	// Whitespace removal
-	suite.Equal("ABCDEF", util.NormalizeVerificationCode("ABC DEF"))
-	suite.Equal("ABCDEF", util.NormalizeVerificationCode("AB\tCD\nEF"))
+	suite.True(util.VerificationCodeEquals("ABC DEF", "ABCDEF"))
+	suite.True(util.VerificationCodeEquals("AB\tCD\nEF", "ABCDEF"))
 	// Hyphen removal
-	suite.Equal("ABCDEF", util.NormalizeVerificationCode("ABC-DEF"))
+	suite.True(util.VerificationCodeEquals("ABC-DEF", "ABCDEF"))
 	// 1 -> I
-	suite.Equal("IABCDE", util.NormalizeVerificationCode("1ABCDE"))
+	suite.True(util.VerificationCodeEquals("1ABCDE", "IABCDE"))
 	// 8 -> B
-	suite.Equal("BABCDE", util.NormalizeVerificationCode("8ABCDE"))
+	suite.True(util.VerificationCodeEquals("8ABCDE", "BABCDE"))
 	// 0 -> O
-	suite.Equal("OABCDE", util.NormalizeVerificationCode("0ABCDE"))
+	suite.True(util.VerificationCodeEquals("0ABCDE", "OABCDE"))
 	// Combined
-	suite.Equal("IOBBCD", util.NormalizeVerificationCode("1 0-8-8cd"))
+	suite.True(util.VerificationCodeEquals("1 0-8-8cd", "IOBBCD"))
+	// Mismatch
+	suite.False(util.VerificationCodeEquals("ABCDEF", "XYZXYZ"))
 }
 
 func TestUtil(t *testing.T) {

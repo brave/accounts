@@ -133,7 +133,7 @@ func (vs *VerificationService) CompleteVerification(verification *datastore.Veri
 		}
 	}
 
-	if util.NormalizeVerificationCode(code) != verification.Code {
+	if !util.VerificationCodeEquals(code, verification.Code) {
 		return nil, util.ErrInvalidCode
 	}
 

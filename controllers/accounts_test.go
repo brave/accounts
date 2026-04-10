@@ -303,11 +303,6 @@ func (suite *AccountsTestSuite) TestRegistration() {
 	suite.Require().NoError(err)
 	suite.NotNil(account.LastEmailVerifiedAt) // Email should now be verified
 
-	// Check that account is now verified
-	account, err = suite.ds.GetAccount(nil, email)
-	suite.Require().NoError(err)
-	suite.NotNil(account.LastEmailVerifiedAt) // Email should now be verified
-
 	// Check that the session created has the correct version (PasswordAuthSessionVersion)
 	sessionID, _, err := suite.jwtService.ValidateAuthToken(*verificationResult.AuthToken)
 	suite.Require().NoError(err)
