@@ -32,7 +32,7 @@ jobs:
     - name: Setup golang
       uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
       with:
-        go-version: '1.25'
+        go-version: '1.26'
     - name: Generate swagger
       run: go install github.com/swaggo/swag/cmd/swag@latest && swag init
     - name: Install dependencies
@@ -40,7 +40,7 @@ jobs:
     - name: Lint
       uses: golangci/golangci-lint-action@0a35821d5c230e903fcfe077583637dea1b27b47 # v9.0.0
       with:
-        version: v2.6
+        version: v2.11.4
         args: --timeout=10m
     - name: Test
       run: go test -p 1 -v ./...
