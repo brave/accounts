@@ -170,8 +170,7 @@ func (vs *VerificationService) CompleteVerification(verification *datastore.Veri
 			sessionID = &session.ID
 		}
 
-		expirationDuration := ChildAuthTokenExpirationTime
-		authTokenResult, err := vs.jwtService.CreateAuthToken(*sessionID, &expirationDuration, verification.Service)
+		authTokenResult, err := vs.jwtService.CreateAuthToken(*sessionID, nil, verification.Service)
 		if err != nil {
 			return nil, err
 		}
