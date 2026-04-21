@@ -40,15 +40,15 @@ other = "Your verification code:"
 
 [VerifyEmailExpiryDisclaimer]
 description = "Informs the user that the verification code expires after 30 minutes"
-other = "Note: This code will expire within 30 minutes."
+other = "Note: This code will expire in 30 minutes."
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "We noticed you're having trouble logging into your Brave Account. Please remember that you have an account registered with this email: {{.Email}}\n\nTry logging in using this email address. If you still need help, please contact our support team."
+other = "It appears you already have an account registered with this email: {{.Email}}.\n\nTry logging in using this email address. If you still need help, please contact Brave support."
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "Having trouble? Here's how to access your Brave Account"
+other = "Having trouble? Here's how to access your Brave Account."
 
 [EmailSignature]
 description = "Email signature"
@@ -88,4 +88,4 @@ other = "Your Brave account password has been changed"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Your Brave account password has been successfully changed. If you didn't make this change, please contact our support team immediately to secure your account."
+other = "Your Brave account password has been successfully changed. If you didn't make this change, please contact Brave support immediately to secure your account."
