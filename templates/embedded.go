@@ -14,9 +14,6 @@ var GeneralEmailHTMLTemplateContent string
 //go:embed email_general_text.tmpl
 var GeneralEmailTextTemplateContent string
 
-//go:embed verify_fe.html
-var DefaultVerifyFrontendContent string
-
 //go:embed email_viewer.tmpl
 var EmailViewerTemplateContent string
 

@@ -62,6 +62,26 @@ func (suite *UtilTest) TestCanonicalizeEmail() {
 	suite.Equal("\"test@Foo\"@example.com", result)
 }
 
+func (suite *UtilTest) TestVerificationCodeEquals() {
+	// Uppercase
+	suite.True(util.VerificationCodeEquals("abcdef", "ABCDEF"))
+	// Whitespace removal
+	suite.True(util.VerificationCodeEquals("ABC DEF", "ABCDEF"))
+	suite.True(util.VerificationCodeEquals("AB\tCD\nEF", "ABCDEF"))
+	// Hyphen removal
+	suite.True(util.VerificationCodeEquals("ABC-DEF", "ABCDEF"))
+	// 1 -> I
+	suite.True(util.VerificationCodeEquals("1ABCDE", "IABCDE"))
+	// 8 -> B
+	suite.True(util.VerificationCodeEquals("8ABCDE", "BABCDE"))
+	// 0 -> O
+	suite.True(util.VerificationCodeEquals("0ABCDE", "OABCDE"))
+	// Combined
+	suite.True(util.VerificationCodeEquals("1 0-8-8cd", "IOBBCD"))
+	// Mismatch
+	suite.False(util.VerificationCodeEquals("ABCDEF", "XYZXYZ"))
+}
+
 func TestUtil(t *testing.T) {
 	suite.Run(t, new(UtilTest))
 }

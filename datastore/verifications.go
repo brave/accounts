@@ -1,15 +1,16 @@
 package datastore
 
 import (
-	"context"
+	"crypto/rand"
+	"encoding/base32"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/brave/accounts/util"
 	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Verification represents an email verification record and its status
@@ -30,6 +31,8 @@ type Verification struct {
 	NewSessionID *uuid.UUID
 	// EmailAttempts tracks the number of times the verification email has been sent
 	EmailAttempts int16
+	// CodeAttempts tracks the number of wrong-code submission attempts
+	CodeAttempts int16
 	// CreatedAt records when the verification was initiated
 	CreatedAt time.Time `gorm:"<-:update"`
 }
@@ -41,22 +44,19 @@ const (
 	ResetPasswordIntent  = "reset_password"
 	ChangePasswordIntent = "change_password"
 
-	codeLength              = 32
-	verifyWaitMaxDuration   = 20 * time.Second
+	codeLength              = 6
 	VerificationExpiration  = 30 * time.Minute
 	maxPendingVerifications = 3
-
-	verificationChannelName = "verification"
+	MaxCodeAttempts         = 10
 )
-
-type verificationWaitRequest struct {
-	responseChan chan<- bool
-	startTime    time.Time
-}
 
 // CreateVerification creates a new verification record
 func (d *Datastore) CreateVerification(email string, service string, intent string) (*Verification, error) {
-	code := util.GenerateRandomString(codeLength)
+	b := make([]byte, codeLength)
+	if _, err := rand.Read(b); err != nil {
+		return nil, fmt.Errorf("failed to generate random code: %w", err)
+	}
+	code := base32.StdEncoding.EncodeToString(b)[:codeLength]
 
 	id, err := uuid.NewV7()
 	if err != nil {
@@ -93,33 +93,24 @@ func (d *Datastore) CreateVerification(email string, service string, intent stri
 	return &verification, nil
 }
 
-// UpdateVerificationStatus updates the verification status for a given email
-func (d *Datastore) UpdateAndGetVerificationStatus(id uuid.UUID, code string) (*Verification, error) {
+// MarkVerificationAsComplete marks the verification as verified
+func (d *Datastore) MarkVerificationAsComplete(id uuid.UUID) error {
 	result := d.DB.Model(&Verification{}).
-		Where("id = ? AND code = ? AND verified = false", id, code).
+		Where("id = ?", id).
 		Update("verified", true)
 
 	if result.Error != nil {
-		return nil, fmt.Errorf("error updating verification status: %w", result.Error)
+		return fmt.Errorf("error updating verification status: %w", result.Error)
 	}
 
 	if result.RowsAffected == 0 {
-		return nil, util.ErrVerificationNotFound
+		return util.ErrVerificationNotFound
 	}
 
-	// Send notification
-	if err := d.DB.Exec(
-		"SELECT pg_notify(?, ?)",
-		verificationChannelName,
-		id.String(),
-	).Error; err != nil {
-		return nil, fmt.Errorf("failed to send notification: %w", err)
-	}
-
-	return d.GetVerificationStatus(id)
+	return nil
 }
 
-// GetVerificationStatus checks if email is verified with given token
+// GetVerificationStatus fetches the verification record by ID, returning an error if expired or not found
 func (d *Datastore) GetVerificationStatus(id uuid.UUID) (*Verification, error) {
 	var verification Verification
 	if err := d.DB.First(&verification, "id = ?", id).Error; err != nil {
@@ -137,105 +128,6 @@ func (d *Datastore) GetVerificationStatus(id uuid.UUID) (*Verification, error) {
 	}
 
 	return &verification, nil
-}
-
-// Authenticates id and code with pending verification, and returns true if verification is still pending
-func (d *Datastore) EnsureVerificationCodeIsPending(id uuid.UUID, code string) error {
-	verification, err := d.GetVerificationStatus(id)
-	if err != nil {
-		return err
-	}
-
-	if verification.Code != code || verification.Verified {
-		return util.ErrVerificationNotFound
-	}
-
-	return nil
-}
-
-func (d *Datastore) WaitOnVerification(ctx context.Context, id uuid.UUID) (bool, error) {
-	waitChan := make(chan bool)
-
-	d.verificationEventWaitMapLock.Lock()
-	d.verificationEventWaitMap[id] = &verificationWaitRequest{
-		responseChan: waitChan,
-		startTime:    time.Now(),
-	}
-	d.verificationEventWaitMapLock.Unlock()
-
-	// Check the database to see if the verification status changed
-	// while setting up the listener.
-	var verification Verification
-	result := d.DB.Select("verified").Where("id = ?", id).First(&verification)
-	if result.Error != nil {
-		return false, result.Error
-	}
-	if verification.Verified {
-		return true, nil
-	}
-
-	select {
-	case verified := <-waitChan:
-		return verified, nil
-	case <-time.After(verifyWaitMaxDuration):
-		return false, nil
-	}
-}
-
-func (d *Datastore) StartVerificationEventListener() {
-	d.verificationEventWaitMap = make(map[uuid.UUID]*verificationWaitRequest)
-	go func() {
-		for {
-			ctx := context.Background()
-			conn, err := d.listenPool.Acquire(ctx)
-			if err != nil {
-				log.Panic().Err(err).Msg("failed to acquire database conn from pool")
-			}
-
-			err = util.ListenOnPGChannel(ctx, conn, verificationChannelName)
-			if err != nil {
-				log.Panic().Err(err).Msg("failed to listen on channel")
-			}
-
-			for {
-				notif, err := conn.Conn().WaitForNotification(ctx)
-				if err != nil {
-					log.Error().Err(err).Msg("error waiting for notification")
-					conn.Release()
-					break
-				}
-				verificationID, err := uuid.Parse(notif.Payload)
-				if err != nil {
-					log.Error().Err(err).Msg("invalid verification ID while listening")
-					continue
-				}
-				d.verificationEventWaitMapLock.Lock()
-				if request, ok := d.verificationEventWaitMap[verificationID]; ok {
-					select {
-					case request.responseChan <- true:
-						// Successfully sent the verification status
-					default:
-						// Channel is closed, skip sending
-					}
-					delete(d.verificationEventWaitMap, verificationID)
-				}
-				d.verificationEventWaitMapLock.Unlock()
-			}
-		}
-	}()
-	go func() {
-		for {
-			d.verificationEventWaitMapLock.Lock()
-			for verificationID, req := range d.verificationEventWaitMap {
-				if time.Since(req.startTime) >= verifyWaitMaxDuration {
-					delete(d.verificationEventWaitMap, verificationID)
-				}
-			}
-			d.verificationEventWaitMapLock.Unlock()
-
-			time.Sleep(time.Second * 30)
-		}
-	}()
 }
 
 func (d *Datastore) DeleteVerification(id uuid.UUID) error {
@@ -306,4 +198,22 @@ func (d *Datastore) DecrementVerificationEmailAttempts(id uuid.UUID) error {
 	}
 
 	return nil
+}
+
+func (d *Datastore) IncrementVerificationCodeAttempts(id uuid.UUID) (int16, error) {
+	var verification Verification
+	result := d.DB.Model(&verification).
+		Clauses(clause.Returning{Columns: []clause.Column{{Name: "code_attempts"}}}).
+		Where("id = ?", id).
+		Update("code_attempts", gorm.Expr("code_attempts + 1"))
+
+	if result.Error != nil {
+		return 0, fmt.Errorf("error incrementing code attempts: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return 0, util.ErrVerificationNotFound
+	}
+
+	return verification.CodeAttempts, nil
 }

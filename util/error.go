@@ -31,6 +31,8 @@ var (
 	ErrFailedToSendEmailInvalidFormat = NewExposedError(13007, "failed to send email due to invalid format")
 	ErrMaxEmailAttempts               = NewExposedError(13008, "maximum email send attempts exceeded")
 	ErrEmailAlreadyVerified           = NewExposedError(13009, "email already verified")
+	ErrMaxCodeAttempts                = NewExposedError(13010, "maximum code verification attempts exceeded")
+	ErrInvalidCode                    = NewExposedError(13011, "invalid verification code")
 
 	// Auth errors, prefixed with '14'
 	ErrInterimPasswordStateNotFound = NewExposedError(14001, "interim password state not found")

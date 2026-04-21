@@ -1,0 +1,1 @@
+ALTER TABLE verifications ADD COLUMN code_attempts SMALLINT NOT NULL DEFAULT 0;

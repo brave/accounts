@@ -27,15 +27,12 @@ import (
 )
 
 const (
-	fromAddressEnv       = "EMAIL_FROM_ADDRESS"
-	baseURLEnv           = "BASE_URL"
-	verifyFrontendURLEnv = "VERIFY_FRONTEND_URL"
-	awsEndpointEnv       = "AWS_ENDPOINT"
-	configSetEnv         = "SES_CONFIG_SET"
-	sesRoleEnv           = "SES_ROLE"
+	fromAddressEnv = "EMAIL_FROM_ADDRESS"
+	awsEndpointEnv = "AWS_ENDPOINT"
+	configSetEnv   = "SES_CONFIG_SET"
+	sesRoleEnv     = "SES_ROLE"
 
 	defaultFromAddress = "noreply@brave.com"
-	defaultBaseURL     = "http://localhost:8080"
 	expiresHeaderName  = "X-Expires-At"
 )
 
@@ -50,8 +47,6 @@ type SESService struct {
 	generalHTMLTemplate *htmlTemplate.Template
 	generalTextTemplate *textTemplate.Template
 	fromAddress         string
-	baseURL             string
-	frontendURL         string
 	configSet           string
 	i18nBundle          *i18n.Bundle
 }
@@ -77,11 +72,10 @@ type emailFields struct {
 
 type verifyEmailFields struct {
 	emailFields
-	VerifyURL          string
-	Instructions       string
-	Action             string
-	VerifyActionBackup string
-	ExpiryDisclaimer   string
+	VerificationCode string
+	Instructions     string
+	CodeLabel        string
+	ExpiryDisclaimer string
 }
 
 type similarEmailFields struct {
@@ -155,17 +149,7 @@ func NewSESService(i18nBundle *i18n.Bundle, env string) (*SESService, error) {
 	}
 	fromAddress = fmt.Sprintf("Brave Software <%v>", fromAddress)
 
-	baseURL := os.Getenv(baseURLEnv)
-	if baseURL == "" {
-		baseURL = defaultBaseURL
-	}
-
 	configSet := os.Getenv(configSetEnv)
-
-	frontendURL := os.Getenv(verifyFrontendURLEnv)
-	if frontendURL == "" && env == util.ProductionEnv {
-		return nil, fmt.Errorf("%s env var must be specified in production", verifyFrontendURLEnv)
-	}
 
 	return &SESService{
 		client,
@@ -174,8 +158,6 @@ func NewSESService(i18nBundle *i18n.Bundle, env string) (*SESService, error) {
 		generalHtmlTmpl,
 		generalTextTmpl,
 		fromAddress,
-		baseURL,
-		frontendURL,
 		configSet,
 		i18nBundle,
 	}, nil
@@ -237,12 +219,6 @@ func (s *SESService) sendEmail(ctx context.Context, email string, locale string,
 }
 
 func (s *SESService) SendVerificationEmail(ctx context.Context, email string, verification *datastore.Verification, locale string) error {
-	frontendURL := s.frontendURL
-	if frontendURL == "" {
-		frontendURL = s.baseURL + "/v2/verify/complete_fe"
-	}
-	verifyURL := fmt.Sprintf("%s?id=%s&code=%s", frontendURL, verification.ID.String(), verification.Code)
-
 	localizer := i18n.NewLocalizer(s.i18nBundle, locale)
 
 	var subjectMessageID string
@@ -264,19 +240,18 @@ func (s *SESService) SendVerificationEmail(ctx context.Context, email string, ve
 
 	fields, effectiveLocale := newEmailFields(localizer, subjectMessageID)
 	data := verifyEmailFields{
-		emailFields:        fields,
-		VerifyURL:          verifyURL,
-		Instructions:       localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: instructionsMessageID}),
-		Action:             localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailAction"}),
-		VerifyActionBackup: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailActionBackup"}),
-		ExpiryDisclaimer:   localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailExpiryDisclaimer"}),
+		emailFields:      fields,
+		VerificationCode: verification.Code,
+		Instructions:     localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: instructionsMessageID}),
+		CodeLabel:        localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailCode"}),
+		ExpiryDisclaimer: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailExpiryDisclaimer"}),
 	}
 
 	if err := s.sendEmail(ctx, email, effectiveLocale, data.Subject, &data, s.verifyHTMLTemplate, s.verifyTextTemplate); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
-	log.Debug().Str("verify_url", verifyURL).Msg("Sent verification link")
+	log.Debug().Str("verification_code", verification.Code).Msg("Sent verification code")
 
 	return nil
 }

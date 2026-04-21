@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/brave/accounts/datastore"
 	"github.com/brave/accounts/middleware"
@@ -61,6 +62,8 @@ type RegistrationResponse struct {
 	SerializedResponse *string `json:"serializedResponse,omitempty"`
 	// JWT token for checking verification status (only present when registering a new account)
 	VerificationToken *string `json:"verificationToken,omitempty"`
+	// Expiry timestamp of the verification token (only present when VerificationToken is set)
+	VerificationTokenExpiresAt *time.Time `json:"verificationTokenExpiresAt,omitempty"`
 }
 
 // @Description OPAQUE registration record for a new account
@@ -272,6 +275,7 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 	}
 
 	var verificationToken *string
+	var verificationTokenExpiresAt *time.Time
 	if verification != nil {
 		// If verification is present, check its status and intent
 		if !checkVerificationStatusAndIntent(w, r, verification) {
@@ -299,6 +303,10 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 			util.AccountsServiceName,
 			nil,
 		)
+		if verificationToken != nil {
+			expiresAt := time.Now().Add(datastore.VerificationExpiration)
+			verificationTokenExpiresAt = &expiresAt
+		}
 		if err != nil {
 			if errors.Is(err, util.ErrTooManyVerifications) ||
 				errors.Is(err, util.ErrIntentNotAllowed) ||
@@ -338,6 +346,7 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 
 	// Include verification token if a new verification was created
 	response.VerificationToken = verificationToken
+	response.VerificationTokenExpiresAt = verificationTokenExpiresAt
 
 	render.Status(r, http.StatusOK)
 	render.JSON(w, r, response)

@@ -131,19 +131,8 @@
                       </p>
                       <div role="separator" style="line-height: 24px">&zwj;</div>
                       <div style="text-align: center">
-                        <a href="{{.VerifyURL}}" class="dark-bg-dark-button-background dark-text-dark-schemes-on-primary" style="display: inline-block; border-radius: 16px; background-color: #3e37d4; padding-left: 16px; padding-right: 16px; padding-top: 12px; padding-bottom: 12px; font-size: 16px; line-height: 1.5; font-weight: 600; color: #ffffff; text-decoration: none">
-                          <span style="padding-left: 8px; padding-right: 8px">
-      <!--[if mso]>
-        <i style="mso-font-width: 150%; mso-text-raise: 30px" hidden>&emsp;</i>
-      <![endif]-->
-      <span style="mso-text-raise: 16px">
-                      {{.Action}}
-                    </span>
-                          <!--[if mso]>
-        <i hidden style="mso-font-width: 150%">&emsp;&#8203;</i>
-      <![endif]-->
-                          </span>
-                        </a>
+                        <p style="padding: 0; margin: 0">{{.CodeLabel}}</p>
+                        <p style="padding: 0; margin: 0; font-size: 28px; line-height: 36px; font-weight: 700; letter-spacing: 4px">{{.VerificationCode}}</p>
                       </div>
                     </td>
                   </tr>
@@ -152,13 +141,9 @@
                   <tr>
                     <td style="padding-left: 16px; padding-right: 16px">
                       <div role="separator" style="line-height: 32px">&zwj;</div>
-                      <table class="dark-bg-dark-systemfeedback-info-background" role="presentation" style="font-size: 16px; line-height: 24px; letter-spacing: 0; font-weight: 400; font-family: Inter Variable,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol','Noto Color Emoji'; border-radius: 8px; background-color: #eaf1ff" cellpadding="0" cellspacing="0">
+                      <table class="dark-bg-dark-systemfeedback-info-background" role="presentation" style="width: 100%; font-size: 16px; line-height: 24px; letter-spacing: 0; font-weight: 400; font-family: Inter Variable,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol','Noto Color Emoji'; border-radius: 8px; background-color: #eaf1ff" cellpadding="0" cellspacing="0">
                         <tr>
-                          <td class="mso-break-all" style="overflow-wrap: break-word; word-break: break-all; padding: 24px">
-                            <p style="padding: 0; margin: 0; padding-bottom: 8px">{{.VerifyActionBackup}}</p>
-                            <p class="mso-break-all" style="padding: 0; margin: 0; overflow-wrap: break-word; word-break: break-all; padding-bottom: 8px">
-                              <a href="{{.VerifyURL}}" style="color: #3e37d4">{{.VerifyURL}}</a>
-                            </p>
+                          <td style="padding: 24px">
                             <p style="padding: 0; margin: 0">
                               {{.ExpiryDisclaimer}}
                             </p>

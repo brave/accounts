@@ -143,8 +143,6 @@ func main() {
 		return
 	}
 
-	datastore.StartVerificationEventListener()
-
 	i18nBundle, err := util.CreateI18nBundle()
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to init i18n bundle")

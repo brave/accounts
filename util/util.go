@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -50,14 +49,6 @@ const (
 	recoveryKeyArgonSaltLength = 16
 	recoveryKeyFullHashLength  = recoveryKeyArgonKeyLength + recoveryKeyArgonSaltLength
 )
-
-func GenerateRandomString(length int) string {
-	b := make([]byte, length)
-	if _, err := rand.Read(b); err != nil {
-		panic(fmt.Errorf("failed to generate random string: %w", err))
-	}
-	return base64.URLEncoding.EncodeToString(b)
-}
 
 func generateRecoveryKeyHash(recoveryKey string, salt []byte) []byte {
 	uppercaseKey := strings.TrimSpace(strings.ToUpper(recoveryKey))
@@ -319,6 +310,22 @@ func (k *KeyServiceClient) MakeRequest(method string, path string, body interfac
 		return fmt.Errorf("failed to decode response: %w", err)
 	}
 	return nil
+}
+
+// VerificationCodeEquals reports whether the user-supplied code matches the
+// stored normalized code, using a constant-time comparison to prevent timing
+// attacks.
+func VerificationCodeEquals(userInput, expected string) bool {
+	userInput = strings.ToUpper(userInput)
+	userInput = strings.ReplaceAll(userInput, " ", "")
+	userInput = strings.ReplaceAll(userInput, "\t", "")
+	userInput = strings.ReplaceAll(userInput, "\n", "")
+	userInput = strings.ReplaceAll(userInput, "\r", "")
+	userInput = strings.ReplaceAll(userInput, "-", "")
+	userInput = strings.ReplaceAll(userInput, "1", "I")
+	userInput = strings.ReplaceAll(userInput, "8", "B")
+	userInput = strings.ReplaceAll(userInput, "0", "O")
+	return subtle.ConstantTimeCompare([]byte(userInput), []byte(expected)) == 1
 }
 
 func GetRequestLocale(explicitLocale string, r *http.Request) string {
