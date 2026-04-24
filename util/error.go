@@ -27,6 +27,7 @@ var (
 	ErrIntentNotAllowed               = NewExposedError(13003, "intent not allowed")
 	ErrAccountExists                  = NewExposedError(13004, "account already exists")
 	ErrAccountDoesNotExist            = NewExposedError(13005, "account does not exist")
+	ErrRegistrationVerificationPending = NewExposedError(13012, "registration verification already pending for this email")
 	ErrEmailDomainNotSupported        = NewExposedError(13006, "email domain is not supported")
 	ErrFailedToSendEmailInvalidFormat = NewExposedError(13007, "failed to send email due to invalid format")
 	ErrMaxEmailAttempts               = NewExposedError(13008, "maximum email send attempts exceeded")

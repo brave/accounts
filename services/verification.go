@@ -72,11 +72,15 @@ func (vs *VerificationService) InitializeVerification(ctx context.Context, email
 
 	// Validate account requirements
 	if intent == datastore.RegistrationIntent || intent == datastore.ResetPasswordIntent || intent == datastore.ChangePasswordIntent {
-		accountExists, err := vs.datastore.AccountExists(email)
-		if err != nil {
+		account, err := vs.datastore.GetAccount(nil, email)
+		if err != nil && err != datastore.ErrAccountNotFound {
 			return nil, nil, err
 		}
+		accountExists := account != nil
 		if intent == datastore.RegistrationIntent && accountExists {
+			if account.LastEmailVerifiedAt == nil {
+				return nil, nil, util.ErrRegistrationVerificationPending
+			}
 			return nil, nil, util.ErrAccountExists
 		}
 		if (intent == datastore.ResetPasswordIntent || intent == datastore.ChangePasswordIntent) && !accountExists {
