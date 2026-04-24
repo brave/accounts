@@ -311,6 +311,7 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 				errors.Is(err, util.ErrIntentNotAllowed) ||
 				errors.Is(err, util.ErrEmailDomainNotSupported) ||
 				errors.Is(err, util.ErrAccountExists) ||
+				errors.Is(err, util.ErrRegistrationVerificationPending) ||
 				errors.Is(err, util.ErrAccountDoesNotExist) ||
 				errors.Is(err, util.ErrNewAccountEmailRequired) {
 				util.RenderErrorResponse(w, r, http.StatusBadRequest, err)
