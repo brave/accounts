@@ -316,8 +316,10 @@ func (suite *AccountsTestSuite) TestRegistration() {
 func (suite *AccountsTestSuite) TestRegistrationAccountAlreadyExists() {
 	email := "existing@example.com"
 
-	// Create an existing account
-	_, err := suite.ds.GetOrCreateAccount(email)
+	// Create an existing verified account
+	account, err := suite.ds.GetOrCreateAccount(email)
+	suite.Require().NoError(err)
+	err = suite.ds.UpdateAccountLastEmailVerifiedAt(account.ID)
 	suite.Require().NoError(err)
 
 	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
@@ -334,6 +336,28 @@ func (suite *AccountsTestSuite) TestRegistrationAccountAlreadyExists() {
 	resp := util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusBadRequest, resp.Code)
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrAccountExists.Code)
+}
+
+func (suite *AccountsTestSuite) TestRegistrationVerificationPending() {
+	email := "pending@example.com"
+
+	// Create an unverified account (simulates a prior registration init)
+	_, err := suite.ds.GetOrCreateAccount(email)
+	suite.Require().NoError(err)
+
+	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+
+	// Test password init with newAccountEmail for unverified account
+	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
+		BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse:     true,
+		NewAccountEmail:       &email,
+		InitiatingServiceName: util.AccountsServiceName,
+	})
+
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrRegistrationVerificationPending.Code)
 }
 
 func (suite *AccountsTestSuite) TestChangePassword() {

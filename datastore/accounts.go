@@ -86,20 +86,6 @@ func (d *Datastore) GetAccountsBySimplifiedEmail(email string) ([]Account, error
 	return accounts, nil
 }
 
-func (d *Datastore) AccountExists(email string) (bool, error) {
-	var exists bool
-	result := d.DB.Model(&Account{}).
-		Select("1").
-		Where("email = ?", util.CanonicalizeEmail(email)).
-		Limit(1).
-		Find(&exists)
-
-	if result.Error != nil {
-		return false, fmt.Errorf("error checking account existence: %w", result.Error)
-	}
-	return exists, nil
-}
-
 func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
 	var account *Account
 
