@@ -58,7 +58,7 @@ type TOTPGenerateRequest struct {
 	// AccountID is the UUID of the account for which to generate/delete a TOTP key
 	AccountID uuid.UUID `json:"accountId" validate:"required"`
 	// Email is the email address for the account (used for TOTP generation)
-	Email string `json:"email" validate:"required,email"`
+	Email string `json:"email" validate:"required,email,max=254"`
 }
 
 // TOTPGenerateResponse represents the response body containing the generated TOTP key

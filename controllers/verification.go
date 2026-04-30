@@ -32,7 +32,7 @@ type VerificationController struct {
 // @Description	Request to initialize email verification
 type VerifyInitRequest struct {
 	// Email address to verify
-	Email string `json:"email" validate:"required,email,ascii" example:"test@example.com"`
+	Email string `json:"email" validate:"required,email,ascii,max=254" example:"test@example.com"`
 	// Purpose of verification (e.g., get auth token, simple verification)
 	Intent string `json:"intent" validate:"required,oneof=auth_token verification reset_password change_password" example:"reset_password"`
 	// Service requesting the verification
