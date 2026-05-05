@@ -165,17 +165,6 @@ func (suite *VerificationTestSuite) TestVerifyInitUnsupportedEmail() {
 	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
 	suite.Equal(http.StatusBadRequest, resp.Code)
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
-
-	// Test 'strict' TLDs for email-aliases service
-	body.Email = "test@example.ru"
-	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
-	suite.Equal(http.StatusBadRequest, resp.Code)
-	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
-
-	body.Email = "test@example.kp"
-	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
-	suite.Equal(http.StatusBadRequest, resp.Code)
-	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
 }
 
 func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {

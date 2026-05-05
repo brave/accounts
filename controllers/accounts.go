@@ -288,8 +288,7 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 			return
 		}
 
-		// Perform email country check
-		if !util.IsEmailAllowed(*requestData.NewAccountEmail, requestData.InitiatingServiceName) {
+		if !util.IsEmailAllowed(*requestData.NewAccountEmail) {
 			util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailDomainNotSupported)
 			return
 		}
