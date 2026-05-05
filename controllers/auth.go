@@ -284,8 +284,7 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Perform email country check
-	if !util.IsEmailAllowed(requestData.Email, requestData.InitiatingServiceName) {
+	if !util.IsEmailAllowed(requestData.Email) {
 		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailDomainNotSupported)
 		return
 	}
@@ -536,7 +535,7 @@ func (ac *AuthController) CreateServiceToken(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if !util.IsEmailAllowed(session.Email, req.Service) {
+	if !util.IsEmailAllowed(session.Email) {
 		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailDomainNotSupported)
 		return
 	}

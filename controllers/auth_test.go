@@ -347,43 +347,6 @@ func (suite *AuthTestSuite) TestAuthLoginEmailNotVerified() {
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailNotVerified.Code)
 }
 
-func (suite *AuthTestSuite) TestAuthLoginStrictCountryCheck() {
-	// Update the existing account's email to a restricted country TLD (.ru)
-	email := "test@example.ru"
-	suite.Require().NoError(suite.ds.DB.Model(&datastore.Account{}).Where("id = ?", suite.account.ID).Update("email", email).Error)
-
-	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
-	suite.Require().NoError(err)
-	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
-	serializedKE1 := hex.EncodeToString(ke1.Serialize())
-
-	// Test login with accounts initiating service - should succeed (no strict check)
-	loginReq := controllers.LoginInitRequest{
-		Email:                 email,
-		SerializedKE1:         &serializedKE1,
-		InitiatingServiceName: util.AccountsServiceName,
-	}
-
-	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
-	resp := util.ExecuteTestRequest(req, suite.router)
-	suite.Equal(http.StatusOK, resp.Code)
-
-	// Test login with email-aliases initiating service - should fail (strict check enabled)
-	loginReq.InitiatingServiceName = util.EmailAliasesServiceName
-
-	req = util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
-	resp = util.ExecuteTestRequest(req, suite.router)
-	suite.Equal(http.StatusBadRequest, resp.Code)
-	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
-
-	// Test login with accounts initiating service - should succeed (no strict check)
-	loginReq.InitiatingServiceName = util.AccountsServiceName
-
-	req = util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
-	resp = util.ExecuteTestRequest(req, suite.router)
-	suite.Equal(http.StatusOK, resp.Code)
-}
-
 func (suite *AuthTestSuite) TestAuthLoginExpiredLoginState() {
 	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
 	suite.Require().NoError(err)
@@ -507,24 +470,6 @@ func (suite *AuthTestSuite) TestCreateServiceToken() {
 	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusForbidden, resp.Code)
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrInvalidTokenAudience.Code)
-
-	// Test TLD in 'strict' list
-	ruAccount, err := suite.ds.GetOrCreateAccount("test@example.ru")
-	suite.Require().NoError(err)
-	err = suite.ds.UpdateAccountLastEmailVerifiedAt(ruAccount.ID)
-	suite.Require().NoError(err)
-	session, err = suite.ds.CreateSession(ruAccount.ID, datastore.EmailAuthSessionVersion, "")
-	suite.Require().NoError(err)
-	token, err = suite.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
-	suite.Require().NoError(err)
-
-	req = util.CreateJSONTestRequest("/v2/auth/service_token", controllers.CreateServiceTokenRequest{
-		Service: util.EmailAliasesServiceName,
-	})
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp = util.ExecuteTestRequest(req, suite.router)
-	suite.Equal(http.StatusBadRequest, resp.Code)
-	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailDomainNotSupported.Code)
 }
 
 func (suite *AuthTestSuite) TestAuth2FAWithTOTPCode() {
