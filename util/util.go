@@ -106,32 +106,8 @@ func isGmail(domain string) bool {
 	return strings.EqualFold(domain, "gmail.com") || strings.EqualFold(domain, "googlemail.com")
 }
 
-func IsEmailAllowed(email string, serviceName string) bool {
-	lowerEmail := strings.ToLower(email)
-	// Check if email ends with @bravealias.com
-	if strings.HasSuffix(lowerEmail, "@bravealias.com") {
-		return false
-	}
-
-	// Always block these TLDs
-	unsupportedTLDs := []string{".cu", ".kp", ".tz"}
-	for _, tld := range unsupportedTLDs {
-		if strings.HasSuffix(lowerEmail, tld) {
-			return false
-		}
-	}
-
-	checkStrictCountries := serviceName == EmailAliasesServiceName || serviceName == PremiumServiceName
-	if checkStrictCountries {
-		restrictedTLDs := []string{".ir", ".sy", ".by", ".md", ".ru", ".ve"}
-		for _, tld := range restrictedTLDs {
-			if strings.HasSuffix(lowerEmail, tld) {
-				return false
-			}
-		}
-	}
-
-	return true
+func IsEmailAllowed(email string) bool {
+	return !strings.HasSuffix(strings.ToLower(email), "@bravealias.com")
 }
 
 // Simplify email address according to provider-specific

@@ -66,7 +66,7 @@ func (vs *VerificationService) InitializeVerification(ctx context.Context, email
 	}
 
 	// Validate email
-	if !util.IsEmailAllowed(email, service) {
+	if !util.IsEmailAllowed(email) {
 		return nil, nil, util.ErrEmailDomainNotSupported
 	}
 

@@ -28,7 +28,7 @@ type AuthController struct {
 // @Description Request for account login
 type LoginInitRequest struct {
 	// Email address of the account
-	Email string `json:"email" validate:"required,email,ascii" example:"test@example.com"`
+	Email string `json:"email" validate:"required,email,ascii,max=254" example:"test@example.com"`
 	// Blinded message component of KE1
 	BlindedMessage *string `json:"blindedMessage" validate:"required_without=SerializedKE1"`
 	// Client ephemeral public key of KE1
@@ -284,8 +284,7 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Perform email country check
-	if !util.IsEmailAllowed(requestData.Email, requestData.InitiatingServiceName) {
+	if !util.IsEmailAllowed(requestData.Email) {
 		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailDomainNotSupported)
 		return
 	}
@@ -536,7 +535,7 @@ func (ac *AuthController) CreateServiceToken(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if !util.IsEmailAllowed(session.Email, req.Service) {
+	if !util.IsEmailAllowed(session.Email) {
 		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailDomainNotSupported)
 		return
 	}
