@@ -1,0 +1,10 @@
+commit_message: "l10n(%language%): adds/updates translations for %original_file_name%"
+append_commit_message: false
+pull_request_reviewers:
+  - AndyAnds265
+files:
+  - source: /templates/strings/en.toml
+    languages_mapping:
+      two_letters_code:
+        zh-TW: zh-tw
+    translation: /%original_path%/%two_letters_code%.%file_extension%
