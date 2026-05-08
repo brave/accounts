@@ -8,3 +8,5 @@ files:
       two_letters_code:
         zh-TW: zh-tw
     translation: /%original_path%/%two_letters_code%.%file_extension%
+    translatable_elements:
+      - "$.*.other"
