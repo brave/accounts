@@ -1,0 +1,94 @@
+[VerifyEmailSubject]
+description = "Email subject for email verification"
+other = "Verify your email"
+
+[SetPasswordEmailSubject]
+description = "Email subject for setting a new password"
+other = "Set a new password for your Brave account"
+
+[RegistrationEmailSubject]
+description = "Email subject for creating a new account"
+other = "Create your Brave account"
+
+[LoginEmailSubject]
+description = "Email subject for logging into an account"
+other = "Access your Brave account"
+
+[EmailGreeting]
+description = "Greeting in the email message"
+other = "Hello,"
+
+[SetPasswordEmailInstructions]
+description = "Instructions to verify email address and set a new password for an account"
+other = "Here is the code you will need to verify your email address and set a new password for your Brave account."
+
+[RegistrationEmailInstructions]
+description = "Instructions to verify email address and create a new account"
+other = "Here is the code you will need to verify your email address and create your Brave account."
+
+[VerifyEmailInstructions]
+description = "Instructions to verify email address"
+other = "Here is the code you will need to verify your email address."
+
+[LoginEmailInstructions]
+description = "Instruction to verify an email address and login to an account"
+other = "Here is the code you will need to access your Brave account."
+
+[VerifyEmailCode]
+description = "Label preceding the verification code displayed in the email"
+other = "Your verification code:"
+
+[VerifyEmailExpiryDisclaimer]
+description = "Informs the user that the verification code expires after 30 minutes"
+other = "Note: This code will expire in 30 minutes."
+
+[SimilarEmailLoginMessage]
+description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = """
+It appears you already have an account registered with this email: {{.Email}}.
+
+Try logging in using this email address. If you still need help, please contact Brave support."""
+
+[SimilarEmailSubject]
+description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = "Having trouble? Here's how to access your Brave Account."
+
+[EmailSignature]
+description = "Email signature"
+other = "The Brave Team"
+
+[EmailDisregard]
+description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
+other = "If you didn’t make this request, please disregard this email."
+
+[EmailCopyright]
+description = "Brave copyright notice"
+other = "Copyright © {{.Year}} Brave Software Inc."
+
+[EmailAllRightsReserved]
+description = "All rights reserved notice"
+other = "All rights reserved"
+
+[EmailPrivacyPolicy]
+description = "Privacy policy link text"
+other = "Privacy Policy"
+
+[EmailTermsOfUse]
+description = "Terms of use link text"
+other = "Terms of Use"
+
+[EmailDownloadBrave]
+description = "Brave download link text"
+other = "Download Brave"
+
+[EmailContactSupport]
+description = "Support contact link text"
+other = "Contact Support"
+
+[PasswordChangeNotificationSubject]
+description = "Email subject for password change notification"
+other = "Your Brave account password has been changed"
+
+[PasswordChangeNotificationMessage]
+description = "Email message informing user that their password was changed"
+other = "Your Brave account password has been successfully changed. If you didn't make this change, please contact Brave support immediately to secure your account."
