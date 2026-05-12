@@ -50,13 +50,20 @@ const (
 	MaxCodeAttempts         = 10
 )
 
-// CreateVerification creates a new verification record
-func (d *Datastore) CreateVerification(email string, service string, intent string) (*Verification, error) {
+func generateVerificationCode() (string, error) {
 	b := make([]byte, codeLength)
 	if _, err := rand.Read(b); err != nil {
-		return nil, fmt.Errorf("failed to generate random code: %w", err)
+		return "", fmt.Errorf("failed to generate random code: %w", err)
 	}
-	code := base32.StdEncoding.EncodeToString(b)[:codeLength]
+	return base32.StdEncoding.EncodeToString(b)[:codeLength], nil
+}
+
+// CreateVerification creates a new verification record
+func (d *Datastore) CreateVerification(email string, service string, intent string) (*Verification, error) {
+	code, err := generateVerificationCode()
+	if err != nil {
+		return nil, err
+	}
 
 	id, err := uuid.NewV7()
 	if err != nil {
