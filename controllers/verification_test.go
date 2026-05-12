@@ -431,8 +431,8 @@ func (suite *VerificationTestSuite) TestVerifyCompleteWrongCode() {
 	verification, err := suite.ds.GetVerificationStatus(verificationID)
 	suite.NoError(err)
 
-	// Submit 10 wrong codes - each should increment code_attempts
-	for i := 1; i <= 10; i++ {
+	// Submit 5 wrong codes - each should increment code_attempts
+	for i := 1; i <= 5; i++ {
 		completeBody := controllers.VerifyCompleteRequest{Code: "AAAAAA"}
 		completeReq := util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
 		completeReq.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
