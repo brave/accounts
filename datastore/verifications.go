@@ -47,7 +47,7 @@ const (
 	codeLength              = 6
 	VerificationExpiration  = 30 * time.Minute
 	maxPendingVerifications = 3
-	MaxCodeAttempts         = 10
+	MaxCodeAttempts         = 5
 )
 
 func generateVerificationCode() (string, error) {
