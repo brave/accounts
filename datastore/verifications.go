@@ -49,6 +49,7 @@ const (
 	codeLength              = 6
 	VerificationExpiration  = 15 * time.Minute
 	maxPendingVerifications = 3
+	maxDailyVerifications   = 5
 	MaxCodeAttempts         = 5
 )
 
@@ -90,6 +91,21 @@ func (d *Datastore) CreateVerification(email string, service string, intent stri
 		Verified:      false,
 	}
 
+	// Enforce daily cap across all verifications for this email
+	now := time.Now().UTC()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	var dailyCount int64
+	if err := d.DB.Model(&Verification{}).
+		Where("email = ? AND created_at >= ?", email, startOfDay).
+		Count(&dailyCount).Error; err != nil {
+		return nil, fmt.Errorf("error counting daily verifications: %w", err)
+	}
+
+	if dailyCount >= maxDailyVerifications {
+		return nil, util.ErrDailyVerificationLimitReached
+	}
+
+	// Reject if too many unverified verifications are still pending
 	var existingCount int64
 	if err := d.validVerificationModel(nil).
 		Where("email = ? AND verified = false AND created_at > ?",
