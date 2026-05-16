@@ -40,8 +40,6 @@ var (
 const (
 	logPrettyEnv              = "LOG_PRETTY"
 	logLevelEnv               = "LOG_LEVEL"
-	passwordAuthEnabledEnv    = "PASSWORD_AUTH_ENABLED"
-	emailAuthEnabledEnv       = "EMAIL_AUTH_ENABLED"
 	accountDeletionEnabledEnv = "ACCOUNT_DELETION_ENABLED"
 	devEndpointsEnabledEnv    = "DEV_ENDPOINTS_ENABLED"
 	allowedOriginsEnv         = "ALLOWED_ORIGINS"
@@ -100,19 +98,10 @@ func main() {
 			util.StagingEnv,
 			util.ProductionEnv)
 	}
-	passwordAuthEnabled := os.Getenv(passwordAuthEnabledEnv) == "true"
-	emailAuthEnabled := os.Getenv(emailAuthEnabledEnv) == "true"
 	accountDeletionEnabled := os.Getenv(accountDeletionEnabledEnv) == "true"
 	allowedOrigins := strings.Split(os.Getenv(allowedOriginsEnv), ",")
 
-	if !passwordAuthEnabled && !emailAuthEnabled {
-		log.Panic().Msg("At least one authentication method must be enabled via PASSWORD_AUTH_ENABLED or EMAIL_AUTH_ENABLED env vars")
-	}
-
-	minSessionVersion := datastore.EmailAuthSessionVersion
-	if passwordAuthEnabled && !emailAuthEnabled {
-		minSessionVersion = datastore.PasswordAuthSessionVersion
-	}
+	minSessionVersion := datastore.PasswordAuthSessionVersion
 
 	datastore, err := datastore.NewDatastore(minSessionVersion, *startKeyServiceFlag, false)
 	if err != nil {
@@ -152,7 +141,7 @@ func main() {
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to init SES util")
 	}
-	verificationService := services.NewVerificationService(datastore, jwtService, sesService, passwordAuthEnabled, emailAuthEnabled)
+	verificationService := services.NewVerificationService(datastore, jwtService, sesService)
 
 	prometheusRegistry := prometheus.NewRegistry()
 
@@ -190,10 +179,8 @@ func main() {
 	})
 
 	r.Route("/v2", func(r chi.Router) {
-		r.With(servicesKeyMiddleware).Mount("/auth", authController.Router(authMiddleware, validateAuthMiddleware, passwordAuthEnabled))
-		if passwordAuthEnabled {
-			r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware, optionalVerificationMiddleware, authMiddleware, accountDeletionEnabled))
-		}
+		r.With(servicesKeyMiddleware).Mount("/auth", authController.Router(authMiddleware, validateAuthMiddleware))
+		r.With(servicesKeyMiddleware).Mount("/accounts", accountsController.Router(verificationMiddleware, optionalVerificationMiddleware, authMiddleware, accountDeletionEnabled))
 		r.Mount("/verify", verificationController.Router(verificationMiddleware, servicesKeyMiddleware, optionalAuthMiddleware, devEndpointsEnabled))
 		r.With(servicesKeyMiddleware).Mount("/sessions", sessionsController.Router(authMiddleware))
 		r.With(servicesKeyMiddleware).Mount("/keys", userKeysController.Router(authMiddleware))

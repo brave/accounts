@@ -10,10 +10,6 @@ other = "Set a new password for your Brave account"
 description = "Email subject for creating a new account"
 other = "Create your Brave account"
 
-[LoginEmailSubject]
-description = "Email subject for logging into an account"
-other = "Access your Brave account"
-
 [EmailGreeting]
 description = "Greeting in the email message"
 other = "Hello,"
@@ -29,10 +25,6 @@ other = "Here is the code you will need to verify your email address and create 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
 other = "Here is the code you will need to verify your email address."
-
-[LoginEmailInstructions]
-description = "Instruction to verify an email address and login to an account"
-other = "Here is the code you will need to access your Brave account."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"

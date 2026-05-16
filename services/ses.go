@@ -224,9 +224,6 @@ func (s *SESService) SendVerificationEmail(ctx context.Context, email string, ve
 	var subjectMessageID string
 	var instructionsMessageID string
 	switch verification.Intent {
-	case datastore.AuthTokenIntent:
-		subjectMessageID = "LoginEmailSubject"
-		instructionsMessageID = "LoginEmailInstructions"
 	case datastore.VerificationIntent:
 		subjectMessageID = "VerifyEmailSubject"
 		instructionsMessageID = "VerifyEmailInstructions"

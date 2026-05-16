@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	EmailAuthSessionVersion    = 1
 	PasswordAuthSessionVersion = 2
 )
 
