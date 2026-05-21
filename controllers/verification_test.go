@@ -480,10 +480,10 @@ func (suite *VerificationTestSuite) TestVerificationExpiry() {
 	verificationID, err := suite.jwtService.ValidateVerificationToken(*parsedInitResp.VerificationToken)
 	suite.NoError(err)
 
-	// Manually set verification to expired state (31 minutes ago)
+	// Manually set verification to expired state (16 minutes ago)
 	err = suite.ds.DB.Model(&datastore.Verification{}).
 		Where("id = ?", verificationID).
-		Update("created_at", time.Now().UTC().Add(-31*time.Minute)).Error
+		Update("created_at", time.Now().UTC().Add(-16*time.Minute)).Error
 	suite.NoError(err)
 
 	// Query verification status - should be expired
