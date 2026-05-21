@@ -244,7 +244,7 @@ func (s *SESService) SendVerificationEmail(ctx context.Context, email string, ve
 		VerificationCode: verification.Code,
 		Instructions:     localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: instructionsMessageID}),
 		CodeLabel:        localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailCode"}),
-		ExpiryDisclaimer: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailExpiryDisclaimer"}),
+		ExpiryDisclaimer: localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "VerifyEmailExpiryDisclaimer", TemplateData: map[string]string{"Minutes": strconv.Itoa(int(datastore.VerificationExpiration.Minutes()))}}),
 	}
 
 	if err := s.sendEmail(ctx, email, effectiveLocale, data.Subject, &data, s.verifyHTMLTemplate, s.verifyTextTemplate); err != nil {

@@ -44,7 +44,7 @@ const (
 	ResetPasswordIntent  = "reset_password"
 	ChangePasswordIntent = "change_password"
 
-	VerificationExpiration  = 30 * time.Minute
+	VerificationExpiration  = 15 * time.Minute
 	maxPendingVerifications = 3
 	MaxCodeAttempts         = 5
 )

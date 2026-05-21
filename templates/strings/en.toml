@@ -39,8 +39,8 @@ description = "Label preceding the verification code displayed in the email"
 other = "Your verification code:"
 
 [VerifyEmailExpiryDisclaimer]
-description = "Informs the user that the verification code expires after 30 minutes"
-other = "Note: This code will expire in 30 minutes."
+description = "Informs the user how many minutes until the verification code expires"
+other = "Note: This code will expire in {{.Minutes}} minutes."
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
