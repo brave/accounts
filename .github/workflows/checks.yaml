@@ -42,6 +42,18 @@ jobs:
       with:
         version: v2.11.4
         args: --timeout=10m
+    - name: Lint TOML
+      run: |
+        python3 -c "
+        import tomllib, sys
+        for f in sys.argv[1:]:
+            try:
+                with open(f, 'rb') as fh:
+                    tomllib.load(fh)
+            except tomllib.TOMLDecodeError as e:
+                sys.exit(f'{f}: {e}')
+            print(f'ok: {f}')
+        " templates/strings/*.toml
     - name: Test
       run: go test -p 1 -v ./...
       env:
