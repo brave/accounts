@@ -40,7 +40,7 @@ other = "Votre code de vérification :"
 
 [VerifyEmailExpiryDisclaimer]
 description = "Informs the user how many minutes until the verification code expires"
-other = "Note: This code will expire in {{.Minutes}} minutes."
+other = "Note : Ce code expirera dans {{.Minutes}} minutes."
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
