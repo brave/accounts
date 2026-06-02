@@ -2,9 +2,9 @@ package datastore
 
 import (
 	"crypto/rand"
+	"encoding/base32"
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/brave/accounts/util"
@@ -44,45 +44,23 @@ const (
 	ResetPasswordIntent  = "reset_password"
 	ChangePasswordIntent = "change_password"
 
+	codeLength              = 6
 	VerificationExpiration  = 15 * time.Minute
 	maxPendingVerifications = 3
 	MaxCodeAttempts         = 5
 )
 
-const (
-	codeAlphabetFull  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234679" // 32 chars
-	codeAlphabetDigit = "234679"                           // 6 chars
-	codePattern       = "FFDFFD"                           // F = Full, D = Digit
-)
-
-func generateVerificationCode(pattern string) (string, error) {
-	if len(pattern) == 0 {
-		return "", fmt.Errorf("code pattern must not be empty")
+func generateVerificationCode() (string, error) {
+	b := make([]byte, codeLength)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to generate random code: %w", err)
 	}
-	out := make([]byte, len(pattern))
-	for i, char := range pattern {
-		var alphabet string
-		switch char {
-		case 'F':
-			alphabet = codeAlphabetFull
-		case 'D':
-			alphabet = codeAlphabetDigit
-		default:
-			return "", fmt.Errorf("invalid code pattern char %q", char)
-		}
-		idx, err := rand.Int(rand.Reader, big.NewInt(int64(len(alphabet))))
-		if err != nil {
-			return "", fmt.Errorf("failed to generate random code: %w", err)
-		}
-		// Map random number to char in alphabet for the current position
-		out[i] = alphabet[idx.Int64()]
-	}
-	return string(out), nil
+	return base32.StdEncoding.EncodeToString(b)[:codeLength], nil
 }
 
 // CreateVerification creates a new verification record
 func (d *Datastore) CreateVerification(email string, service string, intent string) (*Verification, error) {
-	code, err := generateVerificationCode(codePattern)
+	code, err := generateVerificationCode()
 	if err != nil {
 		return nil, err
 	}
