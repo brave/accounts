@@ -59,7 +59,7 @@ other = "Il team di Brave"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "Se non stato tu a effettuare questa richiesta, ignora questa email."
+other = "Se non hai effettuato tu questa richiesta, ignora questa email."
 
 [EmailCopyright]
 description = "Brave copyright notice"
@@ -91,4 +91,4 @@ other = "La password del tuo account Brave è stata modificata"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "La password del tuo account Brave è stata modificata con successo. Se non sei stato tu, contatta immediatamente l'assistenza di Brave per proteggere il tuo account."
+other = "La password del tuo account Brave è stata modificata con successo. Non sei tu? Contatta immediatamente l'assistenza di Brave per proteggere il tuo account."
