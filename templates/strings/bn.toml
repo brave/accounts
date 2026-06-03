@@ -1,57 +1,57 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Verify your email"
+other = "আপনার ইমেইল যাচাই করুন"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
-other = "Set a new password for your Brave account"
+other = "আপনার Brave অ্যাকাউন্টের জন্য একটি নতুন পাসওয়ার্ড সেট করুন"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
-other = "Create your Brave account"
+other = "আপনার ব্রেভ অ্যাকাউন্ট তৈরি করুন"
 
 [LoginEmailSubject]
 description = "Email subject for logging into an account"
-other = "Access your Brave account"
+other = "আপনার Brave অ্যাকাউন্ট অ্যাক্সেস করুন"
 
 [EmailGreeting]
 description = "Greeting in the email message"
-other = "Hello,"
+other = "হ্যালো,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Here is the code you will need to verify your email address and set a new password for your Brave account."
+other = "এখানে সেই কোডটি রয়েছে যা আপনাকে আপনার ইমেইল ঠিকানা যাচাই করতে এবং আপনার Brave অ্যাকাউন্টের জন্য একটি নতুন পাসওয়ার্ড সেট করতে প্রয়োজন হবে।"
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Here is the code you will need to verify your email address and create your Brave account."
+other = "এখানে সেই কোডটি রয়েছে যা আপনাকে আপনার ইমেইল ঠিকানা যাচাই করতে এবং আপনার Brave অ্যাকাউন্ট তৈরি করতে প্রয়োজন হবে।"
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Here is the code you will need to verify your email address."
+other = "এখানে সেই কোডটি রয়েছে যা আপনার ইমেইল ঠিকানা যাচাই করতে প্রয়োজন হবে।"
 
 [LoginEmailInstructions]
 description = "Instruction to verify an email address and login to an account"
-other = "Here is the code you will need to access your Brave account."
+other = "এখানে সেই কোডটি রয়েছে যা আপনার Brave অ্যাকাউন্ট অ্যাক্সেস করতে প্রয়োজন হবে।"
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
-other = "Your verification code:"
+other = "আপনার যাচাইকরণ কোড:"
 
 [VerifyEmailExpiryDisclaimer]
 description = "Informs the user how many minutes until the verification code expires"
-other = "Note: This code will expire in {{.Minutes}} minutes."
+other = "দ্রষ্টব্য: এই কোডটির মেয়াদ {{.Minutes}} মিনিটের মধ্যে শেষ হয়ে যাবে।"
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
-It appears you already have an account registered with this email: {{.Email}}.
+মনে হচ্ছে এই ইমেল {{.Email}} দিয়ে ইতিমধ্যেই একটি অ্যাকাউন্ট নিবন্ধিত আছে।
 
-Try logging in using this email address. If you still need help, please contact Brave support."""
+এই ইমেইল ঠিকানা ব্যবহার করে লগইন করার চেষ্টা করুন। যদি এখনও সাহায্যের প্রয়োজন হয়, অনুগ্রহ করে Brave সাপোর্টের সাথে যোগাযোগ করুন।"""
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "Having trouble? Here's how to access your Brave Account."
+other = "সমস্যা হচ্ছে? কীভাবে আপনার Brave অ্যাকাউন্টে অ্যাক্সেস করবেন তা এখানে দেওয়া আছে।"
 
 [EmailSignature]
 description = "Email signature"
@@ -59,7 +59,7 @@ other = "The Brave Team"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "If you didn’t make this request, please disregard this email."
+other = "যদি আপনি এই অনুরোধ না করে থাকেন, অনুগ্রহ করে এই ইমেইলটি উপেক্ষা করুন।"
 
 [EmailCopyright]
 description = "Brave copyright notice"
@@ -67,28 +67,28 @@ other = "Copyright © {{.Year}} Brave Software Inc."
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
-other = "All rights reserved"
+other = "সমস্ত অধিকার সংরক্ষিত"
 
 [EmailPrivacyPolicy]
 description = "Privacy policy link text"
-other = "Privacy Policy"
+other = "গোপনীয়তা নীতি"
 
 [EmailTermsOfUse]
 description = "Terms of use link text"
-other = "Terms of Use"
+other = "ব্যবহারের শর্তাবলী"
 
 [EmailDownloadBrave]
 description = "Brave download link text"
-other = "Download Brave"
+other = "Brave ডাউনলোড করুন"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Contact Support"
+other = "সহায়তার সাথে যোগাযোগ করুন"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Your Brave account password has been changed"
+other = "আপনার Brave অ্যাকাউন্টের পাসওয়ার্ড পরিবর্তন করা হয়েছে"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Your Brave account password has been successfully changed. If you didn't make this change, please contact Brave support immediately to secure your account."
+other = "আপনার Brave অ্যাকাউন্টের পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে। যদি আপনি এই পরিবর্তন না করে থাকেন, তাহলে আপনার অ্যাকাউন্ট সুরক্ষিত রাখতে অনুগ্রহ করে অবিলম্বে Brave সাপোর্টের সাথে যোগাযোগ করুন।"
