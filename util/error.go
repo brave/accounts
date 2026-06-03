@@ -48,6 +48,9 @@ var (
 	ErrBadRecoveryKey               = NewExposedError(14010, "invalid recovery key")
 	ErrTOTPAlreadyEnabled           = NewExposedError(14011, "TOTP authentication is already enabled for this account")
 	ErrTOTPCodeAlreadyUsed          = NewExposedError(14012, "TOTP code has already been used")
+	ErrMissingToken                 = NewExposedError(14013, "missing token")
+	ErrExpiredToken                 = NewExposedError(14014, "token has expired")
+	ErrInvalidToken                 = NewExposedError(14015, "invalid token")
 
 	// Misc errors, prefixed with '15'
 	ErrInvalidServicesKey = NewExposedError(15001, "invalid services key")

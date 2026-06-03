@@ -96,7 +96,7 @@ func VerifyRecoveryKeyHash(recoveryKey string, storedHash []byte) bool {
 func ExtractAuthToken(r *http.Request) (string, error) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-		return "", fmt.Errorf("invalid authorization header")
+		return "", ErrMissingToken
 	}
 
 	return strings.TrimPrefix(authHeader, "Bearer "), nil

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -169,7 +170,10 @@ func (j *JWTService) parseToken(tokenString string, claimKey string) (uuid.UUID,
 	})
 
 	if err != nil {
-		return uuid.Nil, "", fmt.Errorf("invalid token: %w", err)
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return uuid.Nil, "", util.ErrExpiredToken
+		}
+		return uuid.Nil, "", util.ErrInvalidToken
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
@@ -186,7 +190,7 @@ func (j *JWTService) parseToken(tokenString string, claimKey string) (uuid.UUID,
 		return id, audStr, err
 	}
 
-	return uuid.Nil, "", fmt.Errorf("invalid token claims")
+	return uuid.Nil, "", util.ErrInvalidToken
 }
 
 func (j *JWTService) ValidateVerificationToken(tokenString string) (uuid.UUID, error) {

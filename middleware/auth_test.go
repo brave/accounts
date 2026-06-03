@@ -189,6 +189,51 @@ func (suite *MiddlewareTestSuite) TestServicesKeyMiddleware() {
 	suite.Equal(http.StatusUnauthorized, resp.Code)
 }
 
+func (suite *MiddlewareTestSuite) TestAuthMiddlewareTokenErrors() {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	session, err := suite.ds.CreateSession(suite.account.ID, datastore.EmailAuthSessionVersion, "")
+	suite.Require().NoError(err)
+	expiration := -time.Minute
+	expiredAuthToken, err := suite.jwtService.CreateAuthToken(session.ID, &expiration, util.AccountsServiceName)
+	suite.Require().NoError(err)
+
+	verification, err := suite.ds.CreateVerification("test@example.com", "email-aliases", "verification")
+	suite.Require().NoError(err)
+	expiredVerificationToken, err := suite.jwtService.CreateVerificationToken(verification.ID, -time.Minute, verification.Service)
+	suite.Require().NoError(err)
+
+	middlewares := []http.Handler{
+		middleware.AuthMiddleware(suite.jwtService, suite.ds, 1, false, true)(handler),
+		middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds, true)(handler),
+	}
+	expiredTokens := []string{expiredAuthToken, expiredVerificationToken}
+
+	for i, mw := range middlewares {
+		// Missing token
+		req := httptest.NewRequest("GET", "/", nil)
+		resp := util.ExecuteTestRequest(req, mw)
+		suite.Equal(http.StatusUnauthorized, resp.Code)
+		util.AssertErrorResponseCode(suite.T(), resp, util.ErrMissingToken.Code)
+
+		// Invalid token
+		req = httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer notavalidtoken")
+		resp = util.ExecuteTestRequest(req, mw)
+		suite.Equal(http.StatusUnauthorized, resp.Code)
+		util.AssertErrorResponseCode(suite.T(), resp, util.ErrInvalidToken.Code)
+
+		// Expired token
+		req = httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer "+expiredTokens[i])
+		resp = util.ExecuteTestRequest(req, mw)
+		suite.Equal(http.StatusUnauthorized, resp.Code)
+		util.AssertErrorResponseCode(suite.T(), resp, util.ErrExpiredToken.Code)
+	}
+}
+
 func (suite *MiddlewareTestSuite) TestVerificationAuthMiddleware() {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		verification := r.Context().Value(middleware.ContextVerification).(*datastore.Verification)
