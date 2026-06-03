@@ -45,21 +45,21 @@ other = "Hinweis: Dieser Code läuft in {{.Minutes}} Minuten ab."
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
-It appears you already have an account registered with this email: {{.Email}}.
+Es scheint, dass Sie bereits ein Konto mit dieser E-Mail-Adresse registriert haben: {{.Email}}.
 
-Try logging in using this email address. If you still need help, please contact Brave support."""
+Versuchen Sie, sich mit dieser E-Mail-Adresse anzumelden. Wenn Sie weitere Unterstützung benötigen, kontaktieren Sie bitte den Support von Brave."""
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "Having trouble? Here's how to access your Brave Account."
+other = "Haben Sie Probleme mit dem Kontozugriff? Hier erfahren Sie, wie Sie auf Ihr Brave-Konto zugreifen."
 
 [EmailSignature]
 description = "Email signature"
-other = "The Brave Team"
+other = "Ihr Brave-Team"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "If you didn’t make this request, please disregard this email."
+other = "Wenn Sie diese Anfrage nicht gestellt haben, ignorieren Sie bitte diese E-Mail."
 
 [EmailCopyright]
 description = "Brave copyright notice"
@@ -67,23 +67,23 @@ other = "Copyright © {{.Year}} Brave Software Inc."
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
-other = "All rights reserved"
+other = "Alle Rechte vorbehalten"
 
 [EmailPrivacyPolicy]
 description = "Privacy policy link text"
-other = "Privacy Policy"
+other = "Datenschutzrichtlinie"
 
 [EmailTermsOfUse]
 description = "Terms of use link text"
-other = "Terms of Use"
+other = "Nutzungsbedingungen"
 
 [EmailDownloadBrave]
 description = "Brave download link text"
-other = "Download Brave"
+other = "Brave herunterladen"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Contact Support"
+other = "Support kontaktieren"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
@@ -91,4 +91,4 @@ other = "Your Brave account password has been changed"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Your Brave account password has been successfully changed. If you didn't make this change, please contact Brave support immediately to secure your account."
+other = "Das Passwort für Ihr Brave-Konto wurde erfolgreich geändert. Wenn Sie diese Änderung nicht veranlasst haben, wenden Sie sich bitte umgehend an den Support von Brave, um Ihr Konto zu schützen."
