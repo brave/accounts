@@ -1,42 +1,42 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Verify your email"
+other = "Verifieer je e-mailadres"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
-other = "Set a new password for your Brave account"
+other = "Stel nieuw wachtwoord in voor je Brave-account"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
-other = "Create your Brave account"
+other = "Maak je Brave-account aan"
 
 [LoginEmailSubject]
 description = "Email subject for logging into an account"
-other = "Access your Brave account"
+other = "Toegang tot je Brave-account"
 
 [EmailGreeting]
 description = "Greeting in the email message"
-other = "Hello,"
+other = "Hoi,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Here is the code you will need to verify your email address and set a new password for your Brave account."
+other = "Hier is de code die je nodig hebt om je e-mailadres te verifiëren en een nieuw wachtwoord voor je Brave-account in te stellen."
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Here is the code you will need to verify your email address and create your Brave account."
+other = "Hier is de code die je nodig hebt om je e-mailadres te verifiëren en je Brave-account aan te maken."
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Here is the code you will need to verify your email address."
+other = "Hier is de code die je nodig hebt om je e-mailadres te verifiëren."
 
 [LoginEmailInstructions]
 description = "Instruction to verify an email address and login to an account"
-other = "Here is the code you will need to access your Brave account."
+other = "Hier is de code die je nodig hebt om toegang te krijgen tot je Brave-account."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
-other = "Your verification code:"
+other = "Je verificatiecode:"
 
 [VerifyEmailExpiryDisclaimer]
 description = "Informs the user how many minutes until the verification code expires"
