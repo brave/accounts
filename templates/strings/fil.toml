@@ -8,11 +8,11 @@ other = "Mag-set ng bagong password para sa Brave account mo"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
-other = "Create your Brave account"
+other = "Gawin ang Brave account mo"
 
 [LoginEmailSubject]
 description = "Email subject for logging into an account"
-other = "Access your Brave account"
+other = "I-access ang Brave account mo"
 
 [EmailGreeting]
 description = "Greeting in the email message"
@@ -20,46 +20,46 @@ other = "Hello,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Here is the code you will need to verify your email address and set a new password for your Brave account."
+other = "Heto ang code na kakailanganin mo para i-verify ang iyong email address at mag-set ng bagong password para sa Brave account mo."
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Here is the code you will need to verify your email address and create your Brave account."
+other = "Heto ang code na kakailanganin mo para i-verify ang iyong email address at gawin ang Brave account mo."
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Here is the code you will need to verify your email address."
+other = "Heto ang code na kakailanganin mo para i-verify ang iyong email address."
 
 [LoginEmailInstructions]
 description = "Instruction to verify an email address and login to an account"
-other = "Here is the code you will need to access your Brave account."
+other = "Heto ang code na kakailanganin mo para ma-access ang iyong Brave account."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
-other = "Your verification code:"
+other = "Ang iyong verification code:"
 
 [VerifyEmailExpiryDisclaimer]
 description = "Informs the user how many minutes until the verification code expires"
-other = "Note: This code will expire in {{.Minutes}} minutes."
+other = "Tandaan: Mag-e-expire ang code sa loob ng {{.Minutes}} (na) minuto."
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
-It appears you already have an account registered with this email: {{.Email}}.
+Parang may account ka na na naka-register gamit ang email na ito: {{.Email}}.
 
-Try logging in using this email address. If you still need help, please contact Brave support."""
+Subukang mag-log in gamit ang email address na ito. Kung kailangan mo pa rin ng tulong, pakikontak ang Brave support."""
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "Having trouble? Here's how to access your Brave Account."
+other = "Nagkakaproblema? Ganito ang gawin mo para ma-access ang iyong Brave Account."
 
 [EmailSignature]
 description = "Email signature"
-other = "The Brave Team"
+other = "Ang Brave Team"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "If you didn’t make this request, please disregard this email."
+other = "Kung hindi mo ginawa ang request na ito, balewalain ang email na ito."
 
 [EmailCopyright]
 description = "Brave copyright notice"
@@ -71,24 +71,24 @@ other = "All rights reserved"
 
 [EmailPrivacyPolicy]
 description = "Privacy policy link text"
-other = "Privacy Policy"
+other = "Patakaran sa Privacy"
 
 [EmailTermsOfUse]
 description = "Terms of use link text"
-other = "Terms of Use"
+other = "Mga Tuntunin sa Paggamit"
 
 [EmailDownloadBrave]
 description = "Brave download link text"
-other = "Download Brave"
+other = "I-download ang Brave"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Contact Support"
+other = "Kontakin ang Support"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Your Brave account password has been changed"
+other = "Nabago ang password ng Brave account mo"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Your Brave account password has been successfully changed. If you didn't make this change, please contact Brave support immediately to secure your account."
+other = "Nabago ang password ng Brave account mo. Kung hindi mo ito binago, pakikontak ang Brave support kaagad-agad para ma-secure ang account mo."
