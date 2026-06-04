@@ -12,54 +12,54 @@ other = "Opprett en Brave-konto"
 
 [LoginEmailSubject]
 description = "Email subject for logging into an account"
-other = "Access your Brave account"
+other = "Få tilgang til Brave-kontoen din"
 
 [EmailGreeting]
 description = "Greeting in the email message"
-other = "Hello,"
+other = "Hei,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Here is the code you will need to verify your email address and set a new password for your Brave account."
+other = "Her er koden du trenger for å bekrefte e-postadressen og velge et nytt passord for Brave-kontoen din."
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Here is the code you will need to verify your email address and create your Brave account."
+other = "Her er koden du trenger for å bekrefte e-postadressen din og opprette en Brave-konto."
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Here is the code you will need to verify your email address."
+other = "Her er koden du trenger for å bekrefte e-postadressen din."
 
 [LoginEmailInstructions]
 description = "Instruction to verify an email address and login to an account"
-other = "Here is the code you will need to access your Brave account."
+other = "Her er koden du trenger for å få tilgang til Brave-kontoen din."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
-other = "Your verification code:"
+other = "Bekreftelseskoden din:"
 
 [VerifyEmailExpiryDisclaimer]
 description = "Informs the user how many minutes until the verification code expires"
-other = "Note: This code will expire in {{.Minutes}} minutes."
+other = "Merk: Koden utløper om {{.Minutes}} minutter."
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
-It appears you already have an account registered with this email: {{.Email}}.
+Det ser ut til at du allerede har en konto registrert med følgende e-postadresse: {{.Email}}.
 
-Try logging in using this email address. If you still need help, please contact Brave support."""
+Prøv å logge inn med denne e-postadressen. Dersom du trenger hjelp, kan du ta kontakt med Braves brukerstøtte."""
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "Having trouble? Here's how to access your Brave Account."
+other = "Problemer med innlogging? Slik får du tilgang til Brave-kontoen din."
 
 [EmailSignature]
 description = "Email signature"
-other = "The Brave Team"
+other = "Brave-teamet"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "If you didn’t make this request, please disregard this email."
+other = "Du kan se vekk fra denne e-posten dersom du ikke ba om dette."
 
 [EmailCopyright]
 description = "Brave copyright notice"
@@ -67,28 +67,28 @@ other = "Copyright © {{.Year}} Brave Software Inc."
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
-other = "All rights reserved"
+other = "Med enerett"
 
 [EmailPrivacyPolicy]
 description = "Privacy policy link text"
-other = "Privacy Policy"
+other = "Personvernerklæring"
 
 [EmailTermsOfUse]
 description = "Terms of use link text"
-other = "Terms of Use"
+other = "Bruksvilkår"
 
 [EmailDownloadBrave]
 description = "Brave download link text"
-other = "Download Brave"
+other = "Last ned Brave"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Contact Support"
+other = "Kontakt brukerstøtte"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Your Brave account password has been changed"
+other = "Passordet til Brave-kontoen din ble endret"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Your Brave account password has been successfully changed. If you didn't make this change, please contact Brave support immediately to secure your account."
+other = "Passordet til Brave-kontoen din har blitt endret. Dersom dette ikke var deg, må du ta kontakt med Braves brukerstøtte umiddelbart for å beskytte kontoen din."
