@@ -1,94 +1,94 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Verify your email"
+other = "E-postanızı doğrulayın"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
-other = "Set a new password for your Brave account"
+other = "Brave hesabınız için yeni bir parola belirleyin"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
-other = "Create your Brave account"
+other = "Brave hesabınızı oluşturun"
 
 [LoginEmailSubject]
 description = "Email subject for logging into an account"
-other = "Access your Brave account"
+other = "Brave hesabınıza erişin"
 
 [EmailGreeting]
 description = "Greeting in the email message"
-other = "Hello,"
+other = "Merhaba,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Here is the code you will need to verify your email address and set a new password for your Brave account."
+other = "E-posta adresinizi doğrulamak ve Brave hesabınız için yeni bir parola belirlemek için ihtiyacınız olan kodu burada bulabilirsiniz."
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Here is the code you will need to verify your email address and create your Brave account."
+other = "E-posta adresinizi doğrulamak ve Brave hesabınızı oluşturmak için ihtiyacınız olan kodu burada bulabilirsiniz."
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Here is the code you will need to verify your email address."
+other = "E-posta adresinizi doğrulamak için ihtiyacınız olan kodu burada bulabilirsiniz."
 
 [LoginEmailInstructions]
 description = "Instruction to verify an email address and login to an account"
-other = "Here is the code you will need to access your Brave account."
+other = "Brave hesabınıza erişmek için ihtiyacınız olan kodu burada bulabilirsiniz."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
-other = "Your verification code:"
+other = "Doğrulama kodunuz:"
 
 [VerifyEmailExpiryDisclaimer]
 description = "Informs the user how many minutes until the verification code expires"
-other = "Note: This code will expire in {{.Minutes}} minutes."
+other = "Not: Bu kodun geçerlilik süresi {{.Minutes}} dakikadır."
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
-It appears you already have an account registered with this email: {{.Email}}.
+Şu e-posta ile daha önce kayıt yapmışsınız gibi görünüyor: {{.Email}}.
 
-Try logging in using this email address. If you still need help, please contact Brave support."""
+Bu e-posta adresini kullanarak giriş yapmayı deneyin. Hala yardıma ihtiyacınız olursa lütfen Brave destek ile iletişime geçin."""
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "Having trouble? Here's how to access your Brave Account."
+other = "Sorun mu yaşıyorsunuz? Brave Hesabınıza nasıl erişeceğiniz aşağıda açıklanmıştır."
 
 [EmailSignature]
 description = "Email signature"
-other = "The Brave Team"
+other = "Brave Ekibi"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "If you didn’t make this request, please disregard this email."
+other = "Böyle bir talepte bulunmadıysanız lütfen bu e-postayı dikkate almayın."
 
 [EmailCopyright]
 description = "Brave copyright notice"
-other = "Copyright © {{.Year}} Brave Software Inc."
+other = "Telif © {{.Year}} Brave Software Inc."
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
-other = "All rights reserved"
+other = "Tüm hakları saklıdır"
 
 [EmailPrivacyPolicy]
 description = "Privacy policy link text"
-other = "Privacy Policy"
+other = "Gizlilik Politikası"
 
 [EmailTermsOfUse]
 description = "Terms of use link text"
-other = "Terms of Use"
+other = "Kullanım Koşulları"
 
 [EmailDownloadBrave]
 description = "Brave download link text"
-other = "Download Brave"
+other = "Brave'i İndirin"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Contact Support"
+other = "Destek Ekibiyle İletişime Geçin"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Your Brave account password has been changed"
+other = "Brave hesabınızın parolası değiştirildi"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Your Brave account password has been successfully changed. If you didn't make this change, please contact Brave support immediately to secure your account."
+other = "Brave hesabınızın parolası başarıyla değiştirildi. Bu değişikliği siz yapmadıysanız, hesabınızı güvence altına almak için lütfen derhal Brave destek ekibiyle iletişime geçin."
