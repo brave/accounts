@@ -1,10 +1,10 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Verify your email"
+other = "I-verify ang email mo"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
-other = "Set a new password for your Brave account"
+other = "Mag-set ng bagong password para sa Brave account mo"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
