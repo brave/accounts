@@ -20,7 +20,7 @@ other = "Salam,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Here is the code you will need to verify your email address and set a new password for your Brave account."
+other = "E-poçt ünvanınızı təsdiqləmək və Brave hesabınıza yeni bir parol təyin etmək üçün tələb olunan kod."
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
