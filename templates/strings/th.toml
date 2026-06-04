@@ -1,38 +1,38 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Verify your email"
+other = "ยืนยันอีเมล"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
-other = "Set a new password for your Brave account"
+other = "ตั้งรหัสผ่านใหม่สำหรับบัญชี Brave ของคุณ"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
-other = "Create your Brave account"
+other = "สร้างบัญชี Brave ของคุณ"
 
 [LoginEmailSubject]
 description = "Email subject for logging into an account"
-other = "Access your Brave account"
+other = "เข้าถึงบัญชี Brave ของคุณ"
 
 [EmailGreeting]
 description = "Greeting in the email message"
-other = "Hello,"
+other = "สวัสดี"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Here is the code you will need to verify your email address and set a new password for your Brave account."
+other = "นี่คือรหัสที่คุณต้องใช้เพื่อยืนยันอีเมลของคุณและตั้งรหัสผ่านใหม่สำหรับบัญชี Brave ของคุณ"
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Here is the code you will need to verify your email address and create your Brave account."
+other = "นี่คือรหัสที่คุณต้องใช้เพื่อยืนยันอีเมลและสร้างบัญชี Brave ของคุณ"
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Here is the code you will need to verify your email address."
+other = "นี่คือรหัสที่คุณต้องใช้เพื่อยืนยันอีเมลของคุณ"
 
 [LoginEmailInstructions]
 description = "Instruction to verify an email address and login to an account"
-other = "Here is the code you will need to access your Brave account."
+other = "นี่คือรหัสที่คุณต้องใช้ในการเข้าถึงบัญชี Brave ของคุณ"
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
