@@ -1,69 +1,69 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Verify your email"
+other = "驗證您的電子郵件"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
-other = "Set a new password for your Brave account"
+other = "為您的 Brave 帳戶設定新密碼"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
-other = "Create your Brave account"
+other = "建立您的 Brave 帳戶"
 
 [LoginEmailSubject]
 description = "Email subject for logging into an account"
-other = "Access your Brave account"
+other = "存取您的 Brave 帳戶"
 
 [EmailGreeting]
 description = "Greeting in the email message"
-other = "Hello,"
+other = "您好："
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Here is the code you will need to verify your email address and set a new password for your Brave account."
+other = "以下是您需要用來驗證電子郵件地址並為 Brave 帳戶設定新密碼的驗證碼。"
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Here is the code you will need to verify your email address and create your Brave account."
+other = "以下是您驗證電子郵件地址並建立 Brave 帳戶所需的驗證碼。"
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Here is the code you will need to verify your email address."
+other = "以下是您驗證電子郵件地址所需的驗證碼。"
 
 [LoginEmailInstructions]
 description = "Instruction to verify an email address and login to an account"
-other = "Here is the code you will need to access your Brave account."
+other = "以下是您存取 Brave 帳戶所需的驗證碼。"
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
-other = "Your verification code:"
+other = "您的驗證碼："
 
 [VerifyEmailExpiryDisclaimer]
 description = "Informs the user how many minutes until the verification code expires"
-other = "Note: This code will expire in {{.Minutes}} minutes."
+other = "注意：此驗證碼將在 {{.Minutes}} 分鐘後失效。"
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
-It appears you already have an account registered with this email: {{.Email}}.
+看來您已經用這個電子郵件註冊了一個帳戶： {{.Email}}.
 
-Try logging in using this email address. If you still need help, please contact Brave support."""
+請嘗試使用此電子郵件地址登入。如果您仍然需要幫助，請聯絡 Brave 支援。"""
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "Having trouble? Here's how to access your Brave Account."
+other = "遇到問題嗎？請參閱以下說明，了解如何存取您的 Brave 帳戶。"
 
 [EmailSignature]
 description = "Email signature"
-other = "The Brave Team"
+other = "Brave 團隊上"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "If you didn’t make this request, please disregard this email."
+other = "若您未提出此要求，請忽略此郵件。"
 
 [EmailCopyright]
 description = "Brave copyright notice"
-other = "Copyright © {{.Year}} Brave Software Inc."
+other = "版權所有 © {{.Year}} Brave Software Inc."
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
