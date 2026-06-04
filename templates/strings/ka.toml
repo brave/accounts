@@ -1,53 +1,53 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Verify your email"
+other = "დაადასტურეთ თქვენი ელ-ფოსტა"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
-other = "Set a new password for your Brave account"
+other = "დააყენეთ ახალი პაროლი თქვენი Brave-ს ანგარიშზე"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
-other = "Create your Brave account"
+other = "შექმენით თქვენი Brave-ს ანგარიში"
 
 [LoginEmailSubject]
 description = "Email subject for logging into an account"
-other = "Access your Brave account"
+other = "წვდომა თქვენს Brave ანგარიშზე"
 
 [EmailGreeting]
 description = "Greeting in the email message"
-other = "Hello,"
+other = "გამარჯობა,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Here is the code you will need to verify your email address and set a new password for your Brave account."
+other = "აქ არის კოდი, რომელიც დაგჭირდებათ თქვენი ელ-ფოსტის დასადასტურებლად და Brave ანგარიშისთვის ახალი პაროლის დასაყენებლად."
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Here is the code you will need to verify your email address and create your Brave account."
+other = "აქ არის კოდი, რომელიც დაგჭირდებათ თქვენი ელ-ფოსტის დასადასტურებლად და Brave ანგარიშის შესაქმნელად."
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Here is the code you will need to verify your email address."
+other = "აი კოდი, რომელიც თქვენი ელფოსტის მისამართის დასადასტურებლად დაგჭირდებათ."
 
 [LoginEmailInstructions]
 description = "Instruction to verify an email address and login to an account"
-other = "Here is the code you will need to access your Brave account."
+other = "აი კოდი, რომელიც თქვენი Brave-ს ანგარიშზე წვდომისთვის დაგჭირდებათ."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
-other = "Your verification code:"
+other = "თქვენი ვერიფიკაციის კოდი:"
 
 [VerifyEmailExpiryDisclaimer]
 description = "Informs the user how many minutes until the verification code expires"
-other = "Note: This code will expire in {{.Minutes}} minutes."
+other = "გაითვალისწინეთ: ეს კოდი ძალაში იქნება კიდევ {{.Minutes}} წუთის განმავლობაში."
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
-It appears you already have an account registered with this email: {{.Email}}.
+როგორც ჩანს, ამ ელფოსტით: {{.Email}}უკვე გაქვთ რეგისტრირებული ანგარიში.
 
-Try logging in using this email address. If you still need help, please contact Brave support."""
+სცადეთ ავტორიზაცია ამ ელფოსტის მისამართით. თუ დახმარება კვლავ გჭირდებათ, გთხოვთ, დაუკავშირდეთ Brave-ს მხარდაჭერას."""
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
