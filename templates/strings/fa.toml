@@ -1,6 +1,6 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Verify your email"
+other = "ایمیلتان را تأیید کنید"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
