@@ -1,26 +1,26 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Verify your email"
+other = "Verifică-ți adresa de e-mail"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
-other = "Set a new password for your Brave account"
+other = "Setează o parolă nouă pentru contul tău Brave"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
-other = "Create your Brave account"
+other = "Creează-ți contul Brave"
 
 [LoginEmailSubject]
 description = "Email subject for logging into an account"
-other = "Access your Brave account"
+other = "Accesează-ți contul Brave"
 
 [EmailGreeting]
 description = "Greeting in the email message"
-other = "Hello,"
+other = "Bună,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Here is the code you will need to verify your email address and set a new password for your Brave account."
+other = "Iată codul de care vei avea nevoie pentru a-ți verifica adresa de e-mail și pentru a seta o parolă nouă pentru contul tău Brave."
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
