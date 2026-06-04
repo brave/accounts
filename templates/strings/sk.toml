@@ -16,50 +16,50 @@ other = "Prístup k vášmu účtu Brave"
 
 [EmailGreeting]
 description = "Greeting in the email message"
-other = "Hello,"
+other = "Dobrý deň,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Here is the code you will need to verify your email address and set a new password for your Brave account."
+other = "Tu je kód, ktorý budete potrebovať na overenie svojej e-mailovej adresy a nastavenie nového hesla pre svoj účet Brave."
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Here is the code you will need to verify your email address and create your Brave account."
+other = "Tu je kód, ktorý budete potrebovať na overenie svojej e-mailovej adresy a vytvorenie účtu Brave."
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Here is the code you will need to verify your email address."
+other = "Tu je kód, ktorý budete potrebovať na overenie svojej e-mailovej adresy."
 
 [LoginEmailInstructions]
 description = "Instruction to verify an email address and login to an account"
-other = "Here is the code you will need to access your Brave account."
+other = "Tu je kód, ktorý budete potrebovať na prístup k svojmu účtu Brave."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
-other = "Your verification code:"
+other = "Váš overovací kód:"
 
 [VerifyEmailExpiryDisclaimer]
 description = "Informs the user how many minutes until the verification code expires"
-other = "Note: This code will expire in {{.Minutes}} minutes."
+other = "Poznámka: Platnosť tohto kódu vyprší za {{.Minutes}} minút."
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
-It appears you already have an account registered with this email: {{.Email}}.
+Zdá sa, že už máte zaregistrovaný účet s týmto e-mailom: {{.Email}}.
 
-Try logging in using this email address. If you still need help, please contact Brave support."""
+Skúste sa prihlásiť pomocou tejto e-mailovej adresy. Ak stále potrebujete pomoc, obráťte sa na podporu Brave."""
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "Having trouble? Here's how to access your Brave Account."
+other = "Máte problémy? Tu je návod na prístup k vášmu účtu Brave."
 
 [EmailSignature]
 description = "Email signature"
-other = "The Brave Team"
+other = "Tím Brave"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "If you didn’t make this request, please disregard this email."
+other = "Ak ste túto žiadosť nepodali, ignorujte prosím tento e-mail."
 
 [EmailCopyright]
 description = "Brave copyright notice"
@@ -67,28 +67,28 @@ other = "Copyright © {{.Year}} Brave Software Inc."
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
-other = "All rights reserved"
+other = "Všetky práva vyhradené"
 
 [EmailPrivacyPolicy]
 description = "Privacy policy link text"
-other = "Privacy Policy"
+other = "Zásady ochrany osobných údajov"
 
 [EmailTermsOfUse]
 description = "Terms of use link text"
-other = "Terms of Use"
+other = "Podmienky používania"
 
 [EmailDownloadBrave]
 description = "Brave download link text"
-other = "Download Brave"
+other = "Stiahnite si Brave"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Contact Support"
+other = "Kontaktovať podporu"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Your Brave account password has been changed"
+other = "Heslo vášho účtu Brave bolo zmenené"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Your Brave account password has been successfully changed. If you didn't make this change, please contact Brave support immediately to secure your account."
+other = "Heslo vášho účtu Brave bolo úspešne zmenené. Ak ste túto zmenu nevykonali, okamžite kontaktujte podporu Brave a zabezpečte si svoj účet."
