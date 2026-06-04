@@ -63,32 +63,32 @@ other = "若您未提出此要求，請忽略此郵件。"
 
 [EmailCopyright]
 description = "Brave copyright notice"
-other = "版權所有 © {{.Year}} Brave Software Inc."
+other = "Copyright © {{.Year}} Brave Software Inc."
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
-other = "All rights reserved"
+other = "版權所有"
 
 [EmailPrivacyPolicy]
 description = "Privacy policy link text"
-other = "Privacy Policy"
+other = "隱私政策"
 
 [EmailTermsOfUse]
 description = "Terms of use link text"
-other = "Terms of Use"
+other = "使用條款"
 
 [EmailDownloadBrave]
 description = "Brave download link text"
-other = "Download Brave"
+other = "下載 Brave"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Contact Support"
+other = "聯絡支援"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Your Brave account password has been changed"
+other = "您的 Brave 帳戶密碼已變更"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Your Brave account password has been successfully changed. If you didn't make this change, please contact Brave support immediately to secure your account."
+other = "您的 Brave 帳戶密碼已成功變更。若您未進行此項變更，請立即聯絡 Brave 支援團隊以確保帳戶安全。"
