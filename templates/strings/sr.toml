@@ -1,6 +1,6 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Verify your email"
+other = "Потврдите имејл адресу"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
@@ -45,25 +45,25 @@ other = "Напомена: Овај код истиче за {{.Minutes}} мин
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
-It appears you already have an account registered with this email: {{.Email}}.
+Изгледа да већ имате регистрован налог са овом имејл адресом: {{.Email}}.
 
-Try logging in using this email address. If you still need help, please contact Brave support."""
+Покушајте да се пријавите користећи ову имејл адресу. Ако вам и даље треба помоћ, обратите се Brave подршци."""
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "Having trouble? Here's how to access your Brave Account."
+other = "Имате проблеме? Ево како да приступите Brave налогу."
 
 [EmailSignature]
 description = "Email signature"
-other = "The Brave Team"
+other = "Brave тим"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "If you didn’t make this request, please disregard this email."
+other = "Ако нисте упутили овај захтев, занемарите овај имејл."
 
 [EmailCopyright]
 description = "Brave copyright notice"
-other = "Copyright © {{.Year}} Brave Software Inc."
+other = "Ауторска права © {{.Year}}. Brave Software Inc."
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
@@ -83,12 +83,12 @@ other = "Преузмите Brave"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Contact Support"
+other = "Контактирајте подршку"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Your Brave account password has been changed"
+other = "Лозинка Brave налога је промењена"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Your Brave account password has been successfully changed. If you didn't make this change, please contact Brave support immediately to secure your account."
+other = "Лозинка Brave налога је успешно промењена. Ако нисте извршили ову промену, одмах контактирајте Brave подршку да бисте заштитили налог."
