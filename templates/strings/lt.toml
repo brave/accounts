@@ -55,7 +55,7 @@ other = "Kyla problemų? Štai kaip prisijungti prie savo „Brave“ paskyros."
 
 [EmailSignature]
 description = "Email signature"
-other = "The Brave Team"
+other = "„Brave“ komanda"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
@@ -91,4 +91,4 @@ other = "Jūsų „Brave“ paskyros slaptažodis buvo pakeistas"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Jūsų „Brave“ paskyros slaptažodis buvo sėkmingai pakeistas. Jei šio pakeitimo neatlikote jūs, nedelsdami susisiekite su „Brave“ klientų aptarnavimo komanda, kad apsaugotumėte savo paskyrą."
+other = "Jūsų „Brave“ paskyros slaptažodis buvo sėkmingai pakeistas. Jei jūs neatlikote šio pakeitimo, nedelsdami susisiekite su „Brave“ klientų aptarnavimo komanda, kad apsaugotumėte savo paskyrą."
