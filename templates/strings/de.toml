@@ -16,7 +16,7 @@ other = "Greifen Sie auf Ihr Brave-Konto zu"
 
 [EmailGreeting]
 description = "Greeting in the email message"
-other = "Hello,"
+other = "Hallo,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
@@ -45,7 +45,7 @@ other = "Hinweis: Dieser Code läuft in {{.Minutes}} Minuten ab."
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
-Es scheint, dass Sie bereits ein Konto mit dieser E-Mail-Adresse registriert haben: {{.Email}}.
+Es scheint, dass Sie bereits ein Konto mit der folgenden E-Mail-Adresse registriert haben: {{.Email}}.
 
 Versuchen Sie, sich mit dieser E-Mail-Adresse anzumelden. Wenn Sie weitere Unterstützung benötigen, kontaktieren Sie bitte den Support von Brave."""
 
@@ -55,7 +55,7 @@ other = "Haben Sie Probleme mit dem Kontozugriff? Hier erfahren Sie, wie Sie auf
 
 [EmailSignature]
 description = "Email signature"
-other = "Ihr Brave-Team"
+other = "Das Brave-Team"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
@@ -87,7 +87,7 @@ other = "Support kontaktieren"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Your Brave account password has been changed"
+other = "Das Passwort für Ihr Brave-Konto wurde geändert"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
