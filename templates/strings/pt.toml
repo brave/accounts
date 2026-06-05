@@ -67,23 +67,23 @@ other = "Copyright © {{.Year}} Brave Software Inc."
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
-other = "All rights reserved"
+other = "Todos os direitos reservados"
 
 [EmailPrivacyPolicy]
 description = "Privacy policy link text"
-other = "Privacy Policy"
+other = "Política de Privacidade"
 
 [EmailTermsOfUse]
 description = "Terms of use link text"
-other = "Terms of Use"
+other = "Termos de Uso"
 
 [EmailDownloadBrave]
 description = "Brave download link text"
-other = "Download Brave"
+other = "Baixar o Brave"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Contact Support"
+other = "Entre em contato com o suporte"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
@@ -91,4 +91,4 @@ other = "A senha de sua conta Brave foi alterada"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Your Brave account password has been successfully changed. If you didn't make this change, please contact Brave support immediately to secure your account."
+other = "A senha de sua conta Brave foi alterada. Caso você não tenha feito essa alteração, entre em contato com o suporte Brave imediatamente para garantira a segurança de sua conta."
