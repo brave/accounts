@@ -51,44 +51,44 @@ Försök att logga in med den e-postadressen. Om du fortfarande behöver hjälp,
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "Having trouble? Here's how to access your Brave Account."
+other = "Behöver du hjälp? Så här får du tillgång till ditt Brave-konto."
 
 [EmailSignature]
 description = "Email signature"
-other = "The Brave Team"
+other = "Brave-teamet"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "If you didn’t make this request, please disregard this email."
+other = "Om du inte har gjort denna begäran kan du bortse från detta meddelande."
 
 [EmailCopyright]
 description = "Brave copyright notice"
-other = "Copyright © {{.Year}} Brave Software Inc."
+other = "Copyright ©️ {{.Year}} Brave Software Inc."
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
-other = "All rights reserved"
+other = "Alla rättigheter förbehållna"
 
 [EmailPrivacyPolicy]
 description = "Privacy policy link text"
-other = "Privacy Policy"
+other = "Integritetspolicy"
 
 [EmailTermsOfUse]
 description = "Terms of use link text"
-other = "Terms of Use"
+other = "Användarvillkor"
 
 [EmailDownloadBrave]
 description = "Brave download link text"
-other = "Download Brave"
+other = "Ladda ner Brave"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Contact Support"
+other = "Kontakta support"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Your Brave account password has been changed"
+other = "Lösenordet för ditt Brave-konto har ändrats"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Your Brave account password has been successfully changed. If you didn't make this change, please contact Brave support immediately to secure your account."
+other = "Lösenordet för ditt Brave-konto har ändrats. Om du inte har gjort den här ändringen bör du kontakta Braves support omgående för att skydda ditt konto."
