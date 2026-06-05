@@ -1,94 +1,94 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Verify your email"
+other = "Verificējiet savu e-pastu"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
-other = "Set a new password for your Brave account"
+other = "Iestatiet jaunu paroli savam Brave kontam"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
-other = "Create your Brave account"
+other = "Izveidojiet savu Brave kontu"
 
 [LoginEmailSubject]
 description = "Email subject for logging into an account"
-other = "Access your Brave account"
+other = "Piekļūstiet savam Brave kontam"
 
 [EmailGreeting]
 description = "Greeting in the email message"
-other = "Hello,"
+other = "Sveiki,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Here is the code you will need to verify your email address and set a new password for your Brave account."
+other = "šeit ir kods, kas nepieciešams jūsu e-pasta adreses verificēšanai un jaunas paroles iestatīšanai."
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Here is the code you will need to verify your email address and create your Brave account."
+other = "šeit ir kods, kas nepieciešams jūsu e-pasta adreses verificēšanai un Brave konta izveidošanai."
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Here is the code you will need to verify your email address."
+other = "šeit ir kods, kas nepieciešams jūsu e-pasta adreses verificēšanai."
 
 [LoginEmailInstructions]
 description = "Instruction to verify an email address and login to an account"
-other = "Here is the code you will need to access your Brave account."
+other = "šeit ir kods, kas nepieciešams, lai piekļūtu jūsu Brave kontam."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
-other = "Your verification code:"
+other = "Jūsu verifikācijas kods:"
 
 [VerifyEmailExpiryDisclaimer]
 description = "Informs the user how many minutes until the verification code expires"
-other = "Note: This code will expire in {{.Minutes}} minutes."
+other = "Piezīme: šī koda derīgums beigsies pēc {{.Minutes}} minūtēm."
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
-It appears you already have an account registered with this email: {{.Email}}.
+Šķiet, ka jums jau ir reģistrēts konts ar šo e-pasta adresi: {{.Email}}.
 
-Try logging in using this email address. If you still need help, please contact Brave support."""
+Mēģiniet pieteikties ar šo e-pasta adresi. Ja joprojām nepieciešama palīdzība, lūdzu, sazinieties ar Brave atbalsta dienestu."""
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "Having trouble? Here's how to access your Brave Account."
+other = "Ja jums ir problēmas, šeit uzzināsiet, kā piekļūt savam Brave kontam."
 
 [EmailSignature]
 description = "Email signature"
-other = "The Brave Team"
+other = "Brave komanda"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "If you didn’t make this request, please disregard this email."
+other = "Ja neveicāt šo pieprasījumu, lūdzu, ignorējiet šo e-pastu."
 
 [EmailCopyright]
 description = "Brave copyright notice"
-other = "Copyright © {{.Year}} Brave Software Inc."
+other = "Autortiesības © {{.Year}} Brave Software Inc."
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
-other = "All rights reserved"
+other = "Visas tiesības aizsargātas"
 
 [EmailPrivacyPolicy]
 description = "Privacy policy link text"
-other = "Privacy Policy"
+other = "Privātuma politika"
 
 [EmailTermsOfUse]
 description = "Terms of use link text"
-other = "Terms of Use"
+other = "Lietošanas noteikumi"
 
 [EmailDownloadBrave]
 description = "Brave download link text"
-other = "Download Brave"
+other = "Lejupielādēt Brave"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Contact Support"
+other = "Sazināties ar atbalsta dienestu"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Your Brave account password has been changed"
+other = "Brave konta parole tika nomainīta"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Your Brave account password has been successfully changed. If you didn't make this change, please contact Brave support immediately to secure your account."
+other = "Jūsu Brave konta parole ir veiksmīgi nomainīta. Ja neveicāt šīs izmaiņas, lūdzu, nekavējoties sazinieties ar Brave atbalsta dienestu, lai aizsargātu savu kontu."
