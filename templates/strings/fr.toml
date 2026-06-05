@@ -1,18 +1,18 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Verify your email"
+other = "Vérifiez votre adresse courriel"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
-other = "Set a new password for your Brave account"
+other = "Créez un nouveau mot de passe pour votre compte Brave"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
-other = "Create your Brave account"
+other = "Créez votre compte Brave"
 
 [LoginEmailSubject]
 description = "Email subject for logging into an account"
-other = "Access your Brave account"
+other = "Accédez à votre compte Brave"
 
 [EmailGreeting]
 description = "Greeting in the email message"
