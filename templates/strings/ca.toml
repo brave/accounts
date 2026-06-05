@@ -55,11 +55,11 @@ other = "Tens problemes? Aquí tens com accedir al teu compte de Brave."
 
 [EmailSignature]
 description = "Email signature"
-other = "The Brave Team"
+other = "L'equip de Brave"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "If you didn’t make this request, please disregard this email."
+other = "Si no has fet aquesta sol·licitud, ignora aquest correu electrònic."
 
 [EmailCopyright]
 description = "Brave copyright notice"
@@ -67,28 +67,28 @@ other = "Copyright © {{.Year}} Brave Software Inc."
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
-other = "All rights reserved"
+other = "Tots els drets reservats"
 
 [EmailPrivacyPolicy]
 description = "Privacy policy link text"
-other = "Privacy Policy"
+other = "Política de privacitat"
 
 [EmailTermsOfUse]
 description = "Terms of use link text"
-other = "Terms of Use"
+other = "Condicions d'ús"
 
 [EmailDownloadBrave]
 description = "Brave download link text"
-other = "Download Brave"
+other = "Descarregar Brave"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Contact Support"
+other = "Contactar amb el servei d'assistència"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Your Brave account password has been changed"
+other = "S'ha canviat la contrasenya del teu compte de Brave"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Your Brave account password has been successfully changed. If you didn't make this change, please contact Brave support immediately to secure your account."
+other = "La contrasenya del teu compte de Brave s'ha canviat correctament. Si no has estat tu qui ha fet aquest canvi, posa't en contacte immediatament amb l'equip d'assistència de Brave per protegir el teu compte."
