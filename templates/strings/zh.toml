@@ -4,7 +4,7 @@ other = "验证您的电子邮件地址"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
-other = "为您的 Brave 账户设置一个新号码"
+other = "为您的 Brave 账户设置一个新密码"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
