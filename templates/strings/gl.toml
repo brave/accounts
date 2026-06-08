@@ -46,6 +46,7 @@ other = "Aviso: O código caducará en {{.Minutes}} minutos."
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
 Semella que xa tes unha conta rexistrada co enderezo electrónico: {{.Email}}.
+
 Proba a iniciar sesión con ese enderezo. Se precisas axuda, contacta co equipo de asistencia de Brave."""
 
 [SimilarEmailSubject]
