@@ -86,7 +86,7 @@ other = "Contactar co servizo de asistencia"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Cambiouse o contrasinal da túa conta de Crave"
+other = "Cambiouse o contrasinal da túa conta de Brave"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
