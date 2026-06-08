@@ -44,7 +44,10 @@ other = "Megjegyzés: A kód {{.Minutes}} perc múlva lejár."
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "Úgy tűnik, ehhez az e-mail-címhez már tartozik fiók: {{.Email}}. Próbáljon meg bejelentkezni ezzel az e-mail-címmel. Ha további segítségre van szüksége, forduljon a Brave ügyfélszolgálatához."
+other = """
+Úgy tűnik, ehhez az e-mail-címhez már tartozik fiók: {{.Email}}.
+
+Próbáljon meg bejelentkezni ezzel az e-mail-címmel. Ha további segítségre van szüksége, forduljon a Brave ügyfélszolgálatához."""
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
