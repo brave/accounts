@@ -107,7 +107,7 @@ func (vs *VerificationService) SendVerificationEmail(ctx context.Context, verifi
 	// Send verification email
 	if err := vs.sesService.SendVerificationEmail(ctx, verification.Email, verification, locale); err != nil {
 		if errors.Is(err, util.ErrFailedToSendEmailInvalidFormat) {
-			if vs.datastore.DeleteVerification(verification.ID) != nil {
+			if vs.datastore.InvalidateVerification(verification.ID) != nil {
 				// Don't override the more descriptive error code and let cron handle the cleanup
 				_ = true
 			}

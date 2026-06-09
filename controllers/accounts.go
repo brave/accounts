@@ -399,8 +399,8 @@ func (ac *AccountsController) postPasswordSetup(ctx context.Context, accountID u
 		}
 	}
 
-	if err := ac.ds.DeleteVerification(verification.ID); err != nil {
-		return nil, false, fmt.Errorf("failed to delete verification: %w", err)
+	if err := ac.ds.InvalidateVerification(verification.ID); err != nil {
+		return nil, false, fmt.Errorf("failed to invalidate verification: %w", err)
 	}
 
 	return authToken, shouldInvalidateSessions, nil

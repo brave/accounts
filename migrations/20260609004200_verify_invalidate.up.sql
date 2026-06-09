@@ -1,0 +1,1 @@
+ALTER TABLE verifications ADD COLUMN is_invalidated BOOL NOT NULL DEFAULT FALSE;
