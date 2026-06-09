@@ -49,7 +49,7 @@ const (
 	codeLength              = 6
 	VerificationExpiration  = 15 * time.Minute
 	maxPendingVerifications = 3
-	maxDailyVerifications   = 5
+	maxDailyVerifications   = 10
 	MaxCodeAttempts         = 5
 )
 
@@ -91,35 +91,48 @@ func (d *Datastore) CreateVerification(email string, service string, intent stri
 		Verified:      false,
 	}
 
-	// Enforce daily cap across all verifications for this email
-	now := time.Now().UTC()
-	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	var dailyCount int64
-	if err := d.DB.Model(&Verification{}).
-		Where("email = ? AND created_at >= ?", email, startOfDay).
-		Count(&dailyCount).Error; err != nil {
-		return nil, fmt.Errorf("error counting daily verifications: %w", err)
-	}
+	// Serialize concurrent verification creation for the same email so the
+	// pending/daily count checks below cannot race with concurrent inserts.
+	err = d.DB.Transaction(func(tx *gorm.DB) error {
+		// Take a transaction-scoped advisory lock keyed on the email; released on commit/rollback.
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?)::bigint)", email).Error; err != nil {
+			return fmt.Errorf("error acquiring verification lock: %w", err)
+		}
 
-	if dailyCount >= maxDailyVerifications {
-		return nil, util.ErrDailyVerificationLimitReached
-	}
+		// Enforce daily cap across all verifications for this email
+		var dailyCount int64
+		if err := tx.Model(&Verification{}).
+			Where("email = ? AND created_at >= ?", email, time.Now().UTC().Add(-24 * time.Hour)).
+			Count(&dailyCount).Error; err != nil {
+			return fmt.Errorf("error counting daily verifications: %w", err)
+		}
 
-	// Reject if too many unverified verifications are still pending
-	var existingCount int64
-	if err := d.validVerificationModel(nil).
-		Where("email = ? AND verified = false AND created_at > ?",
-			email,
-			time.Now().Add(-VerificationExpiration)).
-		Count(&existingCount).Error; err != nil {
-		return nil, fmt.Errorf("error counting verifications: %w", err)
-	}
+		if dailyCount >= maxDailyVerifications {
+			return util.ErrDailyVerificationLimitReached
+		}
 
-	if existingCount >= maxPendingVerifications {
-		return nil, util.ErrTooManyVerifications
-	}
-	if err := d.DB.Create(&verification).Error; err != nil {
-		return nil, fmt.Errorf("error creating verification: %w", err)
+		// Reject if too many unverified verifications are still pending
+		var existingCount int64
+		if err := d.validVerificationModel(nil).
+			Where("email = ? AND verified = false AND created_at > ?",
+				email,
+				time.Now().UTC().Add(-VerificationExpiration)).
+			Count(&existingCount).Error; err != nil {
+			return fmt.Errorf("error counting verifications: %w", err)
+		}
+
+		if existingCount >= maxPendingVerifications {
+			return util.ErrTooManyVerifications
+		}
+
+		if err := tx.Create(&verification).Error; err != nil {
+			return fmt.Errorf("error creating verification: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return &verification, nil

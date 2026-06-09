@@ -160,10 +160,10 @@ func (suite *VerificationTestSuite) TestVerifyInitDailyLimitReached() {
 		Locale:  "en-US",
 	}
 
-	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Times(5)
+	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Times(10)
 
-	// Send 5 successful requests, expiring each so the pending cap is not hit
-	for i := 0; i < 5; i++ {
+	// Send 10 successful requests, expiring each so the pending cap is not hit
+	for i := 0; i < 10; i++ {
 		resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
 		suite.Equal(http.StatusOK, resp.Code)
 
@@ -173,10 +173,10 @@ func (suite *VerificationTestSuite) TestVerifyInitDailyLimitReached() {
 		suite.NoError(err)
 		suite.NoError(suite.ds.DB.Model(&datastore.Verification{}).
 			Where("id = ?", verificationID).
-			Update("created_at", time.Now().Add(-(datastore.VerificationExpiration + time.Minute))).Error)
+			Update("created_at", time.Now().UTC().Add(-(datastore.VerificationExpiration + time.Minute))).Error)
 	}
 
-	// 6th request should be blocked by the daily cap
+	// 11th request should be blocked by the daily cap
 	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
 	suite.Equal(http.StatusBadRequest, resp.Code)
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrDailyVerificationLimitReached.Code)
