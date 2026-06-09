@@ -605,7 +605,7 @@ func (suite *VerificationTestSuite) TestVerifyResend() {
 	suite.sesMock.AssertExpectations(suite.T())
 }
 
-func (suite *VerificationTestSuite) TestVerifyDelete() {
+func (suite *VerificationTestSuite) TestVerifyInvalidate() {
 	suite.SetupController(true, true)
 
 	email := "test@example.com"
@@ -625,13 +625,19 @@ func (suite *VerificationTestSuite) TestVerifyDelete() {
 	suite.Require().NoError(err)
 	suite.Nil(account.LastEmailVerifiedAt)
 
-	// Delete verification
+	// Invalidate verification
 	req := httptest.NewRequest(http.MethodDelete, "/v2/verify", nil)
 	req.Header.Set("Authorization", "Bearer "+*verificationToken)
 	resp := util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusNoContent, resp.Code)
 
-	// Verify verification was deleted
+	// Verify the record still exists in the DB with is_invalidated = true
+	var dbVerification datastore.Verification
+	err = suite.ds.DB.First(&dbVerification, "id = ?", verification.ID).Error
+	suite.Require().NoError(err)
+	suite.True(dbVerification.IsInvalidated)
+
+	// Verify GetVerificationStatus treats it as not found
 	_, err = suite.ds.GetVerificationStatus(verification.ID)
 	suite.ErrorIs(err, util.ErrVerificationNotFound)
 
@@ -640,7 +646,7 @@ func (suite *VerificationTestSuite) TestVerifyDelete() {
 	suite.ErrorIs(err, datastore.ErrAccountNotFound)
 }
 
-func (suite *VerificationTestSuite) TestVerifyDeleteForbidden() {
+func (suite *VerificationTestSuite) TestVerifyInvalidateForbidden() {
 	suite.SetupController(true, false)
 
 	// Use InitializeVerification to create an auth_token verification
@@ -654,7 +660,7 @@ func (suite *VerificationTestSuite) TestVerifyDeleteForbidden() {
 	suite.Require().NoError(err)
 	suite.Require().NotNil(*verificationToken)
 
-	// Delete verification - should be bad request for auth_token intent
+	// Invalidate verification - should be bad request for auth_token intent
 	req := httptest.NewRequest(http.MethodDelete, "/v2/verify", nil)
 	req.Header.Set("Authorization", "Bearer "+*verificationToken)
 	resp := util.ExecuteTestRequest(req, suite.router)
@@ -662,7 +668,7 @@ func (suite *VerificationTestSuite) TestVerifyDeleteForbidden() {
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrIntentNotAllowed.Code)
 }
 
-func (suite *VerificationTestSuite) TestVerifyDeleteAlreadyVerified() {
+func (suite *VerificationTestSuite) TestVerifyInvalidateAlreadyVerified() {
 	suite.SetupController(true, true)
 
 	// Use InitializeVerification to create a registration verification
@@ -680,7 +686,7 @@ func (suite *VerificationTestSuite) TestVerifyDeleteAlreadyVerified() {
 	err = suite.ds.DB.Model(&datastore.Verification{}).Where("id = ?", verification.ID).Update("verified", true).Error
 	suite.Require().NoError(err)
 
-	// Delete verification - should be bad request for already verified
+	// Invalidate verification - should be bad request for already verified
 	req := httptest.NewRequest(http.MethodDelete, "/v2/verify", nil)
 	req.Header.Set("Authorization", "Bearer "+*verificationToken)
 	resp := util.ExecuteTestRequest(req, suite.router)

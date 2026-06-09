@@ -200,7 +200,7 @@ func (vc *VerificationController) VerifyDelete(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if err := vc.datastore.DeleteVerification(verification.ID); err != nil {
+	if err := vc.datastore.InvalidateVerification(verification.ID); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}
