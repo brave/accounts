@@ -10,10 +10,6 @@ other = "Brave hisobingiz uchun yangi parol belgilang"
 description = "Email subject for creating a new account"
 other = "Brave hisobingizni yarating"
 
-[LoginEmailSubject]
-description = "Email subject for logging into an account"
-other = "Brave hisobingizga kiring"
-
 [EmailGreeting]
 description = "Greeting in the email message"
 other = "Assalomu alaykum,"
@@ -29,10 +25,6 @@ other = "Mana bu email manzilingizni tasdiqlash va Brave hisobingizni yaratish u
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
 other = "Mana bu email manzilingizni tasdiqlash uchun kerak boʻladigan kod."
-
-[LoginEmailInstructions]
-description = "Instruction to verify an email address and login to an account"
-other = "Mana bu Brave hisobingizga kirish uchun kerak boʻladigan kod."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
