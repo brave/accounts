@@ -10,10 +10,6 @@ other = "Подесите нову лозинку за Brave налог"
 description = "Email subject for creating a new account"
 other = "Отворите Brave налог"
 
-[LoginEmailSubject]
-description = "Email subject for logging into an account"
-other = "Приступите Brave налогу"
-
 [EmailGreeting]
 description = "Greeting in the email message"
 other = "Здраво,"
@@ -29,10 +25,6 @@ other = "Ево кода који ће вам бити потребан за п�
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
 other = "Ево кода који ће вам бити потребан за потврду имејл адресе."
-
-[LoginEmailInstructions]
-description = "Instruction to verify an email address and login to an account"
-other = "Ево кода који ће вам бити потребан за приступ Brave налогу."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
