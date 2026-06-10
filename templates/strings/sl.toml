@@ -10,10 +10,6 @@ other = "Nastavite novo geslo za račun Brave"
 description = "Email subject for creating a new account"
 other = "Ustvarite račun Brave"
 
-[LoginEmailSubject]
-description = "Email subject for logging into an account"
-other = "Dostopajte do računa Brave"
-
 [EmailGreeting]
 description = "Greeting in the email message"
 other = "Pozdravljeni,"
@@ -29,10 +25,6 @@ other = "tukaj je koda, ki jo potrebujete za preverjanje e-poštnega naslova in 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
 other = "Tukaj je koda, ki jo potrebujete za preverjanje e-poštnega naslova."
-
-[LoginEmailInstructions]
-description = "Instruction to verify an email address and login to an account"
-other = "Tukaj je koda, ki jo potrebujete za dostop do računa Brave."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
