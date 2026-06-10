@@ -10,10 +10,6 @@ other = "Setează o parolă nouă pentru contul tău Brave"
 description = "Email subject for creating a new account"
 other = "Creează-ți contul Brave"
 
-[LoginEmailSubject]
-description = "Email subject for logging into an account"
-other = "Accesează-ți contul Brave"
-
 [EmailGreeting]
 description = "Greeting in the email message"
 other = "Bună,"
@@ -29,10 +25,6 @@ other = "Iată codul de care vei avea nevoie pentru a-ți verifica adresa de e-m
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
 other = "Iată codul de care vei avea nevoie pentru a-ți verifica adresa de e-mail."
-
-[LoginEmailInstructions]
-description = "Instruction to verify an email address and login to an account"
-other = "Iată codul de care vei avea nevoie pentru a accesa contul tău Brave."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
