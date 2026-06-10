@@ -10,10 +10,6 @@ other = "Ezarri pasahitz berri bat zure Brave konturako"
 description = "Email subject for creating a new account"
 other = "Sortu zure Brave kontua"
 
-[LoginEmailSubject]
-description = "Email subject for logging into an account"
-other = "Atzitu zure Brave kontua"
-
 [EmailGreeting]
 description = "Greeting in the email message"
 other = "Kaixo,"
@@ -29,10 +25,6 @@ other = "Here is the code you will need to verify your email address and create 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
 other = "Here is the code you will need to verify your email address."
-
-[LoginEmailInstructions]
-description = "Instruction to verify an email address and login to an account"
-other = "Hona hemen zure Brave kontura sartzeko beharko duzun kodea."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
