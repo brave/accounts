@@ -1,0 +1,86 @@
+[VerifyEmailSubject]
+description = "Email subject for email verification"
+other = "Επαλήθευσε το email σου"
+
+[SetPasswordEmailSubject]
+description = "Email subject for setting a new password"
+other = "Όρισε έναν νέο κωδικό πρόσβασης για τον λογαριασμό σου στο Brave"
+
+[RegistrationEmailSubject]
+description = "Email subject for creating a new account"
+other = "Δημιούργησε τον λογαριασμό σου στο Brave"
+
+[EmailGreeting]
+description = "Greeting in the email message"
+other = "Γεια,"
+
+[SetPasswordEmailInstructions]
+description = "Instructions to verify email address and set a new password for an account"
+other = "Ορίστε ο κωδικός που θα χρειαστείς για να επαληθεύσεις το email σου και να ορίσεις έναν νέο κωδικό πρόσβασης για τον λογαριασμό σου στο Brave."
+
+[RegistrationEmailInstructions]
+description = "Instructions to verify email address and create a new account"
+other = "Ορίστε ο κωδικός που θα χρειαστείς για να επαληθεύσεις το email σου και να δημιουργήσεις τον λογαριασμό σου στο Brave."
+
+[VerifyEmailInstructions]
+description = "Instructions to verify email address"
+other = "Ορίστε ο κωδικός που θα χρειαστείς για να επαληθεύσεις το email σου."
+
+[VerifyEmailCode]
+description = "Label preceding the verification code displayed in the email"
+other = "Ο κωδικός επαλήθευσης:"
+
+[VerifyEmailExpiryDisclaimer]
+description = "Informs the user how many minutes until the verification code expires"
+other = "Σημείωση: Αυτός ο κωδικός θα λήξει σε {{.Minutes}} λεπτά."
+
+[SimilarEmailLoginMessage]
+description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = """
+Φαίνεται ότι έχεις ήδη έναν λογαριασμό με αυτό το email: {{.Email}}.
+
+Προσπάθησε να συνδεθείς χρησιμοποιώντας αυτή το email. Εάν εξακολουθείς να χρειάζεσαι βοήθεια, επικοινώνησε με την υποστήριξη Brave."""
+
+[SimilarEmailSubject]
+description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = "Αντιμετωπίζεις προβλήματα; Δες πώς μπορείς να αποκτήσεις πρόσβαση στον λογαριασμό σου Brave."
+
+[EmailSignature]
+description = "Email signature"
+other = "The Brave Team"
+
+[EmailDisregard]
+description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
+other = "Εάν δεν έχεις υποβάλει αυτό το αίτημα, αγνόησε αυτό το email."
+
+[EmailCopyright]
+description = "Brave copyright notice"
+other = "Copyright © {{.Year}} Brave Software Inc."
+
+[EmailAllRightsReserved]
+description = "All rights reserved notice"
+other = "Με επιφύλαξη παντός δικαιώματος"
+
+[EmailPrivacyPolicy]
+description = "Privacy policy link text"
+other = "Πολιτική Απορρήτου"
+
+[EmailTermsOfUse]
+description = "Terms of use link text"
+other = "Όροι χρήσης"
+
+[EmailDownloadBrave]
+description = "Brave download link text"
+other = "Λήψη Brave"
+
+[EmailContactSupport]
+description = "Support contact link text"
+other = "Επικοινωνία με την υποστήριξη"
+
+[PasswordChangeNotificationSubject]
+description = "Email subject for password change notification"
+other = "Ο κωδικός πρόσβασης του λογαριασμού σου στο Brave έχει αλλάξει"
+
+[PasswordChangeNotificationMessage]
+description = "Email message informing user that their password was changed"
+other = "Ο κωδικός πρόσβασης του λογαριασμού σου στο Brave άλλαξε με επιτυχία. Εάν δεν έκανες αυτή την αλλαγή, επικοινώνησε αμέσως με την υποστήριξη του Brave για να προστατεύσεις τον λογαριασμό σου."

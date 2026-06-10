@@ -1,0 +1,86 @@
+[VerifyEmailSubject]
+description = "Email subject for email verification"
+other = "Проверьте электронную почту"
+
+[SetPasswordEmailSubject]
+description = "Email subject for setting a new password"
+other = "Установите новый пароль для вашего аккаунта Brave"
+
+[RegistrationEmailSubject]
+description = "Email subject for creating a new account"
+other = "Создайте свой аккаунт Brave"
+
+[EmailGreeting]
+description = "Greeting in the email message"
+other = "Здравствуйте,"
+
+[SetPasswordEmailInstructions]
+description = "Instructions to verify email address and set a new password for an account"
+other = "Вот код, который вам понадобится для проверки адреса электронной почты и установки нового пароля для вашей учетной записи Brave."
+
+[RegistrationEmailInstructions]
+description = "Instructions to verify email address and create a new account"
+other = "Вот код, который вам нужно будет подтвердить ваш адрес электронной почты и создать учетную запись Brave."
+
+[VerifyEmailInstructions]
+description = "Instructions to verify email address"
+other = "Вот код, который вам понадобится для подтверждения адреса электронной почты."
+
+[VerifyEmailCode]
+description = "Label preceding the verification code displayed in the email"
+other = "Ваш проверочный код:"
+
+[VerifyEmailExpiryDisclaimer]
+description = "Informs the user how many minutes until the verification code expires"
+other = "Примечание: этот код истекает через {{.Minutes}} минут."
+
+[SimilarEmailLoginMessage]
+description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = """
+Похоже, у вас уже есть аккаунт с таким email: {{.Email}}.
+
+Попробуйте войти используя этот адрес электронной почты. Если вам нужна помощь, обратитесь в службу поддержки Brave."""
+
+[SimilarEmailSubject]
+description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = "Проблемы? Вот как получить доступ к вашему аккаунту Brave."
+
+[EmailSignature]
+description = "Email signature"
+other = "Команда Brave"
+
+[EmailDisregard]
+description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
+other = "Если вы не делали этого запроса, не обращайте внимание на это сообщение."
+
+[EmailCopyright]
+description = "Brave copyright notice"
+other = "Авторское право ©️ {{.Year}} Brave Software Inc."
+
+[EmailAllRightsReserved]
+description = "All rights reserved notice"
+other = "Все права защищены"
+
+[EmailPrivacyPolicy]
+description = "Privacy policy link text"
+other = "Политика конфиденциальности"
+
+[EmailTermsOfUse]
+description = "Terms of use link text"
+other = "Условия использования"
+
+[EmailDownloadBrave]
+description = "Brave download link text"
+other = "Загрузить Brave"
+
+[EmailContactSupport]
+description = "Support contact link text"
+other = "Обратиться в службу поддержки"
+
+[PasswordChangeNotificationSubject]
+description = "Email subject for password change notification"
+other = "Ваш пароль Brave был изменён"
+
+[PasswordChangeNotificationMessage]
+description = "Email message informing user that their password was changed"
+other = "Пароль вашего аккаунта Brave был успешно изменен. Если вы не сделали этого, обратитесь в службу поддержки Brave, чтобы защитить ваш аккаунт."

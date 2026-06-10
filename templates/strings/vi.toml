@@ -1,86 +1,86 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Vérifiez votre adresse e-mail"
+other = "Xác minh email của bạn"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
-other = "Créez un nouveau mot de passe pour votre compte Brave"
+other = "Đặt mật khẩu mới cho tài khoản Brave của bạn"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
-other = "Créez votre compte Brave"
+other = "Tạo tài khoản Brave của bạn"
 
 [EmailGreeting]
 description = "Greeting in the email message"
-other = "Bonjour,"
+other = "Xin chào,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Voici le code dont vous aurez besoin pour vérifier votre adresse e-mail et créer un nouveau mot de passe pour votre compte Brave."
+other = "Đây là mã bạn cần để xác minh địa chỉ email và đặt mật khẩu mới cho tài khoản Brave của mình."
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Voici le code dont vous aurez besoin pour vérifier votre adresse e-mail et créer votre compte Brave."
+other = "Đây là mã bạn cần để xác minh địa chỉ email và tạo tài khoản Brave."
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Voici le code dont vous aurez besoin pour vérifier votre adresse e-mail."
+other = "Đây là mã bạn cần để xác minh địa chỉ email của mình."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
-other = "Votre code de vérification :"
+other = "Mã xác minh của bạn:"
 
 [VerifyEmailExpiryDisclaimer]
 description = "Informs the user how many minutes until the verification code expires"
-other = "Note : Ce code expirera dans {{.Minutes}} minutes."
+other = "Lưu ý: Mã này sẽ hết hạn sau {{.Minutes}} phút."
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
-Il semble que vous ayez déjà un compte enregistré avec cette adresse e-mail : {{.Email}}.
+Có vẻ bạn đã có tài khoản được đăng ký bằng địa chỉ email này: {{.Email}}.
 
-Essayez de vous connecter en utilisant cette adresse e-mail. Si vous avez toujours besoin d'aide, veuillez contacter le support de Brave."""
+Hãy thử đăng nhập bằng email này. Nếu bạn vẫn cần trợ giúp, vui lòng liên hệ bộ phận hỗ trợ của Brave."""
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "Vous avez des problèmes ? Voici comment accéder à votre compte Brave."
+other = "Bạn gặp sự cố? Đây là cách truy cập tài khoản Brave của bạn."
 
 [EmailSignature]
 description = "Email signature"
-other = "L'équipe de Brave"
+other = "Đội ngũ Brave"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "Si vous n'avez pas fait cette demande, veuillez ne pas en tenir compte."
+other = "Nếu bạn không phải là người gửi yêu cầu, vui lòng bỏ qua email này."
 
 [EmailCopyright]
 description = "Brave copyright notice"
-other = "Copyright ©️ {{.Year}} Brave Software Inc."
+other = "Bản quyền © {{.Year}} Brave Software Inc."
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
-other = "Tous droits réservés"
+other = "Tất cả quyền được bảo lưu"
 
 [EmailPrivacyPolicy]
 description = "Privacy policy link text"
-other = "Politique de confidentialité"
+other = "Chính sách quyền riêng tư"
 
 [EmailTermsOfUse]
 description = "Terms of use link text"
-other = "Conditions d'utilisation"
+other = "Điều khoản sử dụng"
 
 [EmailDownloadBrave]
 description = "Brave download link text"
-other = "Télécharger Brave"
+other = "Tải Brave"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Contacter le support"
+other = "Liên hệ hỗ trợ"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Le mot de passe de votre compte Brave a été modifié"
+other = "Mật khẩu tài khoản Brave của bạn đã được thay đổi"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Le mot de passe de votre compte Brave a été modifié avec succès. Si vous n'avez pas effectué ce changement, veuillez contacter le support Brave immédiatement pour sécuriser votre compte."
+other = "Mật khẩu tài khoản Brave của bạn đã được thay đổi thành công. Nếu bạn không thực hiện thay đổi này, vui lòng liên hệ ngay với bộ phận hỗ trợ của Brave để bảo vệ tài khoản của bạn."

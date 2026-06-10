@@ -1,86 +1,86 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Vérifiez votre adresse e-mail"
+other = "验证您的电子邮件地址"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
-other = "Créez un nouveau mot de passe pour votre compte Brave"
+other = "为您的 Brave 账户设置一个新密码"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
-other = "Créez votre compte Brave"
+other = "创建您的 Brave 账户"
 
 [EmailGreeting]
 description = "Greeting in the email message"
-other = "Bonjour,"
+other = "您好，"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Voici le code dont vous aurez besoin pour vérifier votre adresse e-mail et créer un nouveau mot de passe pour votre compte Brave."
+other = "这是您验证电子邮件地址和为 Brave 账户设置新密码所需的验证码。"
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Voici le code dont vous aurez besoin pour vérifier votre adresse e-mail et créer votre compte Brave."
+other = "这是您验证电子邮件地址和创建 Brave 账户所需的验证码。"
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Voici le code dont vous aurez besoin pour vérifier votre adresse e-mail."
+other = "这是您验证电子邮件地址所需的验证码。"
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
-other = "Votre code de vérification :"
+other = "您的验证码："
 
 [VerifyEmailExpiryDisclaimer]
 description = "Informs the user how many minutes until the verification code expires"
-other = "Note : Ce code expirera dans {{.Minutes}} minutes."
+other = "注意：此验证码将会在 {{.Minutes}} 后失效。"
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
-Il semble que vous ayez déjà un compte enregistré avec cette adresse e-mail : {{.Email}}.
+您似乎已有一个使用 {{.Email}} 注册的账户。
 
-Essayez de vous connecter en utilisant cette adresse e-mail. Si vous avez toujours besoin d'aide, veuillez contacter le support de Brave."""
+请尝试使用该电子邮件地址登录账户。如果您仍需要帮助，请联系 Brave 客户支持。"""
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "Vous avez des problèmes ? Voici comment accéder à votre compte Brave."
+other = "遇到了问题？以下是访问您的 Brave 账户的方法。"
 
 [EmailSignature]
 description = "Email signature"
-other = "L'équipe de Brave"
+other = "Brave 团队"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "Si vous n'avez pas fait cette demande, veuillez ne pas en tenir compte."
+other = "如果您没有提出此请求，请忽略此电子邮件。"
 
 [EmailCopyright]
 description = "Brave copyright notice"
-other = "Copyright ©️ {{.Year}} Brave Software Inc."
+other = "Copyright © {{.Year}} Brave Software Inc。"
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
-other = "Tous droits réservés"
+other = "保留所有权利"
 
 [EmailPrivacyPolicy]
 description = "Privacy policy link text"
-other = "Politique de confidentialité"
+other = "隐私政策"
 
 [EmailTermsOfUse]
 description = "Terms of use link text"
-other = "Conditions d'utilisation"
+other = "使用条款"
 
 [EmailDownloadBrave]
 description = "Brave download link text"
-other = "Télécharger Brave"
+other = "下载 Brave"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Contacter le support"
+other = "联系客户支持"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Le mot de passe de votre compte Brave a été modifié"
+other = "您的 Brave 账户密码已更改"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Le mot de passe de votre compte Brave a été modifié avec succès. Si vous n'avez pas effectué ce changement, veuillez contacter le support Brave immédiatement pour sécuriser votre compte."
+other = "您的 Brave 账户密码已成功更改。如果您没有更改密码，请立即联系 Brave 支持人员，以确保您的账户安全。"

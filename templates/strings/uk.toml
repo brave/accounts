@@ -1,0 +1,86 @@
+[VerifyEmailSubject]
+description = "Email subject for email verification"
+other = "Підтвердіть свою електронну пошту"
+
+[SetPasswordEmailSubject]
+description = "Email subject for setting a new password"
+other = "Встановіть новий пароль для облікового запису Brave"
+
+[RegistrationEmailSubject]
+description = "Email subject for creating a new account"
+other = "Створіть обліковий запис Brave"
+
+[EmailGreeting]
+description = "Greeting in the email message"
+other = "Привіт,"
+
+[SetPasswordEmailInstructions]
+description = "Instructions to verify email address and set a new password for an account"
+other = "Ось код, який знадобиться вам для підтвердження адреси електронної пошти та встановлення нового пароля для вашого облікового запису Brave."
+
+[RegistrationEmailInstructions]
+description = "Instructions to verify email address and create a new account"
+other = "Ось код, який знадобиться вам для підтвердження адреси електронної пошти та створення облікового запису Brave."
+
+[VerifyEmailInstructions]
+description = "Instructions to verify email address"
+other = "Ось код, який вам знадобиться для підтвердження електронної адреси."
+
+[VerifyEmailCode]
+description = "Label preceding the verification code displayed in the email"
+other = "Код підтвердження:"
+
+[VerifyEmailExpiryDisclaimer]
+description = "Informs the user how many minutes until the verification code expires"
+other = "Примітка: термін дії цього коду закінчується через {{.Minutes}} хвилин."
+
+[SimilarEmailLoginMessage]
+description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = """
+Здається, у вас вже є обліковий запис, зареєстрований на цю адресу: {{.Email}}.
+
+Спробуйте увійти, використовуючи цю адресу електронної пошти. Якщо вам потрібна допомога, зверніться до служби підтримки Brave."""
+
+[SimilarEmailSubject]
+description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = "Маєте проблеми? Ось як отримати доступ до облікового запису Brave."
+
+[EmailSignature]
+description = "Email signature"
+other = "Команда Brave"
+
+[EmailDisregard]
+description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
+other = "Якщо ви не робили цього запиту, будь ласка, ігноруйте цей лист."
+
+[EmailCopyright]
+description = "Brave copyright notice"
+other = "Copyright © {{.Year}} Brave Software Inc."
+
+[EmailAllRightsReserved]
+description = "All rights reserved notice"
+other = "Всі права захищені"
+
+[EmailPrivacyPolicy]
+description = "Privacy policy link text"
+other = "Політика конфіденційності"
+
+[EmailTermsOfUse]
+description = "Terms of use link text"
+other = "Умови використання"
+
+[EmailDownloadBrave]
+description = "Brave download link text"
+other = "Завантажити Brave"
+
+[EmailContactSupport]
+description = "Support contact link text"
+other = "Звернутися до служби підтримки"
+
+[PasswordChangeNotificationSubject]
+description = "Email subject for password change notification"
+other = "Пароль вашого облікового запису Brave був змінений"
+
+[PasswordChangeNotificationMessage]
+description = "Email message informing user that their password was changed"
+other = "Пароль вашого облікового запису Brave успішно змінено. Якщо ви не змінювали пароль, негайно зверніться до служби підтримки Brave, щоб захистити свій обліковий запис."

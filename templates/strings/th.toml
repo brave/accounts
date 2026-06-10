@@ -1,0 +1,86 @@
+[VerifyEmailSubject]
+description = "Email subject for email verification"
+other = "ยืนยันอีเมล"
+
+[SetPasswordEmailSubject]
+description = "Email subject for setting a new password"
+other = "ตั้งรหัสผ่านใหม่สำหรับบัญชี Brave ของคุณ"
+
+[RegistrationEmailSubject]
+description = "Email subject for creating a new account"
+other = "สร้างบัญชี Brave ของคุณ"
+
+[EmailGreeting]
+description = "Greeting in the email message"
+other = "สวัสดี"
+
+[SetPasswordEmailInstructions]
+description = "Instructions to verify email address and set a new password for an account"
+other = "นี่คือรหัสที่คุณต้องใช้เพื่อยืนยันอีเมลของคุณและตั้งรหัสผ่านใหม่สำหรับบัญชี Brave ของคุณ"
+
+[RegistrationEmailInstructions]
+description = "Instructions to verify email address and create a new account"
+other = "นี่คือรหัสที่คุณต้องใช้เพื่อยืนยันอีเมลและสร้างบัญชี Brave ของคุณ"
+
+[VerifyEmailInstructions]
+description = "Instructions to verify email address"
+other = "นี่คือรหัสที่คุณต้องใช้เพื่อยืนยันอีเมลของคุณ"
+
+[VerifyEmailCode]
+description = "Label preceding the verification code displayed in the email"
+other = "รหัสยืนยันของคุณ:"
+
+[VerifyEmailExpiryDisclaimer]
+description = "Informs the user how many minutes until the verification code expires"
+other = "หมายเหตุ: รหัสนี้จะหมดอายุใน {{.Minutes}} นาที"
+
+[SimilarEmailLoginMessage]
+description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = """
+ดูเหมือนว่าคุณได้ลงทะเบียนบัญชีด้วยอีเมลนี้แล้ว: {{.Email}}
+
+กรุณาลองเข้าสู่ระบบด้วยอีเมลนี้ หากคุณยังคงต้องการความช่วยเหลือ กรุณาติดต่อฝ่ายสนับสนุนของ Brave"""
+
+[SimilarEmailSubject]
+description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = "มีปัญหาใช่ไหม นี่คือวิธีเข้าถึงบัญชี Brave ของคุณ"
+
+[EmailSignature]
+description = "Email signature"
+other = "The Brave Team"
+
+[EmailDisregard]
+description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
+other = "หากคุณไม่ได้ทำคำขอไว้ ไม่ต้องสนใจอีเมลนี้"
+
+[EmailCopyright]
+description = "Brave copyright notice"
+other = "Copyright © {{.Year}} Brave Software Inc."
+
+[EmailAllRightsReserved]
+description = "All rights reserved notice"
+other = "สงวนลิขสิทธิ์"
+
+[EmailPrivacyPolicy]
+description = "Privacy policy link text"
+other = "นโยบายความเป็นส่วนตัว"
+
+[EmailTermsOfUse]
+description = "Terms of use link text"
+other = "ข้อกำหนดการใช้งาน"
+
+[EmailDownloadBrave]
+description = "Brave download link text"
+other = "ดาวน์โหลด Brave"
+
+[EmailContactSupport]
+description = "Support contact link text"
+other = "ติดต่อฝ่ายสนับสนุน"
+
+[PasswordChangeNotificationSubject]
+description = "Email subject for password change notification"
+other = "รหัสผ่านบัญชี Brave ของคุณได้ถูกเปลี่ยนแปลงแล้ว"
+
+[PasswordChangeNotificationMessage]
+description = "Email message informing user that their password was changed"
+other = "รหัสผ่านบัญชี Brave ของคุณได้ถูกเปลี่ยนเรียบร้อยแล้ว หากคุณไม่ได้เป็นผู้ทำการเปลี่ยนแปลงนี้ กรุณาติดต่อฝ่ายสนับสนุนของ Brave ทันทีเพื่อความปลอดภัยของบัญชีของคุณ"

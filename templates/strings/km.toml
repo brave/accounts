@@ -1,0 +1,86 @@
+[VerifyEmailSubject]
+description = "Email subject for email verification"
+other = "ផ្ទៀងផ្ទាត់អ៊ីមែលរបស់អ្នក"
+
+[SetPasswordEmailSubject]
+description = "Email subject for setting a new password"
+other = "កំណត់ពាក្យសម្ងាត់ថ្មីសម្រាប់គណនី Brave របស់អ្នក"
+
+[RegistrationEmailSubject]
+description = "Email subject for creating a new account"
+other = "បង្កើតគណនី Brave របស់អ្នក"
+
+[EmailGreeting]
+description = "Greeting in the email message"
+other = "សួស្តី"
+
+[SetPasswordEmailInstructions]
+description = "Instructions to verify email address and set a new password for an account"
+other = "នេះជាលេខកូដដែលអ្នកត្រូវការដើម្បីផ្ទៀងផ្ទាត់អាសយដ្ឋានអ៊ីមែលរបស់អ្នក និងកំណត់ពាក្យសម្ងាត់ថ្មីសម្រាប់គណនី Brave របស់អ្នក។"
+
+[RegistrationEmailInstructions]
+description = "Instructions to verify email address and create a new account"
+other = "នេះជាលេខកូដដែលអ្នកត្រូវការដើម្បីផ្ទៀងផ្ទាត់អាសយដ្ឋានអ៊ីមែលរបស់អ្នក និងបង្កើតគណនី Brave របស់អ្នក។"
+
+[VerifyEmailInstructions]
+description = "Instructions to verify email address"
+other = "នេះ​ជា​លេខ​កូដ​ដែល​អ្នក​នឹង​ត្រូវ​ការ​ដើម្បី​ផ្ទៀងផ្ទាត់​អាសយដ្ឋាន​អ៊ីមែល​របស់​អ្នក។"
+
+[VerifyEmailCode]
+description = "Label preceding the verification code displayed in the email"
+other = "លេខកូដផ្ទៀងផ្ទាត់របស់អ្នក៖"
+
+[VerifyEmailExpiryDisclaimer]
+description = "Informs the user how many minutes until the verification code expires"
+other = "ចំណាំ៖ លេខកូដនេះនឹងផុតកំណត់ក្នុងរយៈពេល {{.Minutes}} នាទី។"
+
+[SimilarEmailLoginMessage]
+description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = """
+វាហាក់ដូចជាអ្នកមានគណនីដែលបានចុះឈ្មោះរួចហើយជាមួយអ៊ីមែលនេះ៖ {{.Email}}។
+
+សាកល្បងចូលដោយប្រើអាសយដ្ឋានអ៊ីមែលនេះ។ ប្រសិនបើអ្នកនៅតែត្រូវការជំនួយ សូមទាក់ទងផ្នែកជំនួយ Brave។"""
+
+[SimilarEmailSubject]
+description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = "មានបញ្ហាមែនទេ? នេះជាវិធីចូលប្រើគណនី Brave របស់អ្នក។"
+
+[EmailSignature]
+description = "Email signature"
+other = "ក្រុមការងារ Brave"
+
+[EmailDisregard]
+description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
+other = "ប្រសិនបើអ្នកមិនបានធ្វើសំណើនេះទេ សូមកុំអើពើនឹងអ៊ីមែលនេះ។"
+
+[EmailCopyright]
+description = "Brave copyright notice"
+other = "រក្សាសិទ្ធិ © {{.Year}} Brave Software Inc."
+
+[EmailAllRightsReserved]
+description = "All rights reserved notice"
+other = "រក្សាសិទ្ធិគ្រប់យ៉ាង"
+
+[EmailPrivacyPolicy]
+description = "Privacy policy link text"
+other = "គោលការណ៍ឯកជនភាព"
+
+[EmailTermsOfUse]
+description = "Terms of use link text"
+other = "លក្ខខណ្ឌនៃការប្រើប្រាស់"
+
+[EmailDownloadBrave]
+description = "Brave download link text"
+other = "ទាញយក Brave"
+
+[EmailContactSupport]
+description = "Support contact link text"
+other = "ទាក់ទង​ផ្នែក​ជំនួយ"
+
+[PasswordChangeNotificationSubject]
+description = "Email subject for password change notification"
+other = "ពាក្យសម្ងាត់គណនី Brave របស់អ្នកត្រូវបានផ្លាស់ប្តូរ"
+
+[PasswordChangeNotificationMessage]
+description = "Email message informing user that their password was changed"
+other = "ពាក្យសម្ងាត់គណនី Brave របស់អ្នកត្រូវបានផ្លាស់ប្តូរដោយជោគជ័យ។ ប្រសិនបើអ្នកមិនបានធ្វើការផ្លាស់ប្តូរនេះទេ សូមទាក់ទងផ្នែកជំនួយ Brave ជាបន្ទាន់ ដើម្បីការពារគណនីរបស់អ្នក។"

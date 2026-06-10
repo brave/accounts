@@ -1,0 +1,86 @@
+[VerifyEmailSubject]
+description = "Email subject for email verification"
+other = "Потврдете ја вашата е-пошта"
+
+[SetPasswordEmailSubject]
+description = "Email subject for setting a new password"
+other = "Поставете нова лозинка за вашата сметка на Brave"
+
+[RegistrationEmailSubject]
+description = "Email subject for creating a new account"
+other = "Креирајте ја вашата сметка на Brave"
+
+[EmailGreeting]
+description = "Greeting in the email message"
+other = "Здраво,"
+
+[SetPasswordEmailInstructions]
+description = "Instructions to verify email address and set a new password for an account"
+other = "Еве го кодот што ќе ви биде потребен за да ја потврдите вашата е-пошта и да поставите нова лозинка за вашата сметка на Brave."
+
+[RegistrationEmailInstructions]
+description = "Instructions to verify email address and create a new account"
+other = "Еве го кодот што ќе ви биде потребен за да ја потврдите вашата е-пошта и да ја креирате вашата сметка на Brave."
+
+[VerifyEmailInstructions]
+description = "Instructions to verify email address"
+other = "Еве го кодот што ќе ви биде потребен за да ја потврдите вашата е-пошта."
+
+[VerifyEmailCode]
+description = "Label preceding the verification code displayed in the email"
+other = "Вашиот код за потврда:"
+
+[VerifyEmailExpiryDisclaimer]
+description = "Informs the user how many minutes until the verification code expires"
+other = "Забелешка: овој код ќе истече за {{.Minutes}} минути."
+
+[SimilarEmailLoginMessage]
+description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = """
+Се чини дека веќе имате регистрирана сметка со оваа е-пошта: {{.Email}}.
+
+Обидете се да се најавите користејќи ја оваа е-пошта. Доколку сè уште ви е потребна помош, контактирајте со поддршката на Brave."""
+
+[SimilarEmailSubject]
+description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = "Имате проблем? Еве како да пристапите до вашата сметка на Brave."
+
+[EmailSignature]
+description = "Email signature"
+other = "Тимот на Brave"
+
+[EmailDisregard]
+description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
+other = "Доколку не сте го поднеле ова барање, ве молиме игнорирајте ја оваа е-пошта."
+
+[EmailCopyright]
+description = "Brave copyright notice"
+other = "Copyright © {{.Year}} Brave Software Inc."
+
+[EmailAllRightsReserved]
+description = "All rights reserved notice"
+other = "Сите права се задржани"
+
+[EmailPrivacyPolicy]
+description = "Privacy policy link text"
+other = "Политика за приватност"
+
+[EmailTermsOfUse]
+description = "Terms of use link text"
+other = "Услови за користење"
+
+[EmailDownloadBrave]
+description = "Brave download link text"
+other = "Преземи го Brave"
+
+[EmailContactSupport]
+description = "Support contact link text"
+other = "Контактирај со поддршка"
+
+[PasswordChangeNotificationSubject]
+description = "Email subject for password change notification"
+other = "Лозинката за вашата сметка на Brave е променета"
+
+[PasswordChangeNotificationMessage]
+description = "Email message informing user that their password was changed"
+other = "Лозинката за вашата сметка на Brave е успешно променета. Доколку не сте ја направиле оваа промена, веднаш контактирајте со поддршката на Brave за да ја заштитите вашата сметка."
