@@ -10,10 +10,6 @@ other = "Braveアカウントの新しいパスワードを設定してくださ
 description = "Email subject for creating a new account"
 other = "Braveアカウントを作成してください"
 
-[LoginEmailSubject]
-description = "Email subject for logging into an account"
-other = "Braveアカウントにアクセスしてください"
-
 [EmailGreeting]
 description = "Greeting in the email message"
 other = "こんにちは。"
@@ -29,10 +25,6 @@ other = "メールアドレスを確認し、Braveアカウントを作成する
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
 other = "メールアドレスを確認するために必要なコードはこちらです。"
-
-[LoginEmailInstructions]
-description = "Instruction to verify an email address and login to an account"
-other = "Braveアカウントにアクセスするために必要なコードはこちらです。"
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
