@@ -10,10 +10,6 @@ other = "तुमच्या Brave खात्यासाठी एक न�
 description = "Email subject for creating a new account"
 other = "तुमचे खाते तयार Brave करा"
 
-[LoginEmailSubject]
-description = "Email subject for logging into an account"
-other = "तुमचे Brave खाते प्राप्त करा"
-
 [EmailGreeting]
 description = "Greeting in the email message"
 other = "नमस्कार,"
@@ -29,10 +25,6 @@ other = "तुमचा ईमेल पत्ता पडताळून घ�
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
 other = "तुमचा ईमेल पत्ता पडताळून घेण्यासाठी तुम्हाला हा कोड लागेल."
-
-[LoginEmailInstructions]
-description = "Instruction to verify an email address and login to an account"
-other = "तुमचे Brave खाते प्राप्त करण्यासाठी तुम्हाला हा कोड लागेल."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
