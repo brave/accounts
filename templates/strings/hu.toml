@@ -10,10 +10,6 @@ other = "Új jelszó beállítása a Brave-fiókhoz"
 description = "Email subject for creating a new account"
 other = "Brave-fiók létrehozása"
 
-[LoginEmailSubject]
-description = "Email subject for logging into an account"
-other = "Bejelentkezés a Brave-fiókba"
-
 [EmailGreeting]
 description = "Greeting in the email message"
 other = "Üdvözöljük!"
@@ -29,10 +25,6 @@ other = "Az alábbi kódra lesz szüksége az e-mail-cím megerősítéséhez é
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
 other = "Az alábbi kódra lesz szüksége az e-mail-cím megerősítéséhez."
-
-[LoginEmailInstructions]
-description = "Instruction to verify an email address and login to an account"
-other = "Az alábbi kódra lesz szüksége a Brave-fiók eléréséhez."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
