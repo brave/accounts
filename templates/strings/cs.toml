@@ -10,10 +10,6 @@ other = "Nastavte si pro váš účet Brave nové heslo"
 description = "Email subject for creating a new account"
 other = "Vytvořte si účet Brave"
 
-[LoginEmailSubject]
-description = "Email subject for logging into an account"
-other = "Navštivte svůj účet Brave"
-
 [EmailGreeting]
 description = "Greeting in the email message"
 other = "Dobrý den,"
@@ -29,10 +25,6 @@ other = "tady je kód, kterým ověříte svou e-mailovou adresu. Umožní vám 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
 other = "tady je kód, kterým ověříte svou e-mailovou adresu."
-
-[LoginEmailInstructions]
-description = "Instruction to verify an email address and login to an account"
-other = "tady je kód, který vám umožní přístup k vašemu účtu Brave."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
