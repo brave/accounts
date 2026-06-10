@@ -10,10 +10,6 @@ other = "Caktoni një fjalëkalim të ri për llogarinë në Brave"
 description = "Email subject for creating a new account"
 other = "Krijoni llogari në Brave"
 
-[LoginEmailSubject]
-description = "Email subject for logging into an account"
-other = "Hyni në llogarinë në Brave"
-
 [EmailGreeting]
 description = "Greeting in the email message"
 other = "Përshëndetje,"
@@ -29,10 +25,6 @@ other = "Ja edhe kodi që do t'ju duhet për të verifikuar adresën tuaj të em
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
 other = "Ja edhe kodi që do t'ju duhet për të verifikuar adresën e emailit."
-
-[LoginEmailInstructions]
-description = "Instruction to verify an email address and login to an account"
-other = "Ja edhe kodi që do t'ju duhet për të hyrë në llogarinë në Brave."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
