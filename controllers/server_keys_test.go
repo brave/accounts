@@ -32,7 +32,7 @@ func (suite *ServerKeysTestSuite) SetupTest() {
 	suite.T().Setenv(util.KeyServiceSecretEnv, headerSecret)
 
 	var err error
-	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, false, true)
+	suite.ds, err = datastore.NewDatastore(datastore.PasswordAuthSessionVersion, false, true)
 	suite.Require().NoError(err)
 
 	opaqueService, err := services.NewOpaqueService(suite.ds, true)

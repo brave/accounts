@@ -40,7 +40,6 @@ type Verification struct {
 }
 
 const (
-	AuthTokenIntent      = "auth_token"
 	VerificationIntent   = "verification"
 	RegistrationIntent   = "registration"
 	ResetPasswordIntent  = "reset_password"
