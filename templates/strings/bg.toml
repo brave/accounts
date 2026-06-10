@@ -10,10 +10,6 @@ other = "Задай нова парола за акаунта си в Brave"
 description = "Email subject for creating a new account"
 other = "Създай си акаунт в Brave"
 
-[LoginEmailSubject]
-description = "Email subject for logging into an account"
-other = "Влез в акаунта си в Brave"
-
 [EmailGreeting]
 description = "Greeting in the email message"
 other = "Здравей,"
@@ -29,10 +25,6 @@ other = "Ето го кода, необходим за потвърждаван�
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
 other = "Ето го кода, необходим за потвърждаване на имейл адреса ти."
-
-[LoginEmailInstructions]
-description = "Instruction to verify an email address and login to an account"
-other = "Ето го кода, необходим за достъп до акаунта ти в Brave."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
