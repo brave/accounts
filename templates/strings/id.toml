@@ -10,10 +10,6 @@ other = "Buat kata sandi baru untuk akun Brave Anda"
 description = "Email subject for creating a new account"
 other = "Buat akun Brave Anda"
 
-[LoginEmailSubject]
-description = "Email subject for logging into an account"
-other = "Akses akun Brave Anda"
-
 [EmailGreeting]
 description = "Greeting in the email message"
 other = "Halo,"
@@ -29,10 +25,6 @@ other = "Berikut kode yang diperlukan untuk memverifikasi alamat email dan membu
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
 other = "Berikut kode yang diperlukan untuk memverifikasi alamat email Anda."
-
-[LoginEmailInstructions]
-description = "Instruction to verify an email address and login to an account"
-other = "Berikut kode yang diperlukan untuk mengakses akun Brave Anda."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
