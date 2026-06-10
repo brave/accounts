@@ -146,6 +146,7 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 
 	if err != nil {
 		if errors.Is(err, util.ErrTooManyVerifications) ||
+			errors.Is(err, util.ErrDailyVerificationLimitReached) ||
 			errors.Is(err, util.ErrIntentNotAllowed) ||
 			errors.Is(err, util.ErrEmailDomainNotSupported) ||
 			errors.Is(err, util.ErrAccountExists) ||
