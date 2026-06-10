@@ -2,7 +2,6 @@ package datastore
 
 import (
 	"context"
-	"embed"
 	"errors"
 	"fmt"
 	"os"
@@ -71,14 +70,7 @@ func NewDatastore(minSessionVersion int, isKeyService bool, isTesting bool) (*Da
 		}
 	}
 
-	var files embed.FS
-	if isTesting || isKeyService {
-		files = migrations.MigrationFiles
-	} else {
-		files = migrations.MigrationFilesWithExtension
-	}
-
-	iofsDriver, err := iofs.New(files, ".")
+	iofsDriver, err := iofs.New(migrations.MigrationFiles, ".")
 	if err != nil {
 		return nil, fmt.Errorf("failed to load iofs driver for migrations: %w", err)
 	}
