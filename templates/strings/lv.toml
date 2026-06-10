@@ -10,10 +10,6 @@ other = "Iestatiet jaunu paroli savam Brave kontam"
 description = "Email subject for creating a new account"
 other = "Izveidojiet savu Brave kontu"
 
-[LoginEmailSubject]
-description = "Email subject for logging into an account"
-other = "Piekļūstiet savam Brave kontam"
-
 [EmailGreeting]
 description = "Greeting in the email message"
 other = "Sveiki,"
@@ -29,10 +25,6 @@ other = "šeit ir kods, kas nepieciešams jūsu e-pasta adreses verificēšanai 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
 other = "šeit ir kods, kas nepieciešams jūsu e-pasta adreses verificēšanai."
-
-[LoginEmailInstructions]
-description = "Instruction to verify an email address and login to an account"
-other = "šeit ir kods, kas nepieciešams, lai piekļūtu jūsu Brave kontam."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
