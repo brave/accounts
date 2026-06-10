@@ -10,10 +10,6 @@ other = "Brave 계정의 새 비밀번호 설정"
 description = "Email subject for creating a new account"
 other = "Brave 계정 만들기"
 
-[LoginEmailSubject]
-description = "Email subject for logging into an account"
-other = "Brave 계정에 액세스"
-
 [EmailGreeting]
 description = "Greeting in the email message"
 other = "안녕하세요."
@@ -29,10 +25,6 @@ other = "다음은 이메일 주소를 인증하고 Brave 계정을 생성하는
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
 other = "다음은 이메일 주소를 인증하는 데 필요한 코드입니다."
-
-[LoginEmailInstructions]
-description = "Instruction to verify an email address and login to an account"
-other = "다음은 Brave 계정에 액세스하는 데 필요한 코드입니다."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
