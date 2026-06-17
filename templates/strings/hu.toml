@@ -86,3 +86,7 @@ description = "Email message informing user that their password was changed"
 other = """
 A Brave-fiók jelszavát sikeresen megváltoztattuk.
 Ha nem Ön hajtotta végre a módosítást, kérjük, azonnal lépjen kapcsolatba a Brave ügyfélszolgálatával fiókja biztonsága érdekében."""
+
+[PasswordChangeNotificationDisregard]
+description = "Footer for password change notification email reassuring the user if they made the change"
+other = "If you did make this change, no further action is required."
