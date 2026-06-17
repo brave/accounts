@@ -84,3 +84,7 @@ other = "თქვენი Brave-ს ანგარიშის პარო�
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
 other = "თქვენი Brave ანგარიშის პაროლი წარმატებით შეიცვალა. თუ ეს ცვლილება თქვენ არ განგიხორციელებიათ, ანგარიშის დასაცავად დაუყოვნებლივ დაუკავშირდით Brave-ს მხარდაჭერის გუნდს."
+
+[PasswordChangeNotificationDisregard]
+description = "Footer for password change notification email reassuring the user if they made the change"
+other = "If you did make this change, no further action is required."
