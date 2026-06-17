@@ -84,3 +84,7 @@ other = "Ο κωδικός πρόσβασης του λογαριασμού σο
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
 other = "Ο κωδικός πρόσβασης του λογαριασμού σου στο Brave άλλαξε με επιτυχία. Εάν δεν έκανες αυτή την αλλαγή, επικοινώνησε αμέσως με την υποστήριξη του Brave για να προστατεύσεις τον λογαριασμό σου."
+
+[PasswordChangeNotificationDisregard]
+description = "Footer for password change notification email reassuring the user if they made the change"
+other = "If you did make this change, no further action is required."
