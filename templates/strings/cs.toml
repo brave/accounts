@@ -84,3 +84,7 @@ other = "Vaše heslo k účtu Brave bylo změněno."
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
 other = "Heslo vašeho účtu Brave bylo úspěšně změněno. Pokud jste tuto změnu neprovedli, neprodleně kontaktujte podporu Brave a zabezpečte svůj účet."
+
+[PasswordChangeNotificationDisregard]
+description = "Footer for password change notification email reassuring the user if they made the change"
+other = "If you did make this change, no further action is required."
