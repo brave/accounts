@@ -84,3 +84,7 @@ other = "Het wachtwoord voor je Brave-account is gewijzigd"
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
 other = "Het wachtwoord voor je Brave-account is succesvol gewijzigd. Heb je deze wijziging niet zelf doorgevoerd? Neem dan onmiddellijk contact op met Brave-ondersteuning om je account veilig te stellen."
+
+[PasswordChangeNotificationDisregard]
+description = "Footer for password change notification email reassuring the user if they made the change"
+other = "If you did make this change, no further action is required."
