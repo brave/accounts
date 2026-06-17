@@ -273,6 +273,7 @@ func (s *SESService) SendPasswordChangeNotification(ctx context.Context, email s
 	localizer := i18n.NewLocalizer(s.i18nBundle, locale)
 
 	fields, effectiveLocale := newEmailFields(localizer, "PasswordChangeNotificationSubject")
+	fields.Disregard = localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "PasswordChangeNotificationDisregard"})
 	data := similarEmailFields{
 		emailFields: fields,
 		Message:     localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "PasswordChangeNotificationMessage"}),
