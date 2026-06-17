@@ -84,3 +84,7 @@ other = "Jūsų „Brave“ paskyros slaptažodis buvo pakeistas"
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
 other = "Jūsų „Brave“ paskyros slaptažodis buvo sėkmingai pakeistas. Jei jūs neatlikote šio pakeitimo, nedelsdami susisiekite su „Brave“ klientų aptarnavimo komanda, kad apsaugotumėte savo paskyrą."
+
+[PasswordChangeNotificationDisregard]
+description = "Footer for password change notification email reassuring the user if they made the change"
+other = "If you did make this change, no further action is required."
