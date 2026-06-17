@@ -84,3 +84,7 @@ other = "আপনার Brave অ্যাকাউন্টের পাসও
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
 other = "আপনার Brave অ্যাকাউন্টের পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে। যদি আপনি এই পরিবর্তন না করে থাকেন, তাহলে আপনার অ্যাকাউন্ট সুরক্ষিত রাখতে অনুগ্রহ করে অবিলম্বে Brave সাপোর্টের সাথে যোগাযোগ করুন।"
+
+[PasswordChangeNotificationDisregard]
+description = "Footer for password change notification email reassuring the user if they made the change"
+other = "If you did make this change, no further action is required."
