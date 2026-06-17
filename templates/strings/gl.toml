@@ -84,3 +84,7 @@ other = "Cambiouse o contrasinal da túa conta de Brave"
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
 other = "Cambiouse correctamente o contrasinal da túa conta de Brave. Se non fuches ti quen fixo este cambio, contacta inmediatamente co servizo de asistencia de Brave para protexer a túa conta."
+
+[PasswordChangeNotificationDisregard]
+description = "Footer for password change notification email reassuring the user if they made the change"
+other = "If you did make this change, no further action is required."
