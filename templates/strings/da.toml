@@ -84,3 +84,7 @@ other = "Adgangskoden til din Brave-konto er blevet ændret"
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
 other = "Adgangskoden til din Brave-konto er blevet ændret. Hvis du ikke har foretaget denne ændring, bedes du straks kontakte Brave-support for at beskytte din konto."
+
+[PasswordChangeNotificationDisregard]
+description = "Footer for password change notification email reassuring the user if they made the change"
+other = "If you did make this change, no further action is required."
