@@ -84,3 +84,7 @@ other = "Teie Brave'i konto parool on muudetud"
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
 other = "Teie Brave'i konto parool on edukalt muudetud. Kui te ei ole seda muutnud, võtke oma konto turvalisuse tagamiseks kohe ühendust Brave'i klienditoega."
+
+[PasswordChangeNotificationDisregard]
+description = "Footer for password change notification email reassuring the user if they made the change"
+other = "If you did make this change, no further action is required."
