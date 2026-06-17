@@ -84,3 +84,7 @@ other = "Паролата за акаунта ти в Brave е сменена"
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
 other = "Паролата за акаунта ти в Brave беше сменена успешно. Ако смяната не е направена от теб, моля, свържи се незабавно с поддръжката на Brave, за да защитиш акаунта си."
+
+[PasswordChangeNotificationDisregard]
+description = "Footer for password change notification email reassuring the user if they made the change"
+other = "If you did make this change, no further action is required."
