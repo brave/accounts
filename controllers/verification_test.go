@@ -693,6 +693,22 @@ func (suite *VerificationTestSuite) TestVerifyCompleteRegistrationIntentAfterWro
 	suite.Equal(firstSessionID, retrySessionID)
 }
 
+func (suite *VerificationTestSuite) TestVerifyInitUnverifiedAccount() {
+	email := "test@example.com"
+	account, err := suite.ds.GetOrCreateAccount(email)
+	suite.Require().NoError(err)
+	suite.Nil(account.LastEmailVerifiedAt)
+
+	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", controllers.VerifyInitRequest{
+		Email:   email,
+		Intent:  "reset_password",
+		Service: "accounts",
+		Locale:  "en-US",
+	}), suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrAccountDoesNotExist.Code)
+}
+
 func TestVerificationTestSuite(t *testing.T) {
 	t.Run("NoKeyService", func(t *testing.T) {
 		suite.Run(t, NewVerificationTestSuite(false))

@@ -75,8 +75,10 @@ func (vs *VerificationService) InitializeVerification(ctx context.Context, email
 			}
 			return nil, nil, util.ErrAccountExists
 		}
-		if (intent == datastore.ResetPasswordIntent || intent == datastore.ChangePasswordIntent) && !accountExists {
-			return nil, nil, util.ErrAccountDoesNotExist
+		if intent == datastore.ResetPasswordIntent || intent == datastore.ChangePasswordIntent {
+			if !accountExists || account.LastEmailVerifiedAt == nil {
+				return nil, nil, util.ErrAccountDoesNotExist
+			}
 		}
 	}
 
