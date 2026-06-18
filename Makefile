@@ -15,7 +15,7 @@ lint:
 run:
 	docker compose up -d postgres ses-local
 	swag init
-	go run .
+	go run -race .
 
 test:
 	docker compose up -d postgres ses-local
