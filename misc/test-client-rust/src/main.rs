@@ -53,6 +53,10 @@ struct CliArgs {
     #[arg(long)]
     service_name: Option<String>,
 
+    /// Locale for verification emails (e.g. "en-US", "es-ES")
+    #[arg(long)]
+    locale: Option<String>,
+
     /// Set brave-services-key header
     #[arg(short = 'k', long)]
     services_key: Option<String>,
@@ -243,6 +247,10 @@ fn verify(args: &CliArgs) -> (String, Option<String>) {
         Value::String(args.email.as_ref().expect("email must be provided").clone()),
     );
 
+    if let Some(locale) = args.locale.as_ref() {
+        body.insert("locale", locale.clone().into());
+    }
+
     let auth_token = if args.change_password {
         Some(
             args.token
@@ -355,6 +363,10 @@ fn set_password(args: CliArgs) {
 
     let mut body: HashMap<&str, Value> = HashMap::new();
     body.insert("serializedRecord", record_hex.into());
+
+    if let Some(locale) = args.locale.as_ref() {
+        body.insert("locale", locale.clone().into());
+    }
 
     if args.change_password && args.invalidate_sessions {
         body.insert("invalidateSessions", true.into());
