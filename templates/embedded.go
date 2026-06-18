@@ -1,6 +1,6 @@
 package templates
 
-import _ "embed"
+import "embed"
 
 //go:embed verify_html.tmpl
 var VerifyHTMLTemplateContent string
@@ -17,5 +17,5 @@ var GeneralEmailTextTemplateContent string
 //go:embed email_viewer.tmpl
 var EmailViewerTemplateContent string
 
-//go:embed strings/en.toml
-var StringsEnToml []byte
+//go:embed strings/*.toml
+var StringsFS embed.FS
