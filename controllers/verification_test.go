@@ -35,12 +35,12 @@ func NewVerificationTestSuite(useKeyService bool) *VerificationTestSuite {
 	}
 }
 
-func (suite *VerificationTestSuite) SetupController(passwordAuthEnabled bool, emailAuthEnabled bool) {
+func (suite *VerificationTestSuite) SetupTest() {
 	var err error
 	suite.T().Setenv("OPAQUE_SECRET_KEY", "4355f8e6f9ec41649fbcdbcca5075a97dafc4c8d8eb8cc2ba286be7b1c938d05")
 	suite.T().Setenv("OPAQUE_PUBLIC_KEY", "98584585210c1f310e9d0aeb9ac1384b7d51808cfaf21b17b5e3dc8d35dbfb00")
 
-	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, false, true)
+	suite.ds, err = datastore.NewDatastore(datastore.PasswordAuthSessionVersion, false, true)
 	suite.Require().NoError(err)
 
 	if suite.useKeyService {
@@ -50,12 +50,12 @@ func (suite *VerificationTestSuite) SetupController(passwordAuthEnabled bool, em
 	suite.jwtService, err = services.NewJWTService(suite.ds, false)
 	suite.Require().NoError(err)
 	suite.sesMock = &MockSESService{}
-	suite.verificationService = services.NewVerificationService(suite.ds, suite.jwtService, suite.sesMock, passwordAuthEnabled, emailAuthEnabled)
+	suite.verificationService = services.NewVerificationService(suite.ds, suite.jwtService, suite.sesMock)
 	controller := controllers.NewVerificationController(suite.ds, suite.verificationService)
 
 	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds, true)
 	servicesKeyMiddleware := middleware.ServicesKeyMiddleware(util.DevelopmentEnv)
-	optionalAuthMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion, true, false)
+	optionalAuthMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.PasswordAuthSessionVersion, true, false)
 
 	suite.router = chi.NewRouter()
 	suite.router.Mount("/v2/verify", controller.Router(verificationAuthMiddleware, servicesKeyMiddleware, optionalAuthMiddleware, false))
@@ -90,11 +90,9 @@ func (m *MockSESService) SendPasswordChangeNotification(ctx context.Context, ema
 }
 
 func (suite *VerificationTestSuite) TestVerifyInit() {
-	suite.SetupController(false, true)
-
 	body := controllers.VerifyInitRequest{
 		Email:   "test@example.com",
-		Intent:  "auth_token",
+		Intent:  "verification",
 		Service: "email-aliases",
 		Locale:  "en-US",
 	}
@@ -117,11 +115,9 @@ func (suite *VerificationTestSuite) TestVerifyInit() {
 }
 
 func (suite *VerificationTestSuite) TestVerifyInitTooMany() {
-	suite.SetupController(false, true)
-
 	body := controllers.VerifyInitRequest{
 		Email:   "test@example.com",
-		Intent:  "auth_token",
+		Intent:  "verification",
 		Service: "email-aliases",
 		Locale:  "en-US",
 	}
@@ -150,15 +146,45 @@ func (suite *VerificationTestSuite) TestVerifyInitTooMany() {
 	suite.sesMock.AssertExpectations(suite.T())
 }
 
-func (suite *VerificationTestSuite) TestVerifyInitUnsupportedEmail() {
-	suite.SetupController(true, true)
+func (suite *VerificationTestSuite) TestVerifyInitDailyLimitReached() {
+	body := controllers.VerifyInitRequest{
+		Email:   "test@example.com",
+		Intent:  "verification",
+		Service: "email-aliases",
+		Locale:  "en-US",
+	}
 
+	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Times(10)
+
+	// Send 10 successful requests, expiring each so the pending cap is not hit
+	for i := 0; i < 10; i++ {
+		resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
+		suite.Equal(http.StatusOK, resp.Code)
+
+		var parsedResp controllers.VerifyInitResponse
+		util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
+		verificationID, err := suite.jwtService.ValidateVerificationToken(*parsedResp.VerificationToken)
+		suite.NoError(err)
+		suite.NoError(suite.ds.DB.Model(&datastore.Verification{}).
+			Where("id = ?", verificationID).
+			Update("created_at", time.Now().UTC().Add(-(datastore.VerificationExpiration + time.Minute))).Error)
+	}
+
+	// 11th request should be blocked by the daily cap
+	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrDailyVerificationLimitReached.Code)
+
+	suite.sesMock.AssertExpectations(suite.T())
+}
+
+func (suite *VerificationTestSuite) TestVerifyInitUnsupportedEmail() {
 	suite.sesMock.On("SendVerificationEmail", mock.Anything, mock.Anything, mock.Anything, "en-US").Return(nil).Maybe()
 
 	// Test bravealias.com domain
 	body := controllers.VerifyInitRequest{
 		Email:   "test@bravealias.com",
-		Intent:  "auth_token",
+		Intent:  "verification",
 		Service: "email-aliases",
 		Locale:  "en-US",
 	}
@@ -169,25 +195,14 @@ func (suite *VerificationTestSuite) TestVerifyInitUnsupportedEmail() {
 
 func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
 	testCases := []struct {
-		intent              string
-		service             string
-		passwordAuthEnabled bool
+		intent  string
+		service string
 	}{
-		{
-			intent:              "auth_token",
-			service:             "email-aliases",
-			passwordAuthEnabled: true,
-		},
-		{
-			intent:              "reset_password",
-			service:             "accounts",
-			passwordAuthEnabled: false,
-		},
+		{intent: "reset_password", service: "email-aliases"},
+		{intent: "reset_password", service: "premium"},
 	}
 
 	for _, tc := range testCases {
-		suite.SetupController(tc.passwordAuthEnabled, !tc.passwordAuthEnabled) // password auth enabled, email auth disabled
-
 		body := controllers.VerifyInitRequest{
 			Email:   "test@example.com",
 			Service: tc.service,
@@ -202,8 +217,6 @@ func (suite *VerificationTestSuite) TestVerifyInitIntentNotAllowed() {
 }
 
 func (suite *VerificationTestSuite) TestVerifyInitBadIntent() {
-	suite.SetupController(true, false)
-
 	// Test registration intent - should fail because registration intent
 	// should only be used internally by the accounts service, not via direct verification init
 	body := controllers.VerifyInitRequest{
@@ -218,107 +231,58 @@ func (suite *VerificationTestSuite) TestVerifyInitBadIntent() {
 }
 
 func (suite *VerificationTestSuite) TestVerifyComplete() {
-	suite.SetupController(false, true)
+	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
 
-	testCases := []struct {
-		intent              string
-		service             string
-		shouldHaveAuthToken bool
-	}{
-		{
-			intent:              "auth_token",
-			service:             "email-aliases",
-			shouldHaveAuthToken: true,
-		},
-		{
-			intent:              "verification",
-			service:             "email-aliases",
-			shouldHaveAuthToken: false,
-		},
+	initBody := controllers.VerifyInitRequest{
+		Email:   "test@example.com",
+		Intent:  "verification",
+		Service: "email-aliases",
+		Locale:  "en-US",
 	}
 
-	for _, tc := range testCases {
-		suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
+	initResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", initBody), suite.router)
+	suite.Equal(http.StatusOK, initResp.Code)
 
-		initBody := controllers.VerifyInitRequest{
-			Email:   "test@example.com",
-			Intent:  tc.intent,
-			Service: tc.service,
-			Locale:  "en-US",
-		}
+	var parsedInitResp controllers.VerifyInitResponse
+	util.DecodeJSONTestResponse(suite.T(), initResp.Body, &parsedInitResp)
+	suite.Require().NotNil(parsedInitResp.VerificationToken)
 
-		initResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", initBody), suite.router)
-		suite.Equal(http.StatusOK, initResp.Code)
+	verificationID, err := suite.jwtService.ValidateVerificationToken(*parsedInitResp.VerificationToken)
+	suite.NoError(err)
 
-		var parsedInitResp controllers.VerifyInitResponse
-		util.DecodeJSONTestResponse(suite.T(), initResp.Body, &parsedInitResp)
-		suite.Require().NotNil(parsedInitResp.VerificationToken)
+	verification, err := suite.ds.GetVerificationStatus(verificationID)
+	suite.NoError(err)
 
-		verificationID, err := suite.jwtService.ValidateVerificationToken(*parsedInitResp.VerificationToken)
-		suite.NoError(err)
+	// First attempt - should succeed
+	completeBody := controllers.VerifyCompleteRequest{Code: verification.Code}
+	completeReq := util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
+	completeReq.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
+	completeResp := util.ExecuteTestRequest(completeReq, suite.router)
+	suite.Equal(http.StatusOK, completeResp.Code)
 
-		verification, err := suite.ds.GetVerificationStatus(verificationID)
-		suite.NoError(err)
+	var result controllers.VerifyCompleteResponse
+	util.DecodeJSONTestResponse(suite.T(), completeResp.Body, &result)
+	suite.Equal("email-aliases", result.Service)
+	expectedEmail := "test@example.com"
+	suite.Equal(&expectedEmail, result.Email)
+	suite.Nil(result.AuthToken)
 
-		// First attempt - should succeed
-		completeBody := controllers.VerifyCompleteRequest{
-			Code: verification.Code,
-		}
-		completeReq := util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
-		completeReq.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
-		completeResp := util.ExecuteTestRequest(completeReq, suite.router)
-		suite.Equal(http.StatusOK, completeResp.Code)
-
-		var result controllers.VerifyCompleteResponse
-		util.DecodeJSONTestResponse(suite.T(), completeResp.Body, &result)
-		suite.Equal(tc.service, result.Service)
-		expectedEmail := "test@example.com"
-		suite.Equal(&expectedEmail, result.Email)
-
-		if tc.shouldHaveAuthToken {
-			suite.Require().NotNil(result.AuthToken)
-			sessionID, _, err := suite.jwtService.ValidateAuthToken(*result.AuthToken)
-			suite.NoError(err)
-			session, err := suite.ds.GetSession(sessionID)
-			suite.NoError(err)
-			suite.Require().NotNil(session)
-			suite.Equal(datastore.EmailAuthSessionVersion, session.Version)
-		} else {
-			suite.Nil(result.AuthToken)
-		}
-
-		// Second attempt
-		completeReq = util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
-		completeReq.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
-		completeResp = util.ExecuteTestRequest(completeReq, suite.router)
-		if tc.shouldHaveAuthToken {
-			// auth_token/registration: re-issues auth token from existing session
-			suite.Equal(http.StatusOK, completeResp.Code)
-			var result2 controllers.VerifyCompleteResponse
-			util.DecodeJSONTestResponse(suite.T(), completeResp.Body, &result2)
-			suite.Require().NotNil(result2.AuthToken)
-			sessionID2, _, err := suite.jwtService.ValidateAuthToken(*result2.AuthToken)
-			suite.NoError(err)
-			// Same session as the first attempt
-			firstSessionID, _, _ := suite.jwtService.ValidateAuthToken(*result.AuthToken)
-			suite.Equal(firstSessionID, sessionID2)
-		} else {
-			suite.Equal(http.StatusBadRequest, completeResp.Code)
-			util.AssertErrorResponseCode(suite.T(), completeResp, util.ErrEmailAlreadyVerified.Code)
-		}
-	}
+	// Second attempt - should fail because already verified
+	completeReq = util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
+	completeReq.Header.Set("Authorization", "Bearer "+*parsedInitResp.VerificationToken)
+	completeResp = util.ExecuteTestRequest(completeReq, suite.router)
+	suite.Equal(http.StatusBadRequest, completeResp.Code)
+	util.AssertErrorResponseCode(suite.T(), completeResp, util.ErrEmailAlreadyVerified.Code)
 
 	suite.sesMock.AssertExpectations(suite.T())
 }
 
 func (suite *VerificationTestSuite) TestVerifyCompleteWithHyphen() {
-	suite.SetupController(false, true)
-
 	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
 
 	initBody := controllers.VerifyInitRequest{
 		Email:   "test@example.com",
-		Intent:  "auth_token",
+		Intent:  "verification",
 		Service: "email-aliases",
 		Locale:  "en-US",
 	}
@@ -348,8 +312,6 @@ func (suite *VerificationTestSuite) TestVerifyCompleteWithHyphen() {
 }
 
 func (suite *VerificationTestSuite) TestVerifyResult() {
-	suite.SetupController(false, true)
-
 	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
 
 	initBody := controllers.VerifyInitRequest{
@@ -407,13 +369,11 @@ func (suite *VerificationTestSuite) TestVerifyResult() {
 }
 
 func (suite *VerificationTestSuite) TestVerifyCompleteWrongCode() {
-	suite.SetupController(false, true)
-
 	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
 
 	initBody := controllers.VerifyInitRequest{
 		Email:   "test@example.com",
-		Intent:  "auth_token",
+		Intent:  "verification",
 		Service: "email-aliases",
 		Locale:  "en-US",
 	}
@@ -458,8 +418,6 @@ func (suite *VerificationTestSuite) TestVerifyCompleteWrongCode() {
 }
 
 func (suite *VerificationTestSuite) TestVerificationExpiry() {
-	// Setup initial verification request
-	suite.SetupController(false, true)
 	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
 
 	initBody := controllers.VerifyInitRequest{
@@ -469,7 +427,6 @@ func (suite *VerificationTestSuite) TestVerificationExpiry() {
 		Locale:  "en-US",
 	}
 
-	// Initialize verification
 	initResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", initBody), suite.router)
 	suite.Equal(http.StatusOK, initResp.Code)
 
@@ -497,8 +454,6 @@ func (suite *VerificationTestSuite) TestVerificationExpiry() {
 }
 
 func (suite *VerificationTestSuite) TestVerifyInitChangePasswordRequiresAuth() {
-	suite.SetupController(true, false)
-
 	email := "test@example.com"
 	account, err := suite.ds.GetOrCreateAccount(email)
 	suite.Require().NoError(err)
@@ -543,8 +498,6 @@ func (suite *VerificationTestSuite) TestVerifyInitChangePasswordRequiresAuth() {
 }
 
 func (suite *VerificationTestSuite) TestVerifyResend() {
-	suite.SetupController(false, true)
-
 	initBody := controllers.VerifyInitRequest{
 		Email:   "test@example.com",
 		Intent:  "verification",
@@ -605,9 +558,7 @@ func (suite *VerificationTestSuite) TestVerifyResend() {
 	suite.sesMock.AssertExpectations(suite.T())
 }
 
-func (suite *VerificationTestSuite) TestVerifyDelete() {
-	suite.SetupController(true, true)
-
+func (suite *VerificationTestSuite) TestVerifyInvalidate() {
 	email := "test@example.com"
 	// Use InitializeVerification to create a registration verification
 	verification, verificationToken, err := suite.verificationService.InitializeVerification(
@@ -625,13 +576,19 @@ func (suite *VerificationTestSuite) TestVerifyDelete() {
 	suite.Require().NoError(err)
 	suite.Nil(account.LastEmailVerifiedAt)
 
-	// Delete verification
+	// Invalidate verification
 	req := httptest.NewRequest(http.MethodDelete, "/v2/verify", nil)
 	req.Header.Set("Authorization", "Bearer "+*verificationToken)
 	resp := util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusNoContent, resp.Code)
 
-	// Verify verification was deleted
+	// Verify the record still exists in the DB with is_invalidated = true
+	var dbVerification datastore.Verification
+	err = suite.ds.DB.First(&dbVerification, "id = ?", verification.ID).Error
+	suite.Require().NoError(err)
+	suite.True(dbVerification.IsInvalidated)
+
+	// Verify GetVerificationStatus treats it as not found
 	_, err = suite.ds.GetVerificationStatus(verification.ID)
 	suite.ErrorIs(err, util.ErrVerificationNotFound)
 
@@ -640,10 +597,7 @@ func (suite *VerificationTestSuite) TestVerifyDelete() {
 	suite.ErrorIs(err, datastore.ErrAccountNotFound)
 }
 
-func (suite *VerificationTestSuite) TestVerifyDeleteForbidden() {
-	suite.SetupController(true, false)
-
-	// Use InitializeVerification to create an auth_token verification
+func (suite *VerificationTestSuite) TestVerifyInvalidateForbidden() {
 	_, verificationToken, err := suite.verificationService.InitializeVerification(
 		suite.T().Context(),
 		"test@example.com",
@@ -654,7 +608,7 @@ func (suite *VerificationTestSuite) TestVerifyDeleteForbidden() {
 	suite.Require().NoError(err)
 	suite.Require().NotNil(*verificationToken)
 
-	// Delete verification - should be bad request for auth_token intent
+	// Invalidate verification - should be bad request for non-registration intent
 	req := httptest.NewRequest(http.MethodDelete, "/v2/verify", nil)
 	req.Header.Set("Authorization", "Bearer "+*verificationToken)
 	resp := util.ExecuteTestRequest(req, suite.router)
@@ -662,9 +616,7 @@ func (suite *VerificationTestSuite) TestVerifyDeleteForbidden() {
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrIntentNotAllowed.Code)
 }
 
-func (suite *VerificationTestSuite) TestVerifyDeleteAlreadyVerified() {
-	suite.SetupController(true, true)
-
+func (suite *VerificationTestSuite) TestVerifyInvalidateAlreadyVerified() {
 	// Use InitializeVerification to create a registration verification
 	verification, verificationToken, err := suite.verificationService.InitializeVerification(
 		suite.T().Context(),
@@ -680,7 +632,7 @@ func (suite *VerificationTestSuite) TestVerifyDeleteAlreadyVerified() {
 	err = suite.ds.DB.Model(&datastore.Verification{}).Where("id = ?", verification.ID).Update("verified", true).Error
 	suite.Require().NoError(err)
 
-	// Delete verification - should be bad request for already verified
+	// Invalidate verification - should be bad request for already verified
 	req := httptest.NewRequest(http.MethodDelete, "/v2/verify", nil)
 	req.Header.Set("Authorization", "Bearer "+*verificationToken)
 	resp := util.ExecuteTestRequest(req, suite.router)
@@ -689,8 +641,6 @@ func (suite *VerificationTestSuite) TestVerifyDeleteAlreadyVerified() {
 }
 
 func (suite *VerificationTestSuite) TestVerifyCompleteRegistrationIntentAfterWrongCodes() {
-	suite.SetupController(true, false)
-
 	verification, err := suite.ds.CreateVerification("test@example.com", util.AccountsServiceName, datastore.RegistrationIntent)
 	suite.Require().NoError(err)
 
@@ -741,6 +691,22 @@ func (suite *VerificationTestSuite) TestVerifyCompleteRegistrationIntentAfterWro
 	retrySessionID, _, err := suite.jwtService.ValidateAuthToken(*retryResult.AuthToken)
 	suite.Require().NoError(err)
 	suite.Equal(firstSessionID, retrySessionID)
+}
+
+func (suite *VerificationTestSuite) TestVerifyInitUnverifiedAccount() {
+	email := "test@example.com"
+	account, err := suite.ds.GetOrCreateAccount(email)
+	suite.Require().NoError(err)
+	suite.Nil(account.LastEmailVerifiedAt)
+
+	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", controllers.VerifyInitRequest{
+		Email:   email,
+		Intent:  "reset_password",
+		Service: "accounts",
+		Locale:  "en-US",
+	}), suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrAccountDoesNotExist.Code)
 }
 
 func TestVerificationTestSuite(t *testing.T) {

@@ -2,9 +2,9 @@ package datastore
 
 import (
 	"crypto/rand"
+	"encoding/base32"
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/brave/accounts/util"
@@ -33,56 +33,43 @@ type Verification struct {
 	EmailAttempts int16
 	// CodeAttempts tracks the number of wrong-code submission attempts
 	CodeAttempts int16
+	// IsInvalidated indicates whether the verification has been invalidated
+	IsInvalidated bool
 	// CreatedAt records when the verification was initiated
 	CreatedAt time.Time `gorm:"<-:update"`
 }
 
 const (
-	AuthTokenIntent      = "auth_token"
 	VerificationIntent   = "verification"
 	RegistrationIntent   = "registration"
 	ResetPasswordIntent  = "reset_password"
 	ChangePasswordIntent = "change_password"
 
+	codeLength              = 6
 	VerificationExpiration  = 15 * time.Minute
 	maxPendingVerifications = 3
+	maxDailyVerifications   = 10
 	MaxCodeAttempts         = 5
 )
 
-const (
-	codeAlphabetFull  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234679" // 32 chars
-	codeAlphabetDigit = "234679"                           // 6 chars
-	codePattern       = "FFDFFD"                           // F = Full, D = Digit
-)
+func (d *Datastore) validVerificationModel(v *Verification) *gorm.DB {
+	if v == nil {
+		v = &Verification{}
+	}
+	return d.DB.Model(v).Where("is_invalidated = false")
+}
 
-func generateVerificationCode(pattern string) (string, error) {
-	if len(pattern) == 0 {
-		return "", fmt.Errorf("code pattern must not be empty")
+func generateVerificationCode() (string, error) {
+	b := make([]byte, codeLength)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to generate random code: %w", err)
 	}
-	out := make([]byte, len(pattern))
-	for i, char := range pattern {
-		var alphabet string
-		switch char {
-		case 'F':
-			alphabet = codeAlphabetFull
-		case 'D':
-			alphabet = codeAlphabetDigit
-		default:
-			return "", fmt.Errorf("invalid code pattern char %q", char)
-		}
-		idx, err := rand.Int(rand.Reader, big.NewInt(int64(len(alphabet))))
-		if err != nil {
-			return "", fmt.Errorf("failed to generate random code: %w", err)
-		}
-		// Map random number to char in alphabet for the current position
-		out[i] = alphabet[idx.Int64()]
-	}
-	return string(out), nil
+	return base32.StdEncoding.EncodeToString(b)[:codeLength], nil
 }
 
 // CreateVerification creates a new verification record
 func (d *Datastore) CreateVerification(email string, service string, intent string) (*Verification, error) {
-	code, err := generateVerificationCode(codePattern)
+	code, err := generateVerificationCode()
 	if err != nil {
 		return nil, err
 	}
@@ -103,20 +90,48 @@ func (d *Datastore) CreateVerification(email string, service string, intent stri
 		Verified:      false,
 	}
 
-	var existingCount int64
-	if err := d.DB.Model(&Verification{}).
-		Where("email = ? AND verified = false AND created_at > ?",
-			email,
-			time.Now().Add(-VerificationExpiration)).
-		Count(&existingCount).Error; err != nil {
-		return nil, fmt.Errorf("error counting verifications: %w", err)
-	}
+	// Serialize concurrent verification creation for the same email so the
+	// pending/daily count checks below cannot race with concurrent inserts.
+	err = d.DB.Transaction(func(tx *gorm.DB) error {
+		// Take a transaction-scoped advisory lock keyed on the email; released on commit/rollback.
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?)::bigint)", email).Error; err != nil {
+			return fmt.Errorf("error acquiring verification lock: %w", err)
+		}
 
-	if existingCount >= maxPendingVerifications {
-		return nil, util.ErrTooManyVerifications
-	}
-	if err := d.DB.Create(&verification).Error; err != nil {
-		return nil, fmt.Errorf("error creating verification: %w", err)
+		// Enforce daily cap across all verifications for this email
+		var dailyCount int64
+		if err := tx.Model(&Verification{}).
+			Where("email = ? AND created_at >= ?", email, time.Now().UTC().Add(-24 * time.Hour)).
+			Count(&dailyCount).Error; err != nil {
+			return fmt.Errorf("error counting daily verifications: %w", err)
+		}
+
+		if dailyCount >= maxDailyVerifications {
+			return util.ErrDailyVerificationLimitReached
+		}
+
+		// Reject if too many unverified verifications are still pending
+		var existingCount int64
+		if err := d.validVerificationModel(nil).
+			Where("email = ? AND verified = false AND created_at > ?",
+				email,
+				time.Now().UTC().Add(-VerificationExpiration)).
+			Count(&existingCount).Error; err != nil {
+			return fmt.Errorf("error counting verifications: %w", err)
+		}
+
+		if existingCount >= maxPendingVerifications {
+			return util.ErrTooManyVerifications
+		}
+
+		if err := tx.Create(&verification).Error; err != nil {
+			return fmt.Errorf("error creating verification: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return &verification, nil
@@ -124,7 +139,7 @@ func (d *Datastore) CreateVerification(email string, service string, intent stri
 
 // MarkVerificationAsComplete marks the verification as verified
 func (d *Datastore) MarkVerificationAsComplete(id uuid.UUID) error {
-	result := d.DB.Model(&Verification{}).
+	result := d.validVerificationModel(nil).
 		Where("id = ?", id).
 		Update("verified", true)
 
@@ -139,10 +154,10 @@ func (d *Datastore) MarkVerificationAsComplete(id uuid.UUID) error {
 	return nil
 }
 
-// GetVerificationStatus fetches the verification record by ID, returning an error if expired or not found
+// GetVerificationStatus fetches the verification record by ID, returning an error if expired, invalidated, or not found
 func (d *Datastore) GetVerificationStatus(id uuid.UUID) (*Verification, error) {
 	var verification Verification
-	if err := d.DB.First(&verification, "id = ?", id).Error; err != nil {
+	if err := d.validVerificationModel(nil).First(&verification, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, util.ErrVerificationNotFound
 		}
@@ -150,19 +165,18 @@ func (d *Datastore) GetVerificationStatus(id uuid.UUID) (*Verification, error) {
 	}
 
 	if time.Since(verification.CreatedAt) > VerificationExpiration {
-		if err := d.DB.Delete(&verification).Error; err != nil {
-			return nil, fmt.Errorf("error deleting expired verification: %w", err)
-		}
 		return nil, util.ErrVerificationNotFound
 	}
 
 	return &verification, nil
 }
 
-func (d *Datastore) DeleteVerification(id uuid.UUID) error {
-	result := d.DB.Delete(&Verification{}, "id = ?", id)
+func (d *Datastore) InvalidateVerification(id uuid.UUID) error {
+	result := d.validVerificationModel(nil).
+		Where("id = ?", id).
+		Update("is_invalidated", true)
 	if result.Error != nil {
-		return fmt.Errorf("failed to delete verification: %w", result.Error)
+		return fmt.Errorf("failed to invalidate verification: %w", result.Error)
 	}
 
 	if result.RowsAffected == 0 {
@@ -173,7 +187,7 @@ func (d *Datastore) DeleteVerification(id uuid.UUID) error {
 }
 
 func (d *Datastore) SetVerificationNewSessionID(id uuid.UUID, sessionID uuid.UUID) error {
-	result := d.DB.Model(&Verification{}).
+	result := d.validVerificationModel(nil).
 		Where("id = ?", id).
 		Update("new_session_id", sessionID)
 
@@ -188,17 +202,19 @@ func (d *Datastore) SetVerificationNewSessionID(id uuid.UUID, sessionID uuid.UUI
 	return nil
 }
 
-func (d *Datastore) DeleteVerificationsByNewSessionID(sessionID uuid.UUID) error {
-	result := d.DB.Delete(&Verification{}, "new_session_id = ?", sessionID)
+func (d *Datastore) InvalidateVerificationsByNewSessionID(sessionID uuid.UUID) error {
+	result := d.validVerificationModel(nil).
+		Where("new_session_id = ?", sessionID).
+		Update("is_invalidated", true)
 	if result.Error != nil {
-		return fmt.Errorf("failed to delete verifications by session id: %w", result.Error)
+		return fmt.Errorf("failed to invalidate verifications by session id: %w", result.Error)
 	}
 
 	return nil
 }
 
 func (d *Datastore) IncrementVerificationEmailAttempts(id uuid.UUID) error {
-	result := d.DB.Model(&Verification{}).
+	result := d.validVerificationModel(nil).
 		Where("id = ?", id).
 		Update("email_attempts", gorm.Expr("email_attempts + 1"))
 
@@ -214,7 +230,7 @@ func (d *Datastore) IncrementVerificationEmailAttempts(id uuid.UUID) error {
 }
 
 func (d *Datastore) DecrementVerificationEmailAttempts(id uuid.UUID) error {
-	result := d.DB.Model(&Verification{}).
+	result := d.validVerificationModel(nil).
 		Where("id = ?", id).
 		Update("email_attempts", gorm.Expr("email_attempts - 1"))
 
@@ -231,7 +247,7 @@ func (d *Datastore) DecrementVerificationEmailAttempts(id uuid.UUID) error {
 
 func (d *Datastore) IncrementVerificationCodeAttempts(id uuid.UUID) (int16, error) {
 	var verification Verification
-	result := d.DB.Model(&verification).
+	result := d.validVerificationModel(&verification).
 		Clauses(clause.Returning{Columns: []clause.Column{{Name: "code_attempts"}}}).
 		Where("id = ?", id).
 		Update("code_attempts", gorm.Expr("code_attempts + 1"))

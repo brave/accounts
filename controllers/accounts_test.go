@@ -48,7 +48,7 @@ func (suite *AccountsTestSuite) SetupTest() {
 	suite.T().Setenv("OPAQUE_SECRET_KEY", "4355f8e6f9ec41649fbcdbcca5075a97dafc4c8d8eb8cc2ba286be7b1c938d05")
 	suite.T().Setenv("OPAQUE_PUBLIC_KEY", "98584585210c1f310e9d0aeb9ac1384b7d51808cfaf21b17b5e3dc8d35dbfb00")
 
-	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, false, true)
+	suite.ds, err = datastore.NewDatastore(datastore.PasswordAuthSessionVersion, false, true)
 	suite.Require().NoError(err)
 
 	if suite.useKeyService {
@@ -61,7 +61,7 @@ func (suite *AccountsTestSuite) SetupTest() {
 	suite.Require().NoError(err)
 	twoFAService := services.NewTwoFAService(suite.ds, false)
 	suite.sesMock = &MockSESService{}
-	suite.verificationService = services.NewVerificationService(suite.ds, suite.jwtService, suite.sesMock, true, true)
+	suite.verificationService = services.NewVerificationService(suite.ds, suite.jwtService, suite.sesMock)
 	suite.controller = controllers.NewAccountsController(opaqueService, suite.jwtService, twoFAService, suite.ds, suite.verificationService, suite.sesMock)
 
 	suite.opaqueClient, err = opaque.NewClient(opaqueService.Config)
@@ -80,7 +80,7 @@ func (suite *AccountsTestSuite) TearDownTest() {
 }
 
 func (suite *AccountsTestSuite) SetupRouter(accountDeletionEnabled bool) {
-	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion, true, true)
+	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.PasswordAuthSessionVersion, true, true)
 	verificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds, true)
 	permissiveVerificationAuthMiddleware := middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds, false)
 	suite.router = chi.NewRouter()
@@ -95,7 +95,7 @@ func (suite *AccountsTestSuite) createAuthSession() (string, *datastore.Account)
 	suite.Require().NoError(err)
 
 	// Create test account session
-	session, err := suite.ds.CreateSession(account.ID, datastore.EmailAuthSessionVersion, "")
+	session, err := suite.ds.CreateSession(account.ID, datastore.PasswordAuthSessionVersion, "")
 	suite.Require().NoError(err)
 	token, err := suite.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
 	suite.Require().NoError(err)
@@ -382,7 +382,7 @@ func (suite *AccountsTestSuite) TestChangePassword() {
 
 		// Create sessions to verify session invalidation or lack thereof
 		for range 3 {
-			_, err := suite.ds.CreateSession(account.ID, datastore.EmailAuthSessionVersion, "")
+			_, err := suite.ds.CreateSession(account.ID, datastore.PasswordAuthSessionVersion, "")
 			suite.Require().NoError(err)
 		}
 
@@ -465,30 +465,26 @@ func (suite *AccountsTestSuite) TestChangePassword() {
 }
 
 func (suite *AccountsTestSuite) TestSetPasswordBadIntents() {
-	intents := []string{"verification", "auth_token"}
+	verification, err := suite.ds.CreateVerification("test@example.com", "accounts", "verification")
+	suite.Require().NoError(err)
+	err = suite.ds.MarkVerificationAsComplete(verification.ID)
+	suite.Require().NoError(err)
 
-	for _, intent := range intents {
-		verification, err := suite.ds.CreateVerification("test@example.com", "accounts", intent)
-		suite.Require().NoError(err)
-		err = suite.ds.MarkVerificationAsComplete(verification.ID)
-		suite.Require().NoError(err)
+	token, err := suite.jwtService.CreateVerificationToken(verification.ID, time.Minute*30, verification.Service)
+	suite.Require().NoError(err)
 
-		token, err := suite.jwtService.CreateVerificationToken(verification.ID, time.Minute*30, verification.Service)
-		suite.Require().NoError(err)
+	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
 
-		registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
+		BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse:     true,
+		InitiatingServiceName: util.AccountsServiceName,
+	})
+	req.Header.Set("Authorization", "Bearer "+token)
 
-		req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-			BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
-			SerializeResponse:     true,
-			InitiatingServiceName: util.AccountsServiceName,
-		})
-		req.Header.Set("Authorization", "Bearer "+token)
-
-		resp := util.ExecuteTestRequest(req, suite.router)
-		suite.Equal(http.StatusForbidden, resp.Code)
-		util.AssertErrorResponseCode(suite.T(), resp, util.ErrIncorrectVerificationIntent.Code)
-	}
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusForbidden, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrIncorrectVerificationIntent.Code)
 }
 
 func (suite *AccountsTestSuite) TestSetPasswordUnverifiedEmail() {

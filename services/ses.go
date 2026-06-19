@@ -224,9 +224,6 @@ func (s *SESService) SendVerificationEmail(ctx context.Context, email string, ve
 	var subjectMessageID string
 	var instructionsMessageID string
 	switch verification.Intent {
-	case datastore.AuthTokenIntent:
-		subjectMessageID = "LoginEmailSubject"
-		instructionsMessageID = "LoginEmailInstructions"
 	case datastore.VerificationIntent:
 		subjectMessageID = "VerifyEmailSubject"
 		instructionsMessageID = "VerifyEmailInstructions"
@@ -276,6 +273,7 @@ func (s *SESService) SendPasswordChangeNotification(ctx context.Context, email s
 	localizer := i18n.NewLocalizer(s.i18nBundle, locale)
 
 	fields, effectiveLocale := newEmailFields(localizer, "PasswordChangeNotificationSubject")
+	fields.Disregard = localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "PasswordChangeNotificationDisregard"})
 	data := similarEmailFields{
 		emailFields: fields,
 		Message:     localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "PasswordChangeNotificationMessage"}),

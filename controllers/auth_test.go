@@ -48,7 +48,7 @@ func (suite *AuthTestSuite) SetupTest() {
 	suite.T().Setenv("OPAQUE_PUBLIC_KEY", "98584585210c1f310e9d0aeb9ac1384b7d51808cfaf21b17b5e3dc8d35dbfb00")
 	suite.T().Setenv("OPAQUE_FAKE_RECORD", "false")
 
-	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, false, true)
+	suite.ds, err = datastore.NewDatastore(datastore.PasswordAuthSessionVersion, false, true)
 	suite.Require().NoError(err)
 
 	if suite.useKeyService {
@@ -86,7 +86,7 @@ func (suite *AuthTestSuite) SetupTest() {
 	err = suite.ds.UpdateAccountLastEmailVerifiedAt(suite.account.ID)
 	suite.Require().NoError(err)
 
-	suite.SetupRouter(true)
+	suite.SetupRouter()
 }
 
 func (suite *AuthTestSuite) TearDownTest() {
@@ -97,12 +97,12 @@ func (suite *AuthTestSuite) TearDownTest() {
 	util.TestKeyServiceRouter = nil
 }
 
-func (suite *AuthTestSuite) SetupRouter(passwordAuthEnabled bool) {
-	validateAuthMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion, false, true)
-	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.EmailAuthSessionVersion, true, true)
+func (suite *AuthTestSuite) SetupRouter() {
+	validateAuthMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.PasswordAuthSessionVersion, false, true)
+	authMiddleware := middleware.AuthMiddleware(suite.jwtService, suite.ds, datastore.PasswordAuthSessionVersion, true, true)
 
 	suite.router = chi.NewRouter()
-	suite.router.Mount("/v2/auth", suite.controller.Router(authMiddleware, validateAuthMiddleware, passwordAuthEnabled))
+	suite.router.Mount("/v2/auth", suite.controller.Router(authMiddleware, validateAuthMiddleware))
 }
 
 func (suite *AuthTestSuite) createLoginFinalizeRequest(opaqueClient *opaque.Client, serializedKE2Hex string) controllers.LoginFinalizeRequest {
@@ -154,7 +154,7 @@ func (suite *AuthTestSuite) TestAuthValidateDeletesVerificationWithSession() {
 
 func (suite *AuthTestSuite) TestAuthValidate() {
 	// Create test account session
-	session, err := suite.ds.CreateSession(suite.account.ID, datastore.EmailAuthSessionVersion, "")
+	session, err := suite.ds.CreateSession(suite.account.ID, datastore.PasswordAuthSessionVersion, "")
 	suite.Require().NoError(err)
 	token, err := suite.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
 	suite.Require().NoError(err)
@@ -385,41 +385,9 @@ func (suite *AuthTestSuite) TestAuthLoginExpiredLoginState() {
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrInterimPasswordStateExpired.Code)
 }
 
-func (suite *AuthTestSuite) TestPasswordAuthEndpointsDisabled() {
-	// Setup router with password auth disabled
-	suite.SetupRouter(false)
-
-	// Try accessing password auth endpoints, expect 404s
-	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/auth/login/init", nil), suite.router)
-	suite.Equal(404, resp.Code)
-
-	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/auth/login/finalize", nil), suite.router)
-	suite.Equal(404, resp.Code)
-
-	// Validate endpoint should still work
-	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/auth/validate", nil), suite.router)
-	suite.NotEqual(404, resp.Code)
-}
-
-func (suite *AuthTestSuite) TestPasswordAuthEndpointsEnabled() {
-	// Setup router with password auth enabled
-	suite.SetupRouter(true)
-
-	// Try accessing password auth endpoints, expect not-404s
-	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/auth/login/init", nil), suite.router)
-	suite.NotEqual(404, resp.Code)
-
-	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/auth/login/finalize", nil), suite.router)
-	suite.NotEqual(404, resp.Code)
-
-	// Validate endpoint should work
-	resp = util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/auth/validate", nil), suite.router)
-	suite.NotEqual(404, resp.Code)
-}
-
 func (suite *AuthTestSuite) TestCreateServiceToken() {
 	// Create test session and token
-	session, err := suite.ds.CreateSession(suite.account.ID, datastore.EmailAuthSessionVersion, "")
+	session, err := suite.ds.CreateSession(suite.account.ID, datastore.PasswordAuthSessionVersion, "")
 	suite.Require().NoError(err)
 	token, err := suite.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
 	suite.Require().NoError(err)

@@ -10,11 +10,9 @@ import (
 )
 
 type VerificationService struct {
-	datastore           *datastore.Datastore
-	jwtService          *JWTService
-	sesService          SES
-	passwordAuthEnabled bool
-	emailAuthEnabled    bool
+	datastore  *datastore.Datastore
+	jwtService *JWTService
+	sesService SES
 }
 
 type VerificationResult struct {
@@ -23,13 +21,11 @@ type VerificationResult struct {
 	Service   string
 }
 
-func NewVerificationService(datastore *datastore.Datastore, jwtService *JWTService, sesService SES, passwordAuthEnabled bool, emailAuthEnabled bool) *VerificationService {
+func NewVerificationService(datastore *datastore.Datastore, jwtService *JWTService, sesService SES) *VerificationService {
 	return &VerificationService{
-		datastore:           datastore,
-		jwtService:          jwtService,
-		sesService:          sesService,
-		passwordAuthEnabled: passwordAuthEnabled,
-		emailAuthEnabled:    emailAuthEnabled,
+		datastore:  datastore,
+		jwtService: jwtService,
+		sesService: sesService,
 	}
 }
 
@@ -37,19 +33,15 @@ func (vs *VerificationService) InitializeVerification(ctx context.Context, email
 	// Validate intent
 	intentAllowed := true
 	switch intent {
-	case datastore.AuthTokenIntent:
-		if !vs.emailAuthEnabled || service != util.EmailAliasesServiceName {
-			intentAllowed = false
-		}
 	case datastore.VerificationIntent:
 		// All services are allowed to verify email addresses
 		intentAllowed = true
 	case datastore.RegistrationIntent, datastore.ResetPasswordIntent:
-		if !vs.passwordAuthEnabled || service != util.AccountsServiceName {
+		if service != util.AccountsServiceName {
 			intentAllowed = false
 		}
 	case datastore.ChangePasswordIntent:
-		if !vs.passwordAuthEnabled || service != util.AccountsServiceName {
+		if service != util.AccountsServiceName {
 			intentAllowed = false
 		}
 		// A valid auth session is required because we allow the user to choose whether
@@ -83,8 +75,10 @@ func (vs *VerificationService) InitializeVerification(ctx context.Context, email
 			}
 			return nil, nil, util.ErrAccountExists
 		}
-		if (intent == datastore.ResetPasswordIntent || intent == datastore.ChangePasswordIntent) && !accountExists {
-			return nil, nil, util.ErrAccountDoesNotExist
+		if intent == datastore.ResetPasswordIntent || intent == datastore.ChangePasswordIntent {
+			if !accountExists || account.LastEmailVerifiedAt == nil {
+				return nil, nil, util.ErrAccountDoesNotExist
+			}
 		}
 	}
 
@@ -107,7 +101,7 @@ func (vs *VerificationService) SendVerificationEmail(ctx context.Context, verifi
 	// Send verification email
 	if err := vs.sesService.SendVerificationEmail(ctx, verification.Email, verification, locale); err != nil {
 		if errors.Is(err, util.ErrFailedToSendEmailInvalidFormat) {
-			if vs.datastore.DeleteVerification(verification.ID) != nil {
+			if vs.datastore.InvalidateVerification(verification.ID) != nil {
 				// Don't override the more descriptive error code and let cron handle the cleanup
 				_ = true
 			}
@@ -120,7 +114,7 @@ func (vs *VerificationService) SendVerificationEmail(ctx context.Context, verifi
 }
 
 func (vs *VerificationService) CompleteVerification(verification *datastore.Verification, code string, userAgent string) (*VerificationResult, error) {
-	producesAuthToken := verification.Intent == datastore.AuthTokenIntent || verification.Intent == datastore.RegistrationIntent
+	producesAuthToken := verification.Intent == datastore.RegistrationIntent
 
 	if verification.Verified && !producesAuthToken {
 		return nil, util.ErrEmailAlreadyVerified
@@ -156,11 +150,7 @@ func (vs *VerificationService) CompleteVerification(verification *datastore.Veri
 				return nil, err
 			}
 
-			sessionVersion := datastore.EmailAuthSessionVersion
-			if verification.Intent == datastore.RegistrationIntent {
-				sessionVersion = datastore.PasswordAuthSessionVersion
-			}
-			session, err := vs.datastore.CreateSession(account.ID, sessionVersion, userAgent)
+			session, err := vs.datastore.CreateSession(account.ID, datastore.PasswordAuthSessionVersion, userAgent)
 			if err != nil {
 				return nil, err
 			}

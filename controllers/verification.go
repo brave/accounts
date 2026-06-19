@@ -34,7 +34,7 @@ type VerifyInitRequest struct {
 	// Email address to verify
 	Email string `json:"email" validate:"required,email,ascii,max=254" example:"test@example.com"`
 	// Purpose of verification (e.g., get auth token, simple verification)
-	Intent string `json:"intent" validate:"required,oneof=auth_token verification reset_password change_password" example:"reset_password"`
+	Intent string `json:"intent" validate:"required,oneof=verification reset_password change_password" example:"reset_password"`
 	// Service requesting the verification
 	Service string `json:"service" validate:"required,oneof=accounts premium email-aliases" example:"accounts"`
 	// Locale for verification email
@@ -110,7 +110,6 @@ func (vc *VerificationController) Router(verificationAuthMiddleware func(http.Ha
 // @Summary Initialize email verification
 // @Description Starts email verification process by sending a verification email
 // @Description One of the following intents must be provided with the request:
-// @Description - `auth_token`: After verification, create an account if one does not exist, and generate an auth token. The token will be available via the "query result" endpoint.
 // @Description - `verification`: After verification, do not create an account, but indicate that the email was verified in the "query result" response. Do not allow registration after verification.
 // @Description - `reset_password`: After verification, indicate that the email was verified in the "query result" response. A password may be set for the existing account.
 // @Description - `change_password`: After verification, indicate that the email was verified in the "query result" response. A password may be changed for the existing account. Requires a valid auth session.
@@ -146,6 +145,7 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 
 	if err != nil {
 		if errors.Is(err, util.ErrTooManyVerifications) ||
+			errors.Is(err, util.ErrDailyVerificationLimitReached) ||
 			errors.Is(err, util.ErrIntentNotAllowed) ||
 			errors.Is(err, util.ErrEmailDomainNotSupported) ||
 			errors.Is(err, util.ErrAccountExists) ||
@@ -200,7 +200,7 @@ func (vc *VerificationController) VerifyDelete(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if err := vc.datastore.DeleteVerification(verification.ID); err != nil {
+	if err := vc.datastore.InvalidateVerification(verification.ID); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}

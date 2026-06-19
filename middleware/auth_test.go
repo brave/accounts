@@ -30,7 +30,7 @@ func TestMiddlewareTestSuite(t *testing.T) {
 
 func (suite *MiddlewareTestSuite) SetupTest() {
 	var err error
-	suite.ds, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, false, true)
+	suite.ds, err = datastore.NewDatastore(datastore.PasswordAuthSessionVersion, false, true)
 	suite.Require().NoError(err)
 
 	suite.jwtService, err = services.NewJWTService(suite.ds, false)
@@ -48,7 +48,7 @@ func (suite *MiddlewareTestSuite) TestAuthMiddleware() {
 	mw := middleware.AuthMiddleware(suite.jwtService, suite.ds, 1, true, true)
 
 	// Create test token
-	session, err := suite.ds.CreateSession(suite.account.ID, datastore.EmailAuthSessionVersion, "")
+	session, err := suite.ds.CreateSession(suite.account.ID, datastore.PasswordAuthSessionVersion, "")
 	suite.Require().NoError(err)
 	token, err := suite.jwtService.CreateAuthToken(session.ID, nil, util.AccountsServiceName)
 	suite.Require().NoError(err)
@@ -93,7 +93,7 @@ func (suite *MiddlewareTestSuite) TestAuthMiddleware() {
 	suite.Equal(http.StatusUnauthorized, resp.Code)
 
 	// Test outdated session version
-	mw = middleware.AuthMiddleware(suite.jwtService, suite.ds, 2, true, true)
+	mw = middleware.AuthMiddleware(suite.jwtService, suite.ds, 3, true, true)
 	req = httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp = util.ExecuteTestRequest(req, mw(handler))
@@ -187,6 +187,51 @@ func (suite *MiddlewareTestSuite) TestServicesKeyMiddleware() {
 	req = httptest.NewRequest("GET", "/", nil)
 	resp = util.ExecuteTestRequest(req, mw(handler))
 	suite.Equal(http.StatusUnauthorized, resp.Code)
+}
+
+func (suite *MiddlewareTestSuite) TestAuthMiddlewareTokenErrors() {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	session, err := suite.ds.CreateSession(suite.account.ID, datastore.PasswordAuthSessionVersion, "")
+	suite.Require().NoError(err)
+	expiration := -time.Minute
+	expiredAuthToken, err := suite.jwtService.CreateAuthToken(session.ID, &expiration, util.AccountsServiceName)
+	suite.Require().NoError(err)
+
+	verification, err := suite.ds.CreateVerification("test@example.com", "email-aliases", "verification")
+	suite.Require().NoError(err)
+	expiredVerificationToken, err := suite.jwtService.CreateVerificationToken(verification.ID, -time.Minute, verification.Service)
+	suite.Require().NoError(err)
+
+	middlewares := []http.Handler{
+		middleware.AuthMiddleware(suite.jwtService, suite.ds, 1, false, true)(handler),
+		middleware.VerificationAuthMiddleware(suite.jwtService, suite.ds, true)(handler),
+	}
+	expiredTokens := []string{expiredAuthToken, expiredVerificationToken}
+
+	for i, mw := range middlewares {
+		// Missing token
+		req := httptest.NewRequest("GET", "/", nil)
+		resp := util.ExecuteTestRequest(req, mw)
+		suite.Equal(http.StatusUnauthorized, resp.Code)
+		util.AssertErrorResponseCode(suite.T(), resp, util.ErrMissingToken.Code)
+
+		// Invalid token
+		req = httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer notavalidtoken")
+		resp = util.ExecuteTestRequest(req, mw)
+		suite.Equal(http.StatusUnauthorized, resp.Code)
+		util.AssertErrorResponseCode(suite.T(), resp, util.ErrInvalidToken.Code)
+
+		// Expired token
+		req = httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("Authorization", "Bearer "+expiredTokens[i])
+		resp = util.ExecuteTestRequest(req, mw)
+		suite.Equal(http.StatusUnauthorized, resp.Code)
+		util.AssertErrorResponseCode(suite.T(), resp, util.ErrExpiredToken.Code)
+	}
 }
 
 func (suite *MiddlewareTestSuite) TestVerificationAuthMiddleware() {

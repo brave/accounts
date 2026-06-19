@@ -16,7 +16,7 @@ func initKeyServiceForTest(t *testing.T, keyServiceDs **datastore.Datastore, ds 
 	t.Setenv("KEY_SERVICE_URL", "http://localhost:8080")
 	t.Setenv("KEY_SERVICE_SECRET", "abc123")
 	var err error
-	*keyServiceDs, err = datastore.NewDatastore(datastore.EmailAuthSessionVersion, true, true)
+	*keyServiceDs, err = datastore.NewDatastore(datastore.PasswordAuthSessionVersion, true, true)
 	require.NoError(t, err)
 	_, err = (*keyServiceDs).GetOrCreateJWTKeys(true, true)
 	require.NoError(t, err)

@@ -22,8 +22,6 @@ View API documentation at http://localhost:8080/swagger/index.html.
 | BASE_URL | Yes | Base URL of the service |
 | OPAQUE_SECRET_KEY | Yes | OPAQUE server secret key |
 | OPAQUE_PUBLIC_KEY | Yes | OPAQUE server public key |
-| PASSWORD_AUTH_ENABLED | Yes | Enable password authentication if set to 'true' |
-| EMAIL_AUTH_ENABLED | Yes | Enable email `auth_token` authentication if set to 'true' |
 | RDS_ROLE | Yes (if RDS is being used) | The AWS IAM role ARN to assume for RDS access |
 | RDS_DATABASE_PORT | Yes (if RDS is being used) | The port number for the RDS database connection |
 | RDS_WRITER_ENDPOINT | Yes (if RDS is being used) | The endpoint URL for the RDS writer instance |
