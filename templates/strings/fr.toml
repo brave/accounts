@@ -55,7 +55,7 @@ other = "Si vous n’êtes pas à l’origine de cette demande, veuillez ignorer
 
 [EmailCopyright]
 description = "Brave copyright notice"
-other = "Droit d’auteur © {{.Year}} Brave Software Inc."
+other = "Copyright © {{.Year}} Brave Software Inc."
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
@@ -87,4 +87,4 @@ other = "Le mot de passe de votre compte Brave a été modifié avec succès. Si
 
 [PasswordChangeNotificationDisregard]
 description = "Footer for password change notification email reassuring the user if they made the change"
-other = "If you did make this change, no further action is required."
+other = "Si vous avez effectivement procédé à cette modification, aucune autre action n'est nécessaire."
