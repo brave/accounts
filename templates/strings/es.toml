@@ -4,11 +4,11 @@ other = "Verifica tu correo electrónico"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
-other = "Establece una nueva contraseña para tu cuenta de Brave"
+other = "Establece una nueva contraseña para tu cuenta Brave"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
-other = "Crea tu cuenta de Brave"
+other = "Crea tu cuenta Brave"
 
 [EmailGreeting]
 description = "Greeting in the email message"
@@ -16,15 +16,15 @@ other = "Hola,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Aquí tienes el código que necesitarás para verificar tu dirección de correo electrónico y establecer una nueva contraseña para tu cuenta de Brave."
+other = "Este es el código que necesitarás para verificar tu dirección de correo electrónico y establecer una nueva contraseña para tu cuenta Brave."
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Aquí tienes el código que necesitarás para verificar tu dirección de correo electrónico y crear tu cuenta de Brave."
+other = "Este es el código que necesitarás para verificar tu dirección de correo electrónico y crear tu cuenta Brave."
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Aquí tienes el código que necesitarás para verificar tu dirección de correo electrónico."
+other = "Este es el código que necesitarás para verificar tu dirección de correo electrónico."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
@@ -32,26 +32,26 @@ other = "Tu código de verificación:"
 
 [VerifyEmailExpiryDisclaimer]
 description = "Informs the user how many minutes until the verification code expires"
-other = "Nota: este código vence en {{.Minutes}} minutos."
+other = "Nota: Este código caducará en {{.Minutes}} minutos."
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
-Parece que ya tienes una cuenta registrada con este correo electrónico: {{.Email}}.
+Parece que ya tienes una cuenta registrada con este email: {{.Email}}.
 
-Intenta iniciar sesión con esta dirección de correo electrónico. Si aún necesitas ayuda, contacta al Soporte de Brave."""
+Intenta iniciar sesión usando esta dirección de correo electrónico. Si todavía necesitas ayuda, ponte en contacto con el soporte de Brave."""
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "¿Tienes problemas? Aquí tienes cómo acceder a tu cuenta de Brave."
+other = "¿Tienes problemas? Aquí tienes cómo acceder a tu cuenta Brave."
 
 [EmailSignature]
 description = "Email signature"
-other = "El equipo de Brave"
+other = "El equipo Brave"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "Si no has hecho esta solicitud, por favor ignora este correo electrónico."
+other = "Si no hiciste esta solicitud, por favor ignora este correo electrónico."
 
 [EmailCopyright]
 description = "Brave copyright notice"
@@ -67,7 +67,7 @@ other = "Política de privacidad"
 
 [EmailTermsOfUse]
 description = "Terms of use link text"
-other = "Términos de uso"
+other = "Condiciones de uso"
 
 [EmailDownloadBrave]
 description = "Brave download link text"
@@ -75,15 +75,15 @@ other = "Descargar Brave"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Contactar al Soporte"
+other = "Contactar con el servicio de asistencia"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Se ha cambiado la contraseña de tu cuenta de Brave"
+other = "La contraseña de tu cuenta Brave ha sido cambiada"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "La contraseña de tu cuenta de Brave se ha cambiado correctamente. Si no has sido tú quien ha realizado este cambio, contacta al Soporte de Brave de inmediato para proteger tu cuenta."
+other = "La contraseña de tu cuenta Brave se ha cambiado correctamente. Si no realizaste este cambio, ponte en contacto con el soporte de Brave inmediatamente para proteger tu cuenta."
 
 [PasswordChangeNotificationDisregard]
 description = "Footer for password change notification email reassuring the user if they made the change"
