@@ -1,90 +1,90 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Vérifiez votre adresse courriel"
+other = "Verifică-ți adresa de e-mail"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
-other = "Créez un nouveau mot de passe pour votre compte Brave"
+other = "Setează o parolă nouă pentru contul tău Brave"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
-other = "Créez votre compte Brave"
+other = "Creează-ți contul Brave"
 
 [EmailGreeting]
 description = "Greeting in the email message"
-other = "Bonjour,"
+other = "Bună,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Voici le code dont vous aurez besoin pour vérifier votre adresse courriel et définir un nouveau mot de passe pour votre compte Brave."
+other = "Iată codul de care vei avea nevoie pentru a-ți verifica adresa de e-mail și pentru a seta o parolă nouă pentru contul tău Brave."
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Voici le code dont vous aurez besoin pour vérifier votre adresse courriel et créer votre compte Brave."
+other = "Iată codul de care vei avea nevoie pentru a-ți verifica adresa de e-mail și pentru a-ți crea contul Brave."
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Voici le code dont vous aurez besoin pour vérifier votre adresse courriel."
+other = "Iată codul de care vei avea nevoie pentru a-ți verifica adresa de e-mail."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
-other = "Votre code de vérification :"
+other = "Codul tău de verificare:"
 
 [VerifyEmailExpiryDisclaimer]
 description = "Informs the user how many minutes until the verification code expires"
-other = "Remarque : Ce code expirera dans {{.Minutes}} minutes."
+other = "Notă: Acest cod va expira în {{.Minutes}} minute."
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
-Il semble qu’un compte est déjà associé à cette adresse courriel : {{.Email}}.
+Se pare că ai deja un cont înregistrat cu această adresă de e-mail: {{.Email}}.
 
-Essayez d’ouvrir une session avec cette adresse courriel. Si vous avez encore besoin d’aide, veuillez communiquer avec le support de Brave."""
+Încearcă să te autentifici folosind această adresă de e-mail. Dacă ai nevoie în continuare de ajutor, contactează echipa de asistență Brave."""
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "Vous éprouvez des difficultés? Voici comment accéder à votre compte Brave."
+other = "Ai probleme? Iată cum îți poți accesa contul Brave."
 
 [EmailSignature]
 description = "Email signature"
-other = "L’équipe de Brave"
+other = "Echipa Brave"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "Si vous n’êtes pas à l’origine de cette demande, veuillez ignorer ce courriel."
+other = "Dacă nu ai făcut această solicitare, te rugăm să ignori acest e-mail."
 
 [EmailCopyright]
 description = "Brave copyright notice"
-other = "Copyright © {{.Year}} Brave Software Inc."
+other = "Drepturi de autor © {{.Year}} Brave Software Inc."
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
-other = "Tous droits réservés"
+other = "Toate drepturile rezervate"
 
 [EmailPrivacyPolicy]
 description = "Privacy policy link text"
-other = "Politique de confidentialité"
+other = "Politica de confidențialitate"
 
 [EmailTermsOfUse]
 description = "Terms of use link text"
-other = "Conditions d’utilisation"
+other = "Termeni de utilizare"
 
 [EmailDownloadBrave]
 description = "Brave download link text"
-other = "Télécharger Brave"
+other = "Descarcă Brave"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Communiquer avec le support"
+other = "Contactează echipa de asistență"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Le mot de passe de votre compte Brave a été modifié"
+other = "Parola contului tău Brave a fost schimbată"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Le mot de passe de votre compte Brave a été modifié avec succès. Si vous n’êtes pas à l’origine de cette modification, veuillez communiquer immédiatement avec le support Brave afin de protéger votre compte."
+other = "Parola contului tău Brave a fost schimbată cu succes. Dacă nu ai efectuat această modificare, contactează imediat echipa de asistență Brave pentru a-ți securiza contul."
 
 [PasswordChangeNotificationDisregard]
 description = "Footer for password change notification email reassuring the user if they made the change"
-other = "Si vous avez effectivement procédé à cette modification, aucune autre action n'est nécessaire."
+other = "If you did make this change, no further action is required."

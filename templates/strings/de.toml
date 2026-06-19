@@ -1,57 +1,57 @@
 [VerifyEmailSubject]
 description = "Email subject for email verification"
-other = "Vérifiez votre adresse courriel"
+other = "Verifizieren Sie Ihre E-Mail-Adresse"
 
 [SetPasswordEmailSubject]
 description = "Email subject for setting a new password"
-other = "Créez un nouveau mot de passe pour votre compte Brave"
+other = "Legen Sie ein neues Passwort für Ihr Brave-Konto fest"
 
 [RegistrationEmailSubject]
 description = "Email subject for creating a new account"
-other = "Créez votre compte Brave"
+other = "Erstellen Sie Ihr Brave-Konto"
 
 [EmailGreeting]
 description = "Greeting in the email message"
-other = "Bonjour,"
+other = "Hallo,"
 
 [SetPasswordEmailInstructions]
 description = "Instructions to verify email address and set a new password for an account"
-other = "Voici le code dont vous aurez besoin pour vérifier votre adresse courriel et définir un nouveau mot de passe pour votre compte Brave."
+other = "hiermit erhalten Sie den Code, den Sie benötigen, um Ihre E-Mail-Adresse zu verifizieren und ein neues Passwort für Ihr Brave-Konto festzulegen."
 
 [RegistrationEmailInstructions]
 description = "Instructions to verify email address and create a new account"
-other = "Voici le code dont vous aurez besoin pour vérifier votre adresse courriel et créer votre compte Brave."
+other = "hiermit erhalten Sie den Code, den Sie benötigen, um Ihre E-Mail-Adresse zu verifizieren und Ihr Brave-Konto zu erstellen."
 
 [VerifyEmailInstructions]
 description = "Instructions to verify email address"
-other = "Voici le code dont vous aurez besoin pour vérifier votre adresse courriel."
+other = "hiermit erhalten Sie den Code, den Sie benötigen, um Ihre E-Mail-Adresse zu verifizieren."
 
 [VerifyEmailCode]
 description = "Label preceding the verification code displayed in the email"
-other = "Votre code de vérification :"
+other = "Ihr Verifizierungscode:"
 
 [VerifyEmailExpiryDisclaimer]
 description = "Informs the user how many minutes until the verification code expires"
-other = "Remarque : Ce code expirera dans {{.Minutes}} minutes."
+other = "Hinweis: Dieser Code läuft in {{.Minutes}} Minuten ab."
 
 [SimilarEmailLoginMessage]
 description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
 other = """
-Il semble qu’un compte est déjà associé à cette adresse courriel : {{.Email}}.
+Es scheint, dass Sie bereits ein Konto mit der folgenden E-Mail-Adresse registriert haben: {{.Email}}.
 
-Essayez d’ouvrir une session avec cette adresse courriel. Si vous avez encore besoin d’aide, veuillez communiquer avec le support de Brave."""
+Versuchen Sie, sich mit dieser E-Mail-Adresse anzumelden. Wenn Sie weitere Unterstützung benötigen, kontaktieren Sie bitte den Support von Brave."""
 
 [SimilarEmailSubject]
 description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
-other = "Vous éprouvez des difficultés? Voici comment accéder à votre compte Brave."
+other = "Haben Sie Probleme mit dem Kontozugriff? Hier erfahren Sie, wie Sie auf Ihr Brave-Konto zugreifen."
 
 [EmailSignature]
 description = "Email signature"
-other = "L’équipe de Brave"
+other = "Das Brave-Team"
 
 [EmailDisregard]
 description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
-other = "Si vous n’êtes pas à l’origine de cette demande, veuillez ignorer ce courriel."
+other = "Wenn Sie diese Anfrage nicht gestellt haben, ignorieren Sie bitte diese E-Mail."
 
 [EmailCopyright]
 description = "Brave copyright notice"
@@ -59,32 +59,32 @@ other = "Copyright © {{.Year}} Brave Software Inc."
 
 [EmailAllRightsReserved]
 description = "All rights reserved notice"
-other = "Tous droits réservés"
+other = "Alle Rechte vorbehalten"
 
 [EmailPrivacyPolicy]
 description = "Privacy policy link text"
-other = "Politique de confidentialité"
+other = "Datenschutzrichtlinie"
 
 [EmailTermsOfUse]
 description = "Terms of use link text"
-other = "Conditions d’utilisation"
+other = "Nutzungsbedingungen"
 
 [EmailDownloadBrave]
 description = "Brave download link text"
-other = "Télécharger Brave"
+other = "Brave herunterladen"
 
 [EmailContactSupport]
 description = "Support contact link text"
-other = "Communiquer avec le support"
+other = "Support kontaktieren"
 
 [PasswordChangeNotificationSubject]
 description = "Email subject for password change notification"
-other = "Le mot de passe de votre compte Brave a été modifié"
+other = "Das Passwort für Ihr Brave-Konto wurde geändert"
 
 [PasswordChangeNotificationMessage]
 description = "Email message informing user that their password was changed"
-other = "Le mot de passe de votre compte Brave a été modifié avec succès. Si vous n’êtes pas à l’origine de cette modification, veuillez communiquer immédiatement avec le support Brave afin de protéger votre compte."
+other = "Das Passwort für Ihr Brave-Konto wurde erfolgreich geändert. Wenn Sie diese Änderung nicht veranlasst haben, wenden Sie sich bitte umgehend an den Support von Brave, um Ihr Konto zu schützen."
 
 [PasswordChangeNotificationDisregard]
 description = "Footer for password change notification email reassuring the user if they made the change"
-other = "Si vous avez effectivement procédé à cette modification, aucune autre action n'est nécessaire."
+other = "If you did make this change, no further action is required."

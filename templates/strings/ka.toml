@@ -1,0 +1,90 @@
+[VerifyEmailSubject]
+description = "Email subject for email verification"
+other = "დაადასტურეთ თქვენი ელ-ფოსტა"
+
+[SetPasswordEmailSubject]
+description = "Email subject for setting a new password"
+other = "დააყენეთ ახალი პაროლი თქვენი Brave-ს ანგარიშზე"
+
+[RegistrationEmailSubject]
+description = "Email subject for creating a new account"
+other = "შექმენით თქვენი Brave-ს ანგარიში"
+
+[EmailGreeting]
+description = "Greeting in the email message"
+other = "გამარჯობა,"
+
+[SetPasswordEmailInstructions]
+description = "Instructions to verify email address and set a new password for an account"
+other = "აქ არის კოდი, რომელიც დაგჭირდებათ თქვენი ელ-ფოსტის დასადასტურებლად და Brave ანგარიშისთვის ახალი პაროლის დასაყენებლად."
+
+[RegistrationEmailInstructions]
+description = "Instructions to verify email address and create a new account"
+other = "აქ არის კოდი, რომელიც დაგჭირდებათ თქვენი ელ-ფოსტის დასადასტურებლად და Brave ანგარიშის შესაქმნელად."
+
+[VerifyEmailInstructions]
+description = "Instructions to verify email address"
+other = "აი კოდი, რომელიც თქვენი ელფოსტის მისამართის დასადასტურებლად დაგჭირდებათ."
+
+[VerifyEmailCode]
+description = "Label preceding the verification code displayed in the email"
+other = "თქვენი ვერიფიკაციის კოდი:"
+
+[VerifyEmailExpiryDisclaimer]
+description = "Informs the user how many minutes until the verification code expires"
+other = "გაითვალისწინეთ: ეს კოდი ძალაში იქნება კიდევ {{.Minutes}} წუთის განმავლობაში."
+
+[SimilarEmailLoginMessage]
+description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = """
+როგორც ჩანს, ამ ელფოსტით: {{.Email}}უკვე გაქვთ რეგისტრირებული ანგარიში.
+
+სცადეთ ავტორიზაცია ამ ელფოსტის მისამართით. თუ დახმარება კვლავ გჭირდებათ, გთხოვთ, დაუკავშირდეთ Brave-ს მხარდაჭერას."""
+
+[SimilarEmailSubject]
+description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = "გიჭირთ შესვლა? აი, როგორ მიიღოთ წვდომა თქვენი Brave-ს ანგარიშზე."
+
+[EmailSignature]
+description = "Email signature"
+other = "The Brave გუნდი"
+
+[EmailDisregard]
+description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
+other = "თუ ეს მოთხოვნა თქვენ არ გაგიგზავნიათ, უბრალოდ უგულებელყავით ეს მეილი."
+
+[EmailCopyright]
+description = "Brave copyright notice"
+other = "საავტორო უფლება © {{.Year}} Brave Software Inc."
+
+[EmailAllRightsReserved]
+description = "All rights reserved notice"
+other = "ყველა უფლება დაცულია"
+
+[EmailPrivacyPolicy]
+description = "Privacy policy link text"
+other = "კონფიდენციალურობის პოლიტიკა"
+
+[EmailTermsOfUse]
+description = "Terms of use link text"
+other = "გამოყენების პირობები"
+
+[EmailDownloadBrave]
+description = "Brave download link text"
+other = "Brave-ს გადმოწერა"
+
+[EmailContactSupport]
+description = "Support contact link text"
+other = "დაუკავშირდით მხარდაჭერას"
+
+[PasswordChangeNotificationSubject]
+description = "Email subject for password change notification"
+other = "თქვენი Brave-ს ანგარიშის პაროლი შეიცვალა"
+
+[PasswordChangeNotificationMessage]
+description = "Email message informing user that their password was changed"
+other = "თქვენი Brave ანგარიშის პაროლი წარმატებით შეიცვალა. თუ ეს ცვლილება თქვენ არ განგიხორციელებიათ, ანგარიშის დასაცავად დაუყოვნებლივ დაუკავშირდით Brave-ს მხარდაჭერის გუნდს."
+
+[PasswordChangeNotificationDisregard]
+description = "Footer for password change notification email reassuring the user if they made the change"
+other = "If you did make this change, no further action is required."

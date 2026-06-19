@@ -1,0 +1,90 @@
+[VerifyEmailSubject]
+description = "Email subject for email verification"
+other = "ຢືນຢັນອີເມວຂອງທ່ານ"
+
+[SetPasswordEmailSubject]
+description = "Email subject for setting a new password"
+other = "ຕັ້ງລະຫັດຜ່ານໃໝ່ສຳລັບບັນຊີ Brave ຂອງທ່ານ"
+
+[RegistrationEmailSubject]
+description = "Email subject for creating a new account"
+other = "ຕັ້ງບັນຊີ Brave ຂອງທ່ານ"
+
+[EmailGreeting]
+description = "Greeting in the email message"
+other = "ສະບາຍດີ,"
+
+[SetPasswordEmailInstructions]
+description = "Instructions to verify email address and set a new password for an account"
+other = "ນີ້ແມ່ນລະຫັດທີ່ທ່ານຈະຕ້ອງໃຊ້ເພື່ອຢືນຢັນທີ່ຢູ່ອີເມວຂອງທ່ານ ແລະ ຕັ້ງລະຫັດຜ່ານໃໝ່ສຳລັບບັນຊີ Brave ຂອງທ່ານ."
+
+[RegistrationEmailInstructions]
+description = "Instructions to verify email address and create a new account"
+other = "ນີ້ແມ່ນລະຫັດທີ່ທ່ານຈະຕ້ອງໃຊ້ເພື່ອຢືນຢັນທີ່ຢູ່ອີເມວຂອງທ່ານ ແລະ ສ້າງບັນຊີ Brave ຂອງທ່ານ."
+
+[VerifyEmailInstructions]
+description = "Instructions to verify email address"
+other = "ນີ້ແມ່ນລະຫັດທີ່ທ່ານຈະຕ້ອງໃຊ້ເພື່ອຢືນຢັນທີ່ຢູ່ອີເມວຂອງທ່ານ."
+
+[VerifyEmailCode]
+description = "Label preceding the verification code displayed in the email"
+other = "ລະຫັດຢືນຢັນຂອງທ່ານແມ່ນ:"
+
+[VerifyEmailExpiryDisclaimer]
+description = "Informs the user how many minutes until the verification code expires"
+other = "ໝາຍເຫດ: ລະຫັດນີ້ຈະໝົດອາຍຸໃນອີກ {{.Minutes}} ນາທີ."
+
+[SimilarEmailLoginMessage]
+description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = """
+ເບິ່ງຄືວ່າທ່ານມີບັນຊີທີ່ໄດ້ລົງທະບຽນໄວ້ແລ້ວດ້ວຍອີເມວນີ້: {{.Email}}.
+
+ລອງເຂົ້າສູ່ລະບົບໂດຍໃຊ້ທີ່ຢູ່ອີເມວນີ້. ຖ້າຫາກທ່ານຍັງຕ້ອງການຄວາມຊ່ວຍເຫຼືອ, ກະລຸນາຕິດຕໍ່ຝ່າຍສະໜັບສະໜູນຂອງ Brave."""
+
+[SimilarEmailSubject]
+description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = "ມີບັນຫາແມ່ນບໍ? ນີ້ແມ່ນວິທີເຂົ້າເຖີງບັນຊີ Brave ຂອງທ່ານ."
+
+[EmailSignature]
+description = "Email signature"
+other = "ທີມງານ Brave"
+
+[EmailDisregard]
+description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
+other = "ຖ້າຫາກທ່ານບໍ່ແມ່ນຄົນທີ່ດຳເນີນການຮ້ອງຂໍນີ້, ກະລຸນາອ່ານຂ້າມອີເມວນີ້ໄດ້ເລີຍ."
+
+[EmailCopyright]
+description = "Brave copyright notice"
+other = "Copyright © {{.Year}} Brave Software Inc."
+
+[EmailAllRightsReserved]
+description = "All rights reserved notice"
+other = "ສະຫງວນລິຂະສິດທຸກປະການ"
+
+[EmailPrivacyPolicy]
+description = "Privacy policy link text"
+other = "ນະໂຍບາຍຄວາມເປັນສ່ວນຕົວ"
+
+[EmailTermsOfUse]
+description = "Terms of use link text"
+other = "ເງື່ອນໄຂຂອງການນຳໃຊ້"
+
+[EmailDownloadBrave]
+description = "Brave download link text"
+other = "ດາວໂຫຼດ Brave"
+
+[EmailContactSupport]
+description = "Support contact link text"
+other = "ຕິດຕໍ່ຝ່າຍສະໜັບສະໜູນ"
+
+[PasswordChangeNotificationSubject]
+description = "Email subject for password change notification"
+other = "ລະຫັດຜ່ານບັນຊີ Brave ຂອງທ່ານໄດ້ຖືກປ່ຽນແລ້ວ"
+
+[PasswordChangeNotificationMessage]
+description = "Email message informing user that their password was changed"
+other = "ລະຫັດຜ່ານບັນຊີ Brave ຂອງທ່ານໄດ້ຖືກປ່ຽນເປັນທີ່ຮຽບຮ້ອຍແລ້ວ. ຖ້າຫາກວ່າທ່ານບໍ່ໄດ້ເປັນຄົນດຳເນີນການປ່ຽນນີ້, ກະລຸນາຕິດຕໍ່ຫາຝ່າຍສະໜັບສະໜູນຂອງ Brave ທັນທີເພື່ອຮັກສາຄວາມປອດໄພບັນຊີຂອງທ່ານ."
+
+[PasswordChangeNotificationDisregard]
+description = "Footer for password change notification email reassuring the user if they made the change"
+other = "If you did make this change, no further action is required."

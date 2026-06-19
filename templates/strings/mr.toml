@@ -1,0 +1,90 @@
+[VerifyEmailSubject]
+description = "Email subject for email verification"
+other = "तुमचा ईमेल पडताळून घ्या"
+
+[SetPasswordEmailSubject]
+description = "Email subject for setting a new password"
+other = "तुमच्या Brave खात्यासाठी एक नवीन पासवर्ड ठेवा"
+
+[RegistrationEmailSubject]
+description = "Email subject for creating a new account"
+other = "तुमचे खाते तयार Brave करा"
+
+[EmailGreeting]
+description = "Greeting in the email message"
+other = "नमस्कार,"
+
+[SetPasswordEmailInstructions]
+description = "Instructions to verify email address and set a new password for an account"
+other = "तुमचा ईमेल पत्ता पडताळून घेण्यासाठी आणि तुमच्या Brave खात्याकरिता नवा पासवर्ड ठेवण्यासाठी तुम्हाला हा कोड लागेल."
+
+[RegistrationEmailInstructions]
+description = "Instructions to verify email address and create a new account"
+other = "तुमचा ईमेल पत्ता पडताळून घेण्यासाठी आणि तुमचे Brave खाते उघडण्यासाठी तुम्हाला हा कोड लागेल."
+
+[VerifyEmailInstructions]
+description = "Instructions to verify email address"
+other = "तुमचा ईमेल पत्ता पडताळून घेण्यासाठी तुम्हाला हा कोड लागेल."
+
+[VerifyEmailCode]
+description = "Label preceding the verification code displayed in the email"
+other = "तुमचा पडताळणी कोड :"
+
+[VerifyEmailExpiryDisclaimer]
+description = "Informs the user how many minutes until the verification code expires"
+other = "हा कोड {{.Minutes}} मिनिटांमध्ये कालबाह्य होईल."
+
+[SimilarEmailLoginMessage]
+description = "Informs the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = """
+तुम्ही हा ईमेल वापरून आधीच एक खाते नोंदवलेले आहे असे दिसते : {{.Email}}.
+
+हा ईमेल पत्ता वापरून लॉगिन करून बघा. जर तुम्हाला तरी मदत हवी असेल, तर कृपया Brave सपोर्टशी संपर्क साधा."""
+
+[SimilarEmailSubject]
+description = "Subject for informing the user that an account exists with a similar email address after an unsuccessful login attempt"
+other = "अडचण येत आहे? तुम्ही तुमचे Brave खाते असे प्राप्त करू शकता."
+
+[EmailSignature]
+description = "Email signature"
+other = "Brave टीम"
+
+[EmailDisregard]
+description = "Instructs the user to ignore the email if the user did not initiate the verification or login request"
+other = "जर तुम्ही ही विनंती केली नसेल, तर या ईमेलकडे दुर्लक्ष करा."
+
+[EmailCopyright]
+description = "Brave copyright notice"
+other = "कॉपीराईट © {{.Year}} ब्रेव्ह सॉफ्टवेअर इन्कॉ."
+
+[EmailAllRightsReserved]
+description = "All rights reserved notice"
+other = "सर्व हक्क सुरक्षित"
+
+[EmailPrivacyPolicy]
+description = "Privacy policy link text"
+other = "गोपनीयता धोरण"
+
+[EmailTermsOfUse]
+description = "Terms of use link text"
+other = "वापराचे नियम"
+
+[EmailDownloadBrave]
+description = "Brave download link text"
+other = "Brave डाऊनलोड करा"
+
+[EmailContactSupport]
+description = "Support contact link text"
+other = "सपोर्टशी संपर्क साधा"
+
+[PasswordChangeNotificationSubject]
+description = "Email subject for password change notification"
+other = "तुमच्या Brave खात्याचा पासवर्ड बदलला आहे"
+
+[PasswordChangeNotificationMessage]
+description = "Email message informing user that their password was changed"
+other = "तुमच्या Brave खात्याचा पासवर्ड यशस्वीरीत्या बदलला आहे. जर तुम्ही हा बदल केला नसेल, तर कृपया Brave सपोर्टशी तत्काळ संपर्क साधा आणि तुमचे खाते सुरक्षित करा."
+
+[PasswordChangeNotificationDisregard]
+description = "Footer for password change notification email reassuring the user if they made the change"
+other = "If you did make this change, no further action is required."
