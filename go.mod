@@ -12,6 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.42.0
 	github.com/bytemare/ecc v0.9.0
 	github.com/bytemare/opaque v0.0.0
+	github.com/getsentry/sentry-go v0.47.0
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-chi/cors v1.2.2
 	github.com/go-chi/docgen v1.4.0
@@ -75,7 +76,6 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.67.5 // indirect
 	github.com/prometheus/procfs v0.20.1 // indirect
-	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/swaggo/files/v2 v2.0.2 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
@@ -102,8 +102,8 @@ require (
 	github.com/rs/zerolog v1.35.0
 	golang.org/x/crypto v0.50.0
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/text v0.36.0
+	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/text v0.37.0
 	gorm.io/driver/postgres v1.6.0
 )
 
