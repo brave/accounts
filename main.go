@@ -14,6 +14,7 @@ import (
 	"github.com/brave/accounts/middleware"
 	"github.com/brave/accounts/services"
 	"github.com/brave/accounts/util"
+	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -59,6 +60,7 @@ func startKeyService(jwtService *services.JWTService, opaqueService *services.Op
 	prometheusRegistry := prometheus.NewRegistry()
 	// Setup router
 	r := chi.NewRouter()
+	r.Use(sentryhttp.New(sentryhttp.Options{Repanic: true}).Handle)
 	r.Use(middleware.LoggerMiddleware(prometheusRegistry))
 	r.Mount("/v2/server_keys", serverKeysController.Router(middleware.KeyServiceMiddleware(environment)))
 	addSwaggerToRouter(r)
@@ -98,6 +100,10 @@ func main() {
 			util.StagingEnv,
 			util.ProductionEnv)
 	}
+
+	flushSentry := util.InitSentry(environment)
+	defer flushSentry()
+
 	accountDeletionEnabled := os.Getenv(accountDeletionEnabledEnv) == "true"
 	allowedOrigins := strings.Split(os.Getenv(allowedOriginsEnv), ",")
 
@@ -165,6 +171,7 @@ func main() {
 	userKeysController := controllers.NewUserKeysController(datastore)
 	accountsController := controllers.NewAccountsController(opaqueService, jwtService, twoFAService, datastore, verificationService, sesService)
 
+	r.Use(sentryhttp.New(sentryhttp.Options{Repanic: true}).Handle)
 	r.Use(chiMiddleware.RealIP)
 	r.Use(middleware.LoggerMiddleware(prometheusRegistry))
 	r.Use(cors.Handler(cors.Options{
@@ -177,6 +184,8 @@ func main() {
 		//nolint:errcheck
 		w.Write([]byte("Brave Accounts Service"))
 	})
+
+	util.MaybeAddSentryDebugEndpoint(r, environment)
 
 	r.Route("/v2", func(r chi.Router) {
 		r.With(servicesKeyMiddleware).Mount("/auth", authController.Router(authMiddleware, validateAuthMiddleware))
