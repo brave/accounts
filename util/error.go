@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 	"github.com/rs/zerolog"
@@ -109,6 +110,12 @@ func RenderErrorResponse(w http.ResponseWriter, r *http.Request, status int, err
 	if status == http.StatusInternalServerError {
 		logLevel = zerolog.ErrorLevel
 		response.Error = http.StatusText(status)
+
+		if hub := sentry.GetHubFromContext(r.Context()); hub != nil {
+			hub.CaptureException(err)
+		} else {
+			sentry.CaptureException(err)
+		}
 	}
 
 	log.WithLevel(logLevel).

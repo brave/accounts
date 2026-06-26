@@ -1,6 +1,7 @@
 package util
 
 import (
+	"errors"
 	"net/http"
 	"os"
 	"time"
@@ -59,11 +60,6 @@ func MaybeAddSentryDebugEndpoint(r chi.Router, environment string) {
 	}
 
 	r.Get("/debug-sentry", func(w http.ResponseWriter, r *http.Request) {
-		if hub := sentry.GetHubFromContext(r.Context()); hub != nil {
-			hub.CaptureMessage("It works!")
-		}
-		w.Header().Set("Content-Type", "text/plain")
-		//nolint:errcheck
-		w.Write([]byte("Sentry test message captured"))
+		RenderErrorResponse(w, r, http.StatusInternalServerError, errors.New("sentry debug test error"))
 	})
 }
