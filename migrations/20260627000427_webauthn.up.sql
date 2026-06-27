@@ -26,7 +26,7 @@ CREATE TABLE interim_webauthn_registration_states (
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'cron') THEN
-        PERFORM cron.schedule('remove-old-webauthn-registration-states', '0 * * * *', $$DELETE FROM interim_webauthn_registration_states WHERE created_at < CURRENT_TIMESTAMP - interval '10 minutes'$$);
+        PERFORM cron.schedule('remove-old-webauthn-registration-states', '0 * * * *', $q$DELETE FROM interim_webauthn_registration_states WHERE created_at < CURRENT_TIMESTAMP - interval '10 minutes'$q$);
     END IF;
 END;
 $$;
