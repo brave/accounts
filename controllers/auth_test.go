@@ -263,7 +263,7 @@ func (suite *AuthTestSuite) TestAuthLogin() {
 func (suite *AuthTestSuite) TestAuthLogout() {
 	finalizeResp, _ := suite.performLoginSteps()
 	suite.NotEmpty(finalizeResp.AuthToken)
-	suite.False(finalizeResp.RequiresTwoFA)
+	suite.Nil(finalizeResp.TwoFAOptions)
 	suite.Equal(suite.account.Email, finalizeResp.Email)
 
 	req := util.CreateJSONTestRequest("/v2/auth/logout", nil)
