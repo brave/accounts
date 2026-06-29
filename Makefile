@@ -7,19 +7,17 @@ clear-emails:
 
 # Run `go install github.com/swaggo/swag/cmd/swag@latest` to use this
 update-swagger:
-	swag init
+	swag init --parseDependency
 
 lint:
 	golangci-lint run
 
-run:
+run: update-swagger
 	docker compose up -d postgres ses-local
-	swag init
 	go run -race .
 
-test:
+test: update-swagger
 	docker compose up -d postgres ses-local
-	swag init
 	go test -p 1 -v ./...
 
 # Run `go install github.com/air-verse/air@latest` to use this

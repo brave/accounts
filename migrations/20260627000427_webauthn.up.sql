@@ -1,0 +1,32 @@
+ALTER TABLE accounts ADD COLUMN webauthn_id BYTEA;
+ALTER TABLE accounts ADD COLUMN webauthn_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE accounts ADD COLUMN webauthn_enabled_at TIMESTAMP;
+
+ALTER TABLE interim_password_states RENAME COLUMN requires_twofa TO totp_enabled;
+ALTER TABLE interim_password_states ADD COLUMN webauthn_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE interim_password_states ADD COLUMN webauthn_challenge JSON;
+
+CREATE TABLE webauthn_credentials (
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    id BYTEA NOT NULL,
+    credential JSON NOT NULL,
+    name TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (account_id, id)
+);
+
+CREATE TABLE interim_webauthn_registration_states (
+    id UUID PRIMARY KEY,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    session_data JSON NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'cron') THEN
+        PERFORM cron.schedule('remove-old-webauthn-registration-states', '0 * * * *', $q$DELETE FROM interim_webauthn_registration_states WHERE created_at < CURRENT_TIMESTAMP - interval '10 minutes'$q$);
+    END IF;
+END;
+$$;
