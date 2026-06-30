@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -53,6 +54,17 @@ func addSwaggerToRouter(r *chi.Mux) {
 	}
 }
 
+func listenAndServe(handler http.Handler) {
+	srv := &http.Server{Addr: *listenFlag, Handler: handler}
+	shutdownDone := util.SetupGracefulShutdownListener(srv)
+
+	log.Info().Msgf("Server listening on %v", *listenFlag)
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Panic().Err(err).Msg("Failed to start server")
+	}
+	<-shutdownDone
+}
+
 func startKeyService(jwtService *services.JWTService, opaqueService *services.OpaqueService, twoFAService *services.TwoFAService, environment string) {
 	// Initialize controllers
 	serverKeysController := controllers.NewServerKeysController(opaqueService, jwtService, twoFAService)
@@ -67,10 +79,7 @@ func startKeyService(jwtService *services.JWTService, opaqueService *services.Op
 
 	util.StartPrometheusServer(prometheusRegistry, *prometheusListenFlag)
 
-	log.Info().Msgf("Server listening on %v", *listenFlag)
-	if err := http.ListenAndServe(*listenFlag, r); err != nil {
-		log.Panic().Err(err).Msg("Failed to start server")
-	}
+	listenAndServe(r)
 }
 
 // @title Brave Accounts Service
@@ -206,8 +215,5 @@ func main() {
 
 	util.StartPrometheusServer(prometheusRegistry, *prometheusListenFlag)
 
-	log.Info().Msgf("Server listening on %v", *listenFlag)
-	if err := http.ListenAndServe(*listenFlag, r); err != nil {
-		log.Panic().Err(err).Msg("Failed to start server")
-	}
+	listenAndServe(r)
 }

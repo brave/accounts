@@ -11,8 +11,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/signal"
 	"regexp"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
@@ -48,6 +51,8 @@ const (
 	recoveryKeyArgonKeyLength  = 32
 	recoveryKeyArgonSaltLength = 16
 	recoveryKeyFullHashLength  = recoveryKeyArgonKeyLength + recoveryKeyArgonSaltLength
+
+	gracefulShutdownTimeout 	 = 30 * time.Second
 )
 
 func generateRecoveryKeyHash(recoveryKey string, salt []byte) []byte {
@@ -180,6 +185,32 @@ func ListenOnPGChannel(ctx context.Context, conn *pgxpool.Conn, channelName stri
 	}
 	_, err := conn.Exec(ctx, "LISTEN \""+channelName+"\"")
 	return err
+}
+
+// SetupGracefulShutdownListener gracefully shuts down srv on SIGINT/SIGTERM.
+// The returned channel is closed once shutdown completes; wait on it after
+// ListenAndServe to ensure in-flight requests are drained.
+func SetupGracefulShutdownListener(srv *http.Server) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+		sig := <-sigChan
+		log.Info().Msgf("Received signal %v, shutting down gracefully", sig)
+
+		ctx, cancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
+		defer cancel()
+
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Error().Err(err).Msg("Failed to gracefully shut down server")
+			return
+		}
+		log.Info().Msg("Server shut down gracefully")
+	}()
+	return done
 }
 
 func StartPrometheusServer(registry *prometheus.Registry, listen string) {
