@@ -479,7 +479,7 @@ func (suite *AccountsTestSuite) TestSetPasswordBadIntents() {
 	token, err := suite.jwtService.CreateVerificationToken(verification.ID, time.Minute*30, verification.Service)
 	suite.Require().NoError(err)
 
-	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+	registrationReq, err := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
 	suite.Require().NoError(err)
 
 	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{

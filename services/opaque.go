@@ -164,7 +164,10 @@ func (o *OpaqueService) DeriveOPRFClientKey(credentialIdentifier string, oprfSee
 	// This matches the logic in opaque/server.go deriveOPRFKey
 	kdf := hash.FromCrypto(o.Config.KDF).GetHashFunction()
 	info := append([]byte(credentialIdentifier), []byte(expandOPRFTag)...)
-	seed := kdf.HKDFExpand(globalSeed, info, seedLength)
+	seed, err := kdf.HKDFExpand(globalSeed, info, seedLength)
+	if err != nil {
+		return nil, *seedID, err
+	}
 	clientKey := o.Config.OPRF.OPRF().DeriveKey(seed, []byte(deriveKeyPairTag))
 
 	return clientKey, *seedID, nil
