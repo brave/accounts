@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -52,7 +53,7 @@ const (
 	recoveryKeyArgonSaltLength = 16
 	recoveryKeyFullHashLength  = recoveryKeyArgonKeyLength + recoveryKeyArgonSaltLength
 
-	gracefulShutdownTimeout 	 = 30 * time.Second
+	gracefulShutdownTimeout = 30 * time.Second
 )
 
 func generateRecoveryKeyHash(recoveryKey string, salt []byte) []byte {
@@ -165,7 +166,20 @@ func DecodeJSONAndValidate(w http.ResponseWriter, r *http.Request, data interfac
 		return false
 	}
 
+	// Translate specific validator failures into shared exposed API errors.
+	//
+	// Validator errors are generic, and the response formatter only emits
+	// error codes for exposed errors. For email max-length failures we want
+	// to return ErrEmailTooLong instead of a general validation error.
 	if err := validate.Struct(data); err != nil {
+		if validationErr, ok := errors.AsType[validator.ValidationErrors](err); ok {
+			for _, ve := range validationErr {
+				if ve.Tag() == "max" && strings.HasSuffix(ve.Field(), "Email") {
+					RenderErrorResponse(w, r, http.StatusBadRequest, ErrEmailTooLong)
+					return false
+				}
+			}
+		}
 		RenderErrorResponse(w, r, http.StatusBadRequest, err)
 		return false
 	}

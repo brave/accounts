@@ -717,3 +717,19 @@ func TestVerificationTestSuite(t *testing.T) {
 		suite.Run(t, NewVerificationTestSuite(true))
 	})
 }
+
+func (suite *VerificationTestSuite) TestVerifyInitEmailTooLong() {
+	suite.sesMock.On("SendVerificationEmail", mock.Anything, mock.Anything, mock.Anything, "en-US").Return(nil).Maybe()
+
+	// Test email exceeding 254 characters
+	longEmail := strings.Repeat("a", 250) + "@example.com"
+	body := controllers.VerifyInitRequest{
+		Email:   longEmail,
+		Intent:  "auth_token",
+		Service: "email-aliases",
+		Locale:  "en-US",
+	}
+	resp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", body), suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailTooLong.Code)
+}

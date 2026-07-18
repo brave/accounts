@@ -793,3 +793,22 @@ func TestAccountsTestSuite(t *testing.T) {
 		suite.Run(t, NewAccountsTestSuite(true))
 	})
 }
+
+func (suite *AccountsTestSuite) TestRegistrationEmailTooLong() {
+	// Create an email that exceeds 254 characters
+	longEmail := strings.Repeat("a", 255) + "@example.com"
+	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+
+	// Test password init with email exceeding length limit
+	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
+		BlindedMessage        : hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse     : true,
+		NewAccountEmail       : &longEmail,
+		InitiatingServiceName : util.AccountsServiceName,
+	})
+	// No Authorization header for registration
+
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailTooLong.Code)
+}

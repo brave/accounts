@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -606,4 +607,24 @@ func TestAuthTestSuite(t *testing.T) {
 	t.Run("WithKeyService", func(t *testing.T) {
 		suite.Run(t, NewAuthTestSuite(true))
 	})
+}
+
+func (suite *AuthTestSuite) TestAuthLoginEmailTooLong() {
+	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
+	suite.Require().NoError(err)
+
+	// Create an email that exceeds 254 characters
+	longEmail := strings.Repeat("a", 255) + "@example.com"
+	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
+	serializedKE1 := hex.EncodeToString(ke1.Serialize())
+	loginReq := controllers.LoginInitRequest{
+		Email:                 longEmail,
+		SerializedKE1:         &serializedKE1,
+		InitiatingServiceName: util.AccountsServiceName,
+	}
+
+	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailTooLong.Code)
 }
