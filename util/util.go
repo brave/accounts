@@ -168,8 +168,8 @@ func DecodeJSONAndValidate(w http.ResponseWriter, r *http.Request, data interfac
 
 	// Translate specific validator failures into shared exposed API errors.
 	//
-	// Validator errors are generic, and the response formatter only emits
-	// error codes for exposed errors. For email max-length failures we want
+	// Validator errors are generic (e.x. "validation failed"), and the response formatter
+	// only emits error codes for exposed errors. For email max-length failures we want
 	// to return ErrEmailTooLong instead of a general validation error.
 	if err := validate.Struct(data); err != nil {
 		if validationErr, ok := errors.AsType[validator.ValidationErrors](err); ok {
