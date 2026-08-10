@@ -558,6 +558,56 @@ func (suite *VerificationTestSuite) TestVerifyResend() {
 	suite.sesMock.AssertExpectations(suite.T())
 }
 
+func (suite *VerificationTestSuite) TestVerifyResendCodeAttemptsLimit() {
+	initBody := controllers.VerifyInitRequest{
+		Email:   "test@example.com",
+		Intent:  "verification",
+		Service: "email-aliases",
+		Locale:  "en-US",
+	}
+
+	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, mock.Anything).Return(nil).Once()
+
+	initResp := util.ExecuteTestRequest(util.CreateJSONTestRequest("/v2/verify/init", initBody), suite.router)
+	suite.Equal(http.StatusOK, initResp.Code)
+
+	var parsedInitResp controllers.VerifyInitResponse
+	util.DecodeJSONTestResponse(suite.T(), initResp.Body, &parsedInitResp)
+	suite.Require().NotNil(parsedInitResp.VerificationToken)
+
+	verificationToken := *parsedInitResp.VerificationToken
+	verificationID, err := suite.jwtService.ValidateVerificationToken(verificationToken)
+	suite.Require().NoError(err)
+
+	verification, err := suite.ds.GetVerificationStatus(verificationID)
+	suite.Require().NoError(err)
+
+	// Exhaust code attempts by submitting wrong codes
+	for i := 1; i <= int(datastore.MaxCodeAttempts); i++ {
+		completeBody := controllers.VerifyCompleteRequest{Code: "AAAAAA"}
+		completeReq := util.CreateJSONTestRequest("/v2/verify/complete", completeBody)
+		completeReq.Header.Set("Authorization", "Bearer "+verificationToken)
+		completeResp := util.ExecuteTestRequest(completeReq, suite.router)
+
+		suite.Equal(http.StatusBadRequest, completeResp.Code)
+	}
+
+	// Resend should now be rejected with ErrMaxCodeAttempts
+	resendBody := controllers.VerifyResendRequest{Locale: "en-US"}
+	req := util.CreateJSONTestRequest("/v2/verify/resend", resendBody)
+	req.Header.Set("Authorization", "Bearer "+verificationToken)
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusBadRequest, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrMaxCodeAttempts.Code)
+
+	// Email attempts should remain unchanged
+	updated, err := suite.ds.GetVerificationStatus(verification.ID)
+	suite.Require().NoError(err)
+	suite.Equal(int16(1), updated.EmailAttempts)
+
+	suite.sesMock.AssertExpectations(suite.T())
+}
+
 func (suite *VerificationTestSuite) TestVerifyInvalidate() {
 	email := "test@example.com"
 	// Use InitializeVerification to create a registration verification

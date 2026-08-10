@@ -338,6 +338,11 @@ func (vc *VerificationController) VerifyResend(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	if verification.CodeAttempts >= datastore.MaxCodeAttempts {
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrMaxCodeAttempts)
+		return
+	}
+
 	if verification.EmailAttempts >= maxEmailAttempts {
 		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrMaxEmailAttempts)
 		return
