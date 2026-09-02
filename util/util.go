@@ -43,6 +43,8 @@ const (
 	KeyServiceSecretHeader = "key-service-secret"
 	KeyServiceURLEnv       = "KEY_SERVICE_URL"
 
+	BraveServicesKeyHeader = "braveservicekey"
+
 	recoveryKeyArgonTime       = 1
 	recoveryKeyArgonMemory     = 64 * 1024
 	recoveryKeyArgonThreads    = 4
