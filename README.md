@@ -34,7 +34,6 @@ View API documentation at http://localhost:8080/swagger/index.html.
 | OPAQUE_FAKE_RECORD | No | Use OPAQUE fake record to prevent client enumeration attacks |
 | VERIFY_FRONTEND_URL | No | Frontend URL to use in verification emails |
 | BRAVE_SERVICES_KEY | No | Comma-separated list of services keys to check against (via the `BraveServiceKey` header) for all requests |
-| WEBHOOK_KEYS | No | A list of URLs and corresponding API keys for sending account event webhooks, delimited by a comma. Each entry should use the following format: `webhook url=webhook api key` |
 | DEV_ENDPOINTS_ENABLED | No | Enable the development-only endpoints |
 | ALLOWED_ORIGINS | No | List of allowed origins for CORS, separated by comma |
 | SES_CONFIG_SET | No | Configuration set name to use for SES emails |

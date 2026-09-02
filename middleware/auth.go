@@ -21,8 +21,7 @@ const (
 	ContextSessionServiceName = contextKey("sessionServiceName")
 	ContextVerification       = contextKey("verification")
 
-	braveServicesKeyEnv    = "BRAVE_SERVICES_KEY"
-	braveServicesKeyHeader = "braveservicekey"
+	braveServicesKeyEnv = "BRAVE_SERVICES_KEY"
 )
 
 func AuthMiddleware(jwtService *services.JWTService, ds *datastore.Datastore, minSessionVersion int, enforceAccountsServiceName bool, required bool) func(http.Handler) http.Handler {
@@ -124,7 +123,7 @@ func ServicesKeyMiddleware(env string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// If services key is configured, verify the request header
 			if len(servicesKeys) > 0 {
-				headerKey := r.Header.Get(braveServicesKeyHeader)
+				headerKey := r.Header.Get(util.BraveServicesKeyHeader)
 				if !slices.Contains(servicesKeys, headerKey) {
 					util.RenderErrorResponse(w, r, http.StatusUnauthorized, util.ErrInvalidServicesKey)
 					return
