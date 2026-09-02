@@ -32,7 +32,6 @@ var (
 	routesFlag             = flag.Bool("routes", false, "Generate router documentation")
 	listenFlag             = flag.String("listen", ":8080", "Use specific address and port for listening")
 	prometheusListenFlag   = flag.String("prom-listen", ":9090", "Use specific address and port for listening for Prometheus server")
-	startWebhookSenderFlag = flag.Bool("start-webhook-sender", false, "Start the webhook event sender")
 	startKeyServiceFlag    = flag.Bool("start-key-service", false, "Start the server key service")
 
 	devEndpointsEnabled = os.Getenv(devEndpointsEnabledEnv) == "true"
@@ -121,13 +120,6 @@ func main() {
 	datastore, err := datastore.NewDatastore(minSessionVersion, *startKeyServiceFlag, false)
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to init datastore")
-	}
-
-	if *startWebhookSenderFlag {
-		if err = services.NewWebhookService(datastore).StartProcessingEvents(); err != nil {
-			log.Panic().Err(err).Msg("Webhook sender failed")
-		}
-		return
 	}
 
 	jwtService, err := services.NewJWTService(datastore, *startKeyServiceFlag)

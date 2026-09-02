@@ -1,0 +1,9 @@
+CREATE TABLE pending_webhook_events (
+    id BIGSERIAL PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    details JSON NOT NULL,
+    url TEXT NOT NULL,
+    attempts INT NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

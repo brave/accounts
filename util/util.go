@@ -12,7 +12,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/signal"
-	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -20,7 +19,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
@@ -170,21 +168,6 @@ func DecodeJSONAndValidate(w http.ResponseWriter, r *http.Request, data interfac
 		return false
 	}
 	return true
-}
-
-func validatePGChannelName(channelName string) error {
-	if !regexp.MustCompile(`^[\w-_]+$`).MatchString(channelName) {
-		return fmt.Errorf("channel name must contain only alphanumeric characters and hyphens")
-	}
-	return nil
-}
-
-func ListenOnPGChannel(ctx context.Context, conn *pgxpool.Conn, channelName string) error {
-	if err := validatePGChannelName(channelName); err != nil {
-		return err
-	}
-	_, err := conn.Exec(ctx, "LISTEN \""+channelName+"\"")
-	return err
 }
 
 // SetupGracefulShutdownListener gracefully shuts down srv on SIGINT/SIGTERM.

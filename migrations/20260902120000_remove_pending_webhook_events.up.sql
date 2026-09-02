@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS pending_webhook_events;
