@@ -18,6 +18,7 @@ View API documentation at http://localhost:8080/swagger/index.html.
 |------|-----------|-------------|
 | ENVIRONMENT | Yes | Must be `production`, `staging`, or `development` |
 | DATABASE_URL | Yes | PostgreSQL database connection URL |
+| DATABASE_POOL_SIZE | No | Max open and idle connections in the Postgres pool (default: 100) |
 | EMAIL_FROM_ADDRESS | Yes | Email address used as sender for verification emails |
 | BASE_URL | Yes | Base URL of the service |
 | OPAQUE_SECRET_KEY | Yes | OPAQUE server secret key |

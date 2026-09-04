@@ -182,7 +182,7 @@ func (vs *VerificationService) CompleteVerification(verification *datastore.Veri
 		}
 	}
 
-	if account != nil {
+	if account != nil && verification.Service == util.AccountsServiceName {
 		if err = vs.datastore.UpdateAccountLastEmailVerifiedAt(account.ID); err != nil {
 			return nil, err
 		}

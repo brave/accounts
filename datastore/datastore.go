@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/brave/accounts/migrations"
 	"github.com/golang-migrate/migrate/v4"
@@ -23,6 +26,12 @@ const testDatabaseURLEnv = "TEST_DATABASE_URL"
 const testKeyServiceDatabaseURLEnv = "TEST_KEY_SERVICE_DATABASE_URL"
 const defaultTestDatabaseURLEnv = "postgres://accounts:password@localhost:5435/test?sslmode=disable"
 const defaultTestKeyServiceDatabaseURLEnv = "postgres://accounts:password@localhost:5435/keys_test?sslmode=disable"
+
+const (
+	databasePoolSizeEnv     = "DATABASE_POOL_SIZE"
+	defaultDatabasePoolSize = 100
+	databaseConnMaxLifetime = time.Hour
+)
 
 type Datastore struct {
 	DB                *gorm.DB
@@ -121,10 +130,47 @@ func NewDatastore(minSessionVersion int, isKeyService bool, isTesting bool) (*Da
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
+	if err = configureDBPool(db); err != nil {
+		return nil, err
+	}
+
 	return &Datastore{
 		DB:                db,
 		minSessionVersion: minSessionVersion,
 	}, nil
+}
+
+func parseDatabasePoolSize() (int, error) {
+	size := defaultDatabasePoolSize
+	if raw := os.Getenv(databasePoolSizeEnv); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed <= 0 {
+			return 0, fmt.Errorf("invalid %s: %q", databasePoolSizeEnv, raw)
+		}
+		size = parsed
+	}
+	return size, nil
+}
+
+func configureDBPool(db *gorm.DB) error {
+	poolSize, err := parseDatabasePoolSize()
+	if err != nil {
+		return err
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return fmt.Errorf("failed to get database pool: %w", err)
+	}
+
+	// Keep max idle equal to max open so the pool does not close connections
+	// under load (Go's default max idle is 2, which churns RDS IAM auth).
+	sqlDB.SetMaxOpenConns(poolSize)
+	sqlDB.SetMaxIdleConns(poolSize)
+	sqlDB.SetConnMaxLifetime(databaseConnMaxLifetime)
+
+	log.Info().Msgf("database pool size: %d", poolSize)
+	return nil
 }
 
 func (ds *Datastore) Close() {
