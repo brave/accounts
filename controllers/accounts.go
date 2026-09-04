@@ -26,7 +26,7 @@ type AccountsController struct {
 	ds                  *datastore.Datastore
 	verificationService *services.VerificationService
 	sesService          services.SES
-	webhookUtil         *util.WebhookUtil
+	webhookService      *services.WebhookService
 }
 
 // @Description Response for password setup or change
@@ -215,7 +215,7 @@ func NewAccountsController(opaqueService *services.OpaqueService, jwtService *se
 		ds:                  ds,
 		verificationService: verificationService,
 		sesService:          sesService,
-		webhookUtil:         util.NewWebhookUtil(),
+		webhookService:      services.NewWebhookService(jwtService),
 	}
 }
 
@@ -707,7 +707,7 @@ func (ac *AccountsController) DeleteAccount(w http.ResponseWriter, r *http.Reque
 
 	// Notify external services of the deletion before any account data is removed,
 	// while the received auth token is still valid
-	if err := ac.webhookUtil.CallDeletionWebhooks(r); err != nil {
+	if err := ac.webhookService.CallDeletionWebhooks(r, session.ID); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
 	}

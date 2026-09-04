@@ -52,7 +52,7 @@ func (suite *AccountsTestSuite) SetupTest() {
 	var err error
 	suite.T().Setenv("OPAQUE_SECRET_KEY", "4355f8e6f9ec41649fbcdbcca5075a97dafc4c8d8eb8cc2ba286be7b1c938d05")
 	suite.T().Setenv("OPAQUE_PUBLIC_KEY", "98584585210c1f310e9d0aeb9ac1384b7d51808cfaf21b17b5e3dc8d35dbfb00")
-	suite.T().Setenv("DELETION_WEBHOOK_URLS", "http://"+testDeletionWebhookAddrs[0]+",http://"+testDeletionWebhookAddrs[1])
+	suite.T().Setenv("DELETION_WEBHOOK_URLS", util.PremiumServiceName+"=http://"+testDeletionWebhookAddrs[0]+","+util.EmailAliasesServiceName+"=http://"+testDeletionWebhookAddrs[1])
 
 	suite.ds, err = datastore.NewDatastore(datastore.PasswordAuthSessionVersion, false, true)
 	suite.Require().NoError(err)
@@ -523,13 +523,25 @@ func (suite *AccountsTestSuite) TestSetPasswordUnverifiedEmail() {
 
 func (suite *AccountsTestSuite) TestDeleteAccount() {
 	token, account := suite.createAuthSession()
+	sessionID, _, err := suite.jwtService.ValidateAuthToken(token)
+	suite.Require().NoError(err)
 
 	webhookCalls := 0
+	var receivedAudiences []string
 	webhookHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		webhookCalls++
 		suite.Equal("DELETE", r.Method)
-		suite.Equal("Bearer "+token, r.Header.Get("Authorization"))
 		suite.Equal("test-services-key", r.Header.Get("BraveServiceKey"))
+
+		serviceToken, err := util.ExtractAuthToken(r)
+		suite.NoError(err)
+		suite.NotEqual(token, serviceToken)
+
+		tokenSessionID, aud, err := suite.jwtService.ValidateAuthToken(serviceToken)
+		suite.NoError(err)
+		suite.Equal(sessionID, tokenSessionID)
+		receivedAudiences = append(receivedAudiences, aud)
+
 		w.WriteHeader(http.StatusNoContent)
 	})
 	for _, addr := range testDeletionWebhookAddrs {
@@ -552,7 +564,7 @@ func (suite *AccountsTestSuite) TestDeleteAccount() {
 	suite.Equal(http.StatusNoContent, resp.Code)
 
 	var sessionCount int64
-	err := suite.ds.DB.Model(&datastore.Session{}).Where("account_id = ?", account.ID).Count(&sessionCount).Error
+	err = suite.ds.DB.Model(&datastore.Session{}).Where("account_id = ?", account.ID).Count(&sessionCount).Error
 	suite.Require().NoError(err)
 	suite.Equal(int64(0), sessionCount)
 
@@ -563,6 +575,7 @@ func (suite *AccountsTestSuite) TestDeleteAccount() {
 
 	// Both deletion webhooks should have been called
 	suite.Equal(2, webhookCalls)
+	suite.ElementsMatch([]string{util.PremiumServiceName, util.EmailAliasesServiceName}, receivedAudiences)
 }
 
 func (suite *AccountsTestSuite) TestDeleteAccountWebhookFailure() {
