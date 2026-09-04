@@ -311,6 +311,29 @@ func (suite *VerificationTestSuite) TestVerifyCompleteWithHyphen() {
 	suite.sesMock.AssertExpectations(suite.T())
 }
 
+func (suite *VerificationTestSuite) TestVerifyCompleteNonAccountsServiceDoesNotUpdateLastEmailVerifiedAt() {
+	email := "test@example.com"
+	account, err := suite.ds.GetOrCreateAccount(email)
+	suite.Require().NoError(err)
+	suite.Nil(account.LastEmailVerifiedAt)
+
+	verification, _, err := suite.verificationService.InitializeVerification(
+		suite.T().Context(),
+		email,
+		datastore.VerificationIntent,
+		util.EmailAliasesServiceName,
+		nil,
+	)
+	suite.Require().NoError(err)
+
+	_, err = suite.verificationService.CompleteVerification(verification, verification.Code, "test-user-agent")
+	suite.Require().NoError(err)
+
+	updatedAccount, err := suite.ds.GetAccount(nil, email)
+	suite.Require().NoError(err)
+	suite.Nil(updatedAccount.LastEmailVerifiedAt)
+}
+
 func (suite *VerificationTestSuite) TestVerifyResult() {
 	suite.sesMock.On("SendVerificationEmail", mock.Anything, "test@example.com", mock.Anything, "en-US").Return(nil).Once()
 
