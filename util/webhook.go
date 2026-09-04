@@ -1,7 +1,9 @@
 package util
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -13,6 +15,7 @@ import (
 const (
 	deletionWebhookURLsEnv = "DELETION_WEBHOOK_URLS"
 	webhookTimeout         = 10 * time.Second
+	dnsResolverAddress     = "1.1.1.1:53"
 )
 
 // WebhookUtil handles calling external webhooks
@@ -23,11 +26,25 @@ type WebhookUtil struct {
 
 // NewWebhookUtil creates a new WebhookUtil, parsing the DELETION_WEBHOOK_URLS env var
 func NewWebhookUtil() *WebhookUtil {
+	// Webhook hostnames are resolved with 1.1.1.1 instead of the system resolver
+	resolver := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			dialer := &net.Dialer{Timeout: webhookTimeout}
+			return dialer.DialContext(ctx, network, dnsResolverAddress)
+		},
+	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = (&net.Dialer{
+		Timeout:  webhookTimeout,
+		Resolver: resolver,
+	}).DialContext
+
 	return &WebhookUtil{
 		deletionWebhookURLs: strings.FieldsFunc(os.Getenv(deletionWebhookURLsEnv), func(r rune) bool {
 			return r == ','
 		}),
-		client: &http.Client{Timeout: webhookTimeout},
+		client: &http.Client{Timeout: webhookTimeout, Transport: transport},
 	}
 }
 
