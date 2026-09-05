@@ -274,6 +274,11 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	if len(*requestData.NewAccountEmail) > 254 {
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailTooLong)
+		return
+	}
+
 	var verificationToken *string
 	var verificationTokenExpiresAt *time.Time
 	if verification != nil {
