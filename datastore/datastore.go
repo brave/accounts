@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/brave/accounts/migrations"
@@ -14,7 +13,6 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/postgres"
@@ -36,10 +34,8 @@ const (
 )
 
 type Datastore struct {
-	listenPool        *pgxpool.Pool
 	DB                *gorm.DB
 	minSessionVersion int
-	webhookUrls       map[string]interface{}
 }
 
 func NewDatastore(minSessionVersion int, isKeyService bool, isTesting bool) (*Datastore, error) {
@@ -117,25 +113,12 @@ func NewDatastore(minSessionVersion int, isKeyService bool, isTesting bool) (*Da
 	pgConfig := postgres.Config{
 		DSN: dbURL,
 	}
-	listenPoolConfig, err := pgxpool.ParseConfig(dbURL)
-	listenPoolConfig.AfterRelease = func(c *pgx.Conn) bool {
-		_, err := c.Exec(context.Background(), "UNLISTEN *")
-		if err != nil {
-			log.Error().Msgf("error unlistening channels on conn release: %v", err)
-			return false
-		}
-		return true
-	}
 
-	if err != nil {
-		return nil, fmt.Errorf("error parsing database connection config: %w", err)
-	}
 	if !isTesting && rdsConnector != nil {
 		pgxConfig, err := pgx.ParseConfig(dbURL)
 		if err != nil {
 			return nil, err
 		}
-		listenPoolConfig.BeforeConnect = rdsConnector.updateConnConfig
 
 		baseDB := stdlib.OpenDB(*pgxConfig, stdlib.OptionBeforeConnect(rdsConnector.updateConnConfig))
 		pgConfig.Conn = baseDB
@@ -151,28 +134,9 @@ func NewDatastore(minSessionVersion int, isKeyService bool, isTesting bool) (*Da
 		return nil, err
 	}
 
-	listenPool, err := pgxpool.NewWithConfig(context.Background(), listenPoolConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
-	}
-
-	webhookUrls := make(map[string]interface{})
-
-	// Parse webhook URLs from environment variable
-	if urls := os.Getenv(WebhookKeysEnv); urls != "" {
-		pairs := strings.Split(urls, ",")
-		for _, pair := range pairs {
-			if parts := strings.Split(pair, "="); len(parts) == 2 {
-				webhookUrls[parts[0]] = true
-			}
-		}
-	}
-
 	return &Datastore{
-		listenPool:        listenPool,
 		DB:                db,
 		minSessionVersion: minSessionVersion,
-		webhookUrls:       webhookUrls,
 	}, nil
 }
 
@@ -210,7 +174,6 @@ func configureDBPool(db *gorm.DB) error {
 }
 
 func (ds *Datastore) Close() {
-	ds.listenPool.Close()
 	db, err := ds.DB.DB()
 	if err != nil {
 		panic("failed to get DB for closing")
@@ -226,5 +189,4 @@ func (ds *Datastore) Close() {
 		panic("failed to close DB")
 	}
 	ds.DB = nil
-	ds.listenPool = nil
 }

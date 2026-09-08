@@ -35,12 +35,12 @@ View API documentation at http://localhost:8080/swagger/index.html.
 | OPAQUE_FAKE_RECORD | No | Use OPAQUE fake record to prevent client enumeration attacks |
 | VERIFY_FRONTEND_URL | No | Frontend URL to use in verification emails |
 | BRAVE_SERVICES_KEY | No | Comma-separated list of services keys to check against (via the `BraveServiceKey` header) for all requests |
-| WEBHOOK_KEYS | No | A list of URLs and corresponding API keys for sending account event webhooks, delimited by a comma. Each entry should use the following format: `webhook url=webhook api key` |
 | DEV_ENDPOINTS_ENABLED | No | Enable the development-only endpoints |
 | ALLOWED_ORIGINS | No | List of allowed origins for CORS, separated by comma |
 | SES_CONFIG_SET | No | Configuration set name to use for SES emails |
 | SES_ROLE | No | The AWS IAM role ARN to assume for SES access |
 | ACCOUNT_DELETION_ENABLED | No | Enables account deletion endpoint |
+| DELETION_WEBHOOK_URLS | No | Comma-separated list of `servicename=url` webhooks to call with `DELETE` before account deletion. Account deletion fails if any webhook does not return a 2xx response |
 | KEY_SERVICE_URL | No | Use the key service for deriving OPRF seeds and signing JWTs |
 | KEY_SERVICE_SECRET | No | Secret to use for key service requests |
 | KEY_SERVICE_DATABASE_URL | No | PostgreSQL database connection URL for key service |
