@@ -1,9 +1,7 @@
 package services
 
 import (
-	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -17,7 +15,6 @@ import (
 const (
 	deletionWebhookURLsEnv = "DELETION_WEBHOOK_URLS"
 	webhookTimeout         = 10 * time.Second
-	dnsResolverAddress     = "1.1.1.1:53"
 	webhookTokenExpiration = 60 * time.Second
 )
 
@@ -59,24 +56,10 @@ func NewWebhookService(jwtService *JWTService) *WebhookService {
 		})
 	}
 
-	// Webhook hostnames are resolved with 1.1.1.1 instead of the system resolver
-	resolver := &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			dialer := &net.Dialer{Timeout: webhookTimeout}
-			return dialer.DialContext(ctx, network, dnsResolverAddress)
-		},
-	}
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.DialContext = (&net.Dialer{
-		Timeout:  webhookTimeout,
-		Resolver: resolver,
-	}).DialContext
-
 	return &WebhookService{
 		webhooks:   webhooks,
 		jwtService: jwtService,
-		client:     &http.Client{Timeout: webhookTimeout, Transport: transport},
+		client:     &http.Client{Timeout: webhookTimeout},
 	}
 }
 
