@@ -4,6 +4,7 @@ import (
 	"encoding/base32"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -23,6 +24,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
+
+// Addresses the deletion webhook test servers bind to, referenced by the
+// DELETION_WEBHOOK_URLS env var set in SetupTest
+var testDeletionWebhookAddrs = [2]string{"127.0.0.1:18081", "127.0.0.1:18082"}
 
 type AccountsTestSuite struct {
 	suite.Suite
@@ -47,6 +52,7 @@ func (suite *AccountsTestSuite) SetupTest() {
 	var err error
 	suite.T().Setenv("OPAQUE_SECRET_KEY", "4355f8e6f9ec41649fbcdbcca5075a97dafc4c8d8eb8cc2ba286be7b1c938d05")
 	suite.T().Setenv("OPAQUE_PUBLIC_KEY", "98584585210c1f310e9d0aeb9ac1384b7d51808cfaf21b17b5e3dc8d35dbfb00")
+	suite.T().Setenv("DELETION_WEBHOOK_URLS", util.PremiumServiceName+"=http://"+testDeletionWebhookAddrs[0]+","+util.EmailAliasesServiceName+"=http://"+testDeletionWebhookAddrs[1])
 
 	suite.ds, err = datastore.NewDatastore(datastore.PasswordAuthSessionVersion, false, true)
 	suite.Require().NoError(err)
@@ -517,16 +523,48 @@ func (suite *AccountsTestSuite) TestSetPasswordUnverifiedEmail() {
 
 func (suite *AccountsTestSuite) TestDeleteAccount() {
 	token, account := suite.createAuthSession()
+	sessionID, _, err := suite.jwtService.ValidateAuthToken(token)
+	suite.Require().NoError(err)
+
+	webhookCalls := 0
+	var receivedAudiences []string
+	webhookHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		webhookCalls++
+		suite.Equal("DELETE", r.Method)
+		suite.Equal("test-services-key", r.Header.Get("BraveServiceKey"))
+
+		serviceToken, err := util.ExtractAuthToken(r)
+		suite.NoError(err)
+		suite.NotEqual(token, serviceToken)
+
+		tokenSessionID, aud, err := suite.jwtService.ValidateAuthToken(serviceToken)
+		suite.NoError(err)
+		suite.Equal(sessionID, tokenSessionID)
+		receivedAudiences = append(receivedAudiences, aud)
+
+		w.WriteHeader(http.StatusNoContent)
+	})
+	for _, addr := range testDeletionWebhookAddrs {
+		listener, err := net.Listen("tcp", addr)
+		suite.Require().NoError(err)
+		server := &http.Server{Handler: webhookHandler}
+		// Avoid connection reuse across tests, which would leave this handler
+		// serving requests made by later tests
+		server.SetKeepAlivesEnabled(false)
+		defer server.Close()      //nolint:errcheck
+		go server.Serve(listener) //nolint:errcheck
+	}
 
 	// Test account deletion
 	req := httptest.NewRequest("DELETE", "/v2/accounts", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("BraveServiceKey", "test-services-key")
 
 	resp := util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusNoContent, resp.Code)
 
 	var sessionCount int64
-	err := suite.ds.DB.Model(&datastore.Session{}).Where("account_id = ?", account.ID).Count(&sessionCount).Error
+	err = suite.ds.DB.Model(&datastore.Session{}).Where("account_id = ?", account.ID).Count(&sessionCount).Error
 	suite.Require().NoError(err)
 	suite.Equal(int64(0), sessionCount)
 
@@ -534,6 +572,35 @@ func (suite *AccountsTestSuite) TestDeleteAccount() {
 	err = suite.ds.DB.Model(&datastore.Account{}).Where("id = ?", account.ID).Count(&accountCount).Error
 	suite.Require().NoError(err)
 	suite.Equal(int64(0), accountCount)
+
+	// Both deletion webhooks should have been called
+	suite.Equal(2, webhookCalls)
+	suite.ElementsMatch([]string{util.PremiumServiceName, util.EmailAliasesServiceName}, receivedAudiences)
+}
+
+func (suite *AccountsTestSuite) TestDeleteAccountWebhookFailure() {
+	listener, err := net.Listen("tcp", testDeletionWebhookAddrs[0])
+	suite.Require().NoError(err)
+	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})}
+	server.SetKeepAlivesEnabled(false)
+	defer server.Close()      //nolint:errcheck
+	go server.Serve(listener) //nolint:errcheck
+
+	token, account := suite.createAuthSession()
+
+	req := httptest.NewRequest("DELETE", "/v2/accounts", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusInternalServerError, resp.Code)
+
+	// Account should not be deleted when a webhook fails
+	var accountCount int64
+	err = suite.ds.DB.Model(&datastore.Account{}).Where("id = ?", account.ID).Count(&accountCount).Error
+	suite.Require().NoError(err)
+	suite.Equal(int64(1), accountCount)
 }
 
 func (suite *AccountsTestSuite) TestAccountDeletionEndpointDisabled() {
