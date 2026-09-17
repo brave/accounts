@@ -143,6 +143,11 @@ func (vc *VerificationController) VerifyInit(w http.ResponseWriter, r *http.Requ
 		session,
 	)
 
+	if len(requestData.Email) > 254 {
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailTooLong)
+		return
+	}
+
 	if err != nil {
 		if errors.Is(err, util.ErrTooManyVerifications) ||
 			errors.Is(err, util.ErrDailyVerificationLimitReached) ||

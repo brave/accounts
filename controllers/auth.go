@@ -282,6 +282,11 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(requestData.Email) > 254 {
+		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailTooLong)
+		return
+	}
+
 	if !util.IsEmailAllowed(requestData.Email) {
 		util.RenderErrorResponse(w, r, http.StatusBadRequest, util.ErrEmailDomainNotSupported)
 		return
