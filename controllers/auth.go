@@ -150,11 +150,11 @@ func (req *LoginInitRequest) ToOpaqueKE1(opaqueService *services.OpaqueService) 
 	}
 
 	return &opaqueMsg.KE1{
-		CredentialRequest: &opaqueMsg.CredentialRequest{
+		CredentialRequest: opaqueMsg.CredentialRequest{
 			BlindedMessage: blindedMessageElement,
 		},
-		ClientPublicKeyshare: epkElement,
-		ClientNonce:          nonce,
+		ClientKeyShare: epkElement,
+		ClientNonce:    nonce,
 	}, nil
 }
 
@@ -170,9 +170,9 @@ func FromOpaqueKE2(opaqueResp *opaqueMsg.KE2, loginToken string, useBinary bool)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize evaluated message: %w", err)
 	}
-	epkBin, err := opaqueResp.ServerPublicKeyshare.MarshalBinary()
+	epkBin, err := opaqueResp.ServerKeyShare.MarshalBinary()
 	if err != nil {
-		return nil, fmt.Errorf("failed to serialize evaluated message: %w", err)
+		return nil, fmt.Errorf("failed to serialize server key share: %w", err)
 	}
 	evalMsg := hex.EncodeToString(evalMsgBin)
 	maskNonce := hex.EncodeToString(opaqueResp.MaskingNonce)
