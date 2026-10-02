@@ -152,9 +152,8 @@ func (suite *AccountsTestSuite) TestResetPassword() {
 
 	// Test password init
 	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-		BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
-		SerializeResponse:     true,
-		InitiatingServiceName: util.AccountsServiceName,
+		BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse: true,
 	})
 	req.Header.Set("Authorization", "Bearer "+token)
 
@@ -206,9 +205,8 @@ func (suite *AccountsTestSuite) TestResetPassword() {
 
 	// Should not be able to set password again
 	req = util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-		BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
-		SerializeResponse:     true,
-		InitiatingServiceName: util.AccountsServiceName,
+		BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse: true,
 	})
 	req.Header.Set("Authorization", "Bearer "+token)
 
@@ -232,10 +230,9 @@ func (suite *AccountsTestSuite) TestRegistration() {
 
 	// Test password init with newAccountEmail (no verification token)
 	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-		BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
-		SerializeResponse:     true,
-		NewAccountEmail:       &email,
-		InitiatingServiceName: util.AccountsServiceName,
+		BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse: true,
+		NewAccountEmail:   &email,
 	})
 	// No Authorization header for registration
 
@@ -332,10 +329,9 @@ func (suite *AccountsTestSuite) TestRegistrationAccountAlreadyExists() {
 
 	// Test password init with newAccountEmail for existing account
 	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-		BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
-		SerializeResponse:     true,
-		NewAccountEmail:       &email,
-		InitiatingServiceName: util.AccountsServiceName,
+		BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse: true,
+		NewAccountEmail:   &email,
 	})
 	// No Authorization header for registration
 
@@ -355,10 +351,9 @@ func (suite *AccountsTestSuite) TestRegistrationVerificationPending() {
 
 	// Test password init with newAccountEmail for unverified account
 	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-		BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
-		SerializeResponse:     true,
-		NewAccountEmail:       &email,
-		InitiatingServiceName: util.AccountsServiceName,
+		BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse: true,
+		NewAccountEmail:   &email,
 	})
 
 	resp := util.ExecuteTestRequest(req, suite.router)
@@ -403,9 +398,8 @@ func (suite *AccountsTestSuite) TestChangePassword() {
 		changeRegistrationReq := suite.opaqueClient.RegistrationInit([]byte("newpassword"))
 
 		req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-			BlindedMessage:        hex.EncodeToString(changeRegistrationReq.Serialize()),
-			SerializeResponse:     true,
-			InitiatingServiceName: util.AccountsServiceName,
+			BlindedMessage:    hex.EncodeToString(changeRegistrationReq.Serialize()),
+			SerializeResponse: true,
 		})
 		req.Header.Set("Authorization", "Bearer "+changeToken)
 
@@ -482,9 +476,8 @@ func (suite *AccountsTestSuite) TestSetPasswordBadIntents() {
 	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
 
 	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-		BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
-		SerializeResponse:     true,
-		InitiatingServiceName: util.AccountsServiceName,
+		BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
+		SerializeResponse: true,
 	})
 	req.Header.Set("Authorization", "Bearer "+token)
 
@@ -509,9 +502,8 @@ func (suite *AccountsTestSuite) TestSetPasswordUnverifiedEmail() {
 
 		// Test password init with unverified email
 		req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
-			BlindedMessage:        hex.EncodeToString(registrationReq.Serialize()),
-			SerializeResponse:     true,
-			InitiatingServiceName: util.AccountsServiceName,
+			BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
+			SerializeResponse: true,
 		})
 		req.Header.Set("Authorization", "Bearer "+token)
 
