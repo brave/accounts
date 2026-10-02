@@ -49,8 +49,6 @@ type RegistrationRequest struct {
 	SerializeResponse bool `json:"serializeResponse"`
 	// Email for new account creation (required if no verification token)
 	NewAccountEmail *string `json:"newAccountEmail" validate:"omitempty,email,max=254"`
-	// Name of service that initiated the registration flow
-	InitiatingServiceName string `json:"initiatingServiceName" validate:"required,oneof=accounts email-aliases premium"`
 }
 
 // @Description Response for registering a new account
