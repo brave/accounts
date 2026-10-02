@@ -37,8 +37,6 @@ type LoginInitRequest struct {
 	NonceU *string `json:"clientNonce" validate:"required_without=SerializedKE1"`
 	// Serialized KE1 message
 	SerializedKE1 *string `json:"serializedKE1" validate:"required_without_all=BlindedMessage EpkU NonceU"`
-	// Name of service that initiated the login flow
-	InitiatingServiceName string `json:"initiatingServiceName" validate:"required,oneof=accounts email-aliases premium"`
 }
 
 // @Description Response for account login
