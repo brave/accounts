@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/rs/zerolog/log"
 )
 
@@ -306,9 +308,24 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 				// If an account exists that matches the simplified email, notify the user
 				// that such an account exists
 				similarAccounts, aerr := ac.ds.GetAccountsBySimplifiedEmail(requestData.Email)
-				if aerr != nil {
-					log.Error().Err(aerr).Msg("failed to find account by simplified email")
-				} else {
+				switch {
+				case errors.Is(aerr, datastore.ErrAccountNotFound):
+					// Email cannot be simplified (e.g. no gmail.com domain), so no
+					// simplified-email lookup was possible
+					log.Error().Msg("failed to find account by simplified email: email cannot be simplified")
+				case aerr != nil:
+					// aerr is the wrapped lookup error from the datastore. Log only
+					// the SQLSTATE code rather than the full error text, since
+					// PostgreSQL error messages can quote input values.
+					var pgErr *pgconn.PgError
+					if errors.As(aerr, &pgErr) {
+						log.Error().Str("pgState", pgErr.Code).Msg("failed to query accounts by simplified email")
+					} else if errors.Is(aerr, context.DeadlineExceeded) {
+						log.Error().Msg("timeout querying accounts by simplified email")
+					} else {
+						log.Error().Msg("failed to query accounts by simplified email")
+					}
+				default:
 					for _, account := range similarAccounts {
 						if aerr = ac.sesService.SendSimilarEmailAlert(r.Context(), account.Email, r.Header.Get("Accept-Language")); aerr != nil {
 							log.Error().Err(aerr).Msg("failed to send email alert about similar email")
