@@ -173,7 +173,7 @@ func main() {
 	accountsController := controllers.NewAccountsController(opaqueService, jwtService, twoFAService, datastore, verificationService, sesService)
 
 	r.Use(sentryhttp.New(sentryhttp.Options{Repanic: true}).Handle)
-	r.Use(chiMiddleware.RealIP)
+	r.Use(chiMiddleware.ClientIPFromXFFTrustedProxies(1))
 	r.Use(middleware.LoggerMiddleware(prometheusRegistry))
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: allowedOrigins,

@@ -328,7 +328,8 @@ func (ac *AccountsController) SetupPasswordInit(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	opaqueResponse, err := ac.opaqueService.SetupPasswordInit(verification.Email, opaqueReq, r.RemoteAddr)
+	clientIP := util.GetRealIP(r)
+	opaqueResponse, err := ac.opaqueService.SetupPasswordInit(verification.Email, opaqueReq, clientIP)
 	if err != nil {
 		if errors.Is(err, util.ErrRateLimitExceeded) {
 			util.RenderErrorResponse(w, r, http.StatusTooManyRequests, err)
@@ -531,7 +532,8 @@ func (ac *AccountsController) SetupPasswordFinalize2FA(w http.ResponseWriter, r 
 		return
 	}
 
-	if err := ac.twoFAService.ProcessChallenge(registrationState, &requestData, r.RemoteAddr); err != nil {
+	clientIP := util.GetRealIP(r)
+	if err := ac.twoFAService.ProcessChallenge(registrationState, &requestData, clientIP); err != nil {
 		if errors.Is(err, util.ErrRateLimitExceeded) {
 			util.RenderErrorResponse(w, r, http.StatusTooManyRequests, err)
 			return
@@ -646,7 +648,8 @@ func (ac *AccountsController) SetupTOTPFinalize(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if err := ac.twoFAService.ValidateTOTPCode(session.AccountID, requestData.Code, &r.RemoteAddr); err != nil {
+	clientIP := util.GetRealIP(r)
+	if err := ac.twoFAService.ValidateTOTPCode(session.AccountID, requestData.Code, &clientIP); err != nil {
 		if errors.Is(err, util.ErrRateLimitExceeded) {
 			util.RenderErrorResponse(w, r, http.StatusTooManyRequests, err)
 			return

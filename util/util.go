@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 	"github.com/prometheus/client_golang/prometheus"
@@ -331,4 +332,11 @@ func GetRequestLocale(explicitLocale string, r *http.Request) string {
 		return locale[:20]
 	}
 	return locale
+}
+
+func GetRealIP(r *http.Request) string {
+	if ip := chiMiddleware.GetClientIP(r.Context()); ip != "" {
+		return ip
+	}
+	return r.RemoteAddr
 }
