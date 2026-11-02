@@ -291,7 +291,8 @@ func (ac *AuthController) LoginInit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ke2, akeState, err := ac.opaqueService.LoginInit(requestData.Email, opaqueReq, r.RemoteAddr)
+	clientIP := util.GetRealIP(r)
+	ke2, akeState, err := ac.opaqueService.LoginInit(requestData.Email, opaqueReq, clientIP)
 	if err != nil {
 		if errors.Is(err, util.ErrRateLimitExceeded) {
 			util.RenderErrorResponse(w, r, http.StatusTooManyRequests, err)
@@ -392,7 +393,8 @@ func (ac *AuthController) LoginFinalize(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	loginState, err := ac.opaqueService.LoginFinalize(loginStateID, opaqueReq, r.RemoteAddr)
+	clientIP := util.GetRealIP(r)
+	loginState, err := ac.opaqueService.LoginFinalize(loginStateID, opaqueReq, clientIP)
 	if err != nil {
 		if errors.Is(err, util.ErrRateLimitExceeded) {
 			util.RenderErrorResponse(w, r, http.StatusTooManyRequests, err)
@@ -479,7 +481,8 @@ func (ac *AuthController) LoginFinalize2FA(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Process the 2FA authentication request
-	if err := ac.twoFAService.ProcessChallenge(loginState, &requestData, r.RemoteAddr); err != nil {
+	clientIP := util.GetRealIP(r)
+	if err := ac.twoFAService.ProcessChallenge(loginState, &requestData, clientIP); err != nil {
 		if errors.Is(err, util.ErrRateLimitExceeded) {
 			util.RenderErrorResponse(w, r, http.StatusTooManyRequests, err)
 			return
