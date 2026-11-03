@@ -361,6 +361,33 @@ func (suite *AccountsTestSuite) TestRegistrationVerificationPending() {
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrRegistrationVerificationPending.Code)
 }
 
+func (suite *AccountsTestSuite) TestCreateRegistrationVerificationPending() {
+	email := "pending-reg@example.com"
+
+	first, err := suite.ds.CreateVerification(email, util.AccountsServiceName, datastore.RegistrationIntent)
+	suite.Require().NoError(err)
+
+	// Blocked by the datastore check; no account exists, so the service-level check isn't involved
+	_, err = suite.ds.CreateVerification(email, util.AccountsServiceName, datastore.RegistrationIntent)
+	suite.ErrorIs(err, util.ErrRegistrationVerificationPending)
+
+	// Other intents aren't affected
+	_, err = suite.ds.CreateVerification(email, util.AccountsServiceName, datastore.VerificationIntent)
+	suite.NoError(err)
+
+	// Invalidated registration verifications don't block
+	suite.Require().NoError(suite.ds.InvalidateVerification(first.ID))
+	second, err := suite.ds.CreateVerification(email, util.AccountsServiceName, datastore.RegistrationIntent)
+	suite.Require().NoError(err)
+
+	// Expired registration verifications don't block
+	err = suite.ds.DB.Model(&datastore.Verification{}).Where("id = ?", second.ID).
+		Update("created_at", time.Now().UTC().Add(-datastore.VerificationExpiration-time.Minute)).Error
+	suite.Require().NoError(err)
+	_, err = suite.ds.CreateVerification(email, util.AccountsServiceName, datastore.RegistrationIntent)
+	suite.NoError(err)
+}
+
 func (suite *AccountsTestSuite) TestChangePassword() {
 	sessionInvalidationSettings := []bool{true, false}
 

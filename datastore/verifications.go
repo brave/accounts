@@ -146,6 +146,22 @@ func (d *Datastore) CreateVerification(email string, service string, intent stri
 			return util.ErrTooManyVerifications
 		}
 
+		if intent == RegistrationIntent {
+			var pendingRegistrations int64
+			if err := d.validVerificationModel(nil).
+				Where("email = ? AND intent = ? AND created_at > ?",
+					email,
+					RegistrationIntent,
+					time.Now().UTC().Add(-VerificationExpiration)).
+				Count(&pendingRegistrations).Error; err != nil {
+				return fmt.Errorf("error counting pending registrations: %w", err)
+			}
+
+			if pendingRegistrations > 0 {
+				return util.ErrRegistrationVerificationPending
+			}
+		}
+
 		if err := tx.Create(&verification).Error; err != nil {
 			return fmt.Errorf("error creating verification: %w", err)
 		}
