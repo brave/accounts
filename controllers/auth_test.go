@@ -31,6 +31,7 @@ type AuthTestSuite struct {
 	controller    *controllers.AuthController
 	router        *chi.Mux
 	opaqueConfig  *opaque.Configuration
+	opaqueService *services.OpaqueService
 	totpKey       *otp.Key
 }
 
@@ -71,6 +72,7 @@ func (suite *AuthTestSuite) SetupTest() {
 	suite.account, err = suite.ds.GetOrCreateAccount("test@example.com")
 	suite.Require().NoError(err)
 
+	suite.opaqueService = opaqueService
 	suite.opaqueConfig = opaqueService.Config
 	opaqueClient, err := opaque.NewClient(opaqueService.Config)
 	suite.Require().NoError(err)
@@ -378,6 +380,46 @@ func (suite *AuthTestSuite) TestAuthLoginExpiredLoginState() {
 	resp = util.ExecuteTestRequest(req, suite.router)
 	suite.Equal(http.StatusUnauthorized, resp.Code)
 	util.AssertErrorResponseCode(suite.T(), resp, util.ErrInterimPasswordStateExpired.Code)
+}
+
+func (suite *AuthTestSuite) TestAuthLoginFinalizeFailsAfterPasswordChange() {
+	opaqueClient, err := opaque.NewClient(suite.opaqueConfig)
+	suite.Require().NoError(err)
+
+	ke1 := opaqueClient.GenerateKE1([]byte("testtest1"))
+	serializedKE1 := hex.EncodeToString(ke1.Serialize())
+	loginReq := controllers.LoginInitRequest{
+		Email:         suite.account.Email,
+		SerializedKE1: &serializedKE1,
+	}
+
+	req := util.CreateJSONTestRequest("/v2/auth/login/init", loginReq)
+	resp := util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusOK, resp.Code)
+
+	var parsedResp controllers.LoginInitResponse
+	util.DecodeJSONTestResponse(suite.T(), resp.Body, &parsedResp)
+	suite.NotNil(parsedResp.SerializedKE2)
+	suite.NotEmpty(parsedResp.LoginToken)
+
+	changeClient, err := opaque.NewClient(suite.opaqueConfig)
+	suite.Require().NoError(err)
+	registrationReq := changeClient.RegistrationInit([]byte("newpassword"))
+	registrationResp, err := suite.opaqueService.SetupPasswordInit(suite.account.Email, registrationReq, "127.0.0.1:12345")
+	suite.Require().NoError(err)
+	registrationRec, _ := changeClient.RegistrationFinalize(registrationResp, opaque.ClientRegistrationFinalizeOptions{
+		ClientIdentity: []byte(suite.account.Email),
+	})
+	_, err = suite.opaqueService.SetupPasswordFinalize(suite.account.Email, registrationRec)
+	suite.Require().NoError(err)
+
+	loginFinalReq := suite.createLoginFinalizeRequest(opaqueClient, *parsedResp.SerializedKE2)
+	req = util.CreateJSONTestRequest("/v2/auth/login/finalize", loginFinalReq)
+	req.Header.Set("Authorization", "Bearer "+parsedResp.LoginToken)
+
+	resp = util.ExecuteTestRequest(req, suite.router)
+	suite.Equal(http.StatusUnauthorized, resp.Code)
+	util.AssertErrorResponseCode(suite.T(), resp, util.ErrInterimPasswordStateNotFound.Code)
 }
 
 func (suite *AuthTestSuite) TestCreateServiceToken() {

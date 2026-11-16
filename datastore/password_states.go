@@ -93,6 +93,10 @@ func (d *Datastore) DeleteInterimPasswordState(stateID uuid.UUID) error {
 	return d.DB.Delete(&InterimPasswordState{}, "id = ?", stateID).Error
 }
 
+func (d *Datastore) DeleteAllInterimPasswordStates(accountID uuid.UUID) error {
+	return d.DB.Delete(&InterimPasswordState{}, "account_id = ?", accountID).Error
+}
+
 func (d *Datastore) processInterimPasswordState(state *InterimPasswordState, forTwoFA bool) error {
 	// Verify that the 2FA state matches the expected operation
 	if forTwoFA != state.AwaitingTwoFA {

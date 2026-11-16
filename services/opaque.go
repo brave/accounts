@@ -236,10 +236,7 @@ func (o *OpaqueService) SetupPasswordFinalize(email string, registration *opaque
 			return nil, err
 		}
 	} else {
-		err = o.ds.UpdateOpaqueRegistration(*registrationState.AccountID, registrationState.OprfSeedID, registration.Serialize())
-		if err != nil {
-			// nolint:errcheck
-			o.ds.DeleteInterimPasswordState(registrationState.ID)
+		if err = o.ds.UpdateOpaqueRegistration(*registrationState.AccountID, registrationState.OprfSeedID, registration.Serialize()); err != nil {
 			return nil, err
 		}
 	}
