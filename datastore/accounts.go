@@ -127,6 +127,10 @@ func (d *Datastore) GetOrCreateAccount(email string) (*Account, error) {
 }
 
 func (d *Datastore) UpdateOpaqueRegistration(accountID uuid.UUID, oprfSeedID int, opaqueRegistration []byte) error {
+	if err := d.DeleteAllInterimPasswordStates(accountID); err != nil {
+		return fmt.Errorf("failed to delete interim password states: %w", err)
+	}
+
 	result := d.DB.Model(&Account{}).
 		Where("id = ?", accountID).
 		Updates(Account{

@@ -546,11 +546,6 @@ func (ac *AccountsController) SetupPasswordFinalize2FA(w http.ResponseWriter, r 
 		return
 	}
 
-	if err := ac.ds.DeleteInterimPasswordState(registrationState.ID); err != nil {
-		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
-		return
-	}
-
 	if err := ac.ds.UpdateOpaqueRegistration(*registrationState.AccountID, registrationState.OprfSeedID, registrationState.State); err != nil {
 		util.RenderErrorResponse(w, r, http.StatusInternalServerError, err)
 		return
