@@ -148,7 +148,8 @@ func (suite *AccountsTestSuite) TestResetPassword() {
 	token, err := suite.jwtService.CreateVerificationToken(verification.ID, time.Minute*30, verification.Service)
 	suite.Require().NoError(err)
 
-	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+	registrationReq, err := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+	suite.Require().NoError(err)
 
 	// Test password init
 	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
@@ -169,9 +170,8 @@ func (suite *AccountsTestSuite) TestResetPassword() {
 	registrationResp, err := suite.opaqueClient.Deserialize.RegistrationResponse(serializedRegistationResp)
 	suite.Require().NoError(err)
 
-	registrationRecord, _ := suite.opaqueClient.RegistrationFinalize(registrationResp, opaque.ClientRegistrationFinalizeOptions{
-		ClientIdentity: []byte(verification.Email),
-	})
+	registrationRecord, _, err := suite.opaqueClient.RegistrationFinalize(registrationResp, []byte(verification.Email), nil)
+	suite.Require().NoError(err)
 	serializedRecord := hex.EncodeToString(registrationRecord.Serialize())
 
 	suite.sesMock.On("SendPasswordChangeNotification", mock.Anything, verification.Email, mock.Anything).Return(nil).Once()
@@ -226,7 +226,8 @@ func (suite *AccountsTestSuite) TestResetPassword() {
 
 func (suite *AccountsTestSuite) TestRegistration() {
 	email := "newuser@example.com"
-	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+	registrationReq, err := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+	suite.Require().NoError(err)
 
 	// Test password init with newAccountEmail (no verification token)
 	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
@@ -263,9 +264,8 @@ func (suite *AccountsTestSuite) TestRegistration() {
 	registrationResp, err := suite.opaqueClient.Deserialize.RegistrationResponse(serializedRegistationResp)
 	suite.Require().NoError(err)
 
-	registrationRecord, _ := suite.opaqueClient.RegistrationFinalize(registrationResp, opaque.ClientRegistrationFinalizeOptions{
-		ClientIdentity: []byte(email),
-	})
+	registrationRecord, _, err := suite.opaqueClient.RegistrationFinalize(registrationResp, []byte(email), nil)
+	suite.Require().NoError(err)
 	serializedRecord := hex.EncodeToString(registrationRecord.Serialize())
 
 	suite.sesMock.On("SendVerificationEmail", mock.Anything, email, mock.Anything, "").Return(nil).Once()
@@ -325,7 +325,8 @@ func (suite *AccountsTestSuite) TestRegistrationAccountAlreadyExists() {
 	err = suite.ds.UpdateAccountLastEmailVerifiedAt(account.ID)
 	suite.Require().NoError(err)
 
-	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+	registrationReq, err := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+	suite.Require().NoError(err)
 
 	// Test password init with newAccountEmail for existing account
 	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
@@ -347,7 +348,9 @@ func (suite *AccountsTestSuite) TestRegistrationVerificationPending() {
 	_, err := suite.ds.GetOrCreateAccount(email)
 	suite.Require().NoError(err)
 
-	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+	// Create an unverified account (simulates a prior registration init)
+	registrationReq, err := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+	suite.Require().NoError(err)
 
 	// Test password init with newAccountEmail for unverified account
 	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
@@ -422,7 +425,8 @@ func (suite *AccountsTestSuite) TestChangePassword() {
 		changeToken, err := suite.jwtService.CreateVerificationToken(changeVerification.ID, time.Minute*30, changeVerification.Service)
 		suite.Require().NoError(err)
 
-		changeRegistrationReq := suite.opaqueClient.RegistrationInit([]byte("newpassword"))
+		changeRegistrationReq, err := suite.opaqueClient.RegistrationInit([]byte("newpassword"))
+		suite.Require().NoError(err)
 
 		req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
 			BlindedMessage:    hex.EncodeToString(changeRegistrationReq.Serialize()),
@@ -443,9 +447,8 @@ func (suite *AccountsTestSuite) TestChangePassword() {
 		changeResp, err := suite.opaqueClient.Deserialize.RegistrationResponse(serializedChangeResp)
 		suite.Require().NoError(err)
 
-		changeRecord, _ := suite.opaqueClient.RegistrationFinalize(changeResp, opaque.ClientRegistrationFinalizeOptions{
-			ClientIdentity: []byte(email),
-		})
+		changeRecord, _, err := suite.opaqueClient.RegistrationFinalize(changeResp, []byte(email), nil)
+		suite.Require().NoError(err)
 		serializedChangeRecord := hex.EncodeToString(changeRecord.Serialize())
 
 		suite.sesMock.On("SendPasswordChangeNotification", mock.Anything, email, "fr-FR").Return(nil).Once()
@@ -488,6 +491,9 @@ func (suite *AccountsTestSuite) TestChangePassword() {
 		finalKeys, err := suite.ds.GetUserKeys(account.ID)
 		suite.Require().NoError(err)
 		suite.Equal(2, len(finalKeys), "User keys should NOT be deleted during password change")
+
+		// Clear client state for next iteration
+		suite.opaqueClient.ClearState()
 	}
 }
 
@@ -500,7 +506,8 @@ func (suite *AccountsTestSuite) TestSetPasswordBadIntents() {
 	token, err := suite.jwtService.CreateVerificationToken(verification.ID, time.Minute*30, verification.Service)
 	suite.Require().NoError(err)
 
-	registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+	registrationReq, err := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+	suite.Require().NoError(err)
 
 	req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
 		BlindedMessage:    hex.EncodeToString(registrationReq.Serialize()),
@@ -525,7 +532,8 @@ func (suite *AccountsTestSuite) TestSetPasswordUnverifiedEmail() {
 		token, err := suite.jwtService.CreateVerificationToken(verification.ID, time.Minute*30, verification.Service)
 		suite.Require().NoError(err)
 
-		registrationReq := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+		registrationReq, err := suite.opaqueClient.RegistrationInit([]byte("testtest1"))
+		suite.Require().NoError(err)
 
 		// Test password init with unverified email
 		req := util.CreateJSONTestRequest("/v2/accounts/password/init", controllers.RegistrationRequest{
@@ -537,6 +545,9 @@ func (suite *AccountsTestSuite) TestSetPasswordUnverifiedEmail() {
 		resp := util.ExecuteTestRequest(req, suite.router)
 		suite.Equal(http.StatusForbidden, resp.Code)
 		util.AssertErrorResponseCode(suite.T(), resp, util.ErrEmailNotVerified.Code)
+
+		// Clear client state for next iteration
+		suite.opaqueClient.ClearState()
 	}
 }
 
