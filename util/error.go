@@ -36,6 +36,7 @@ var (
 	ErrInvalidCode                     = NewExposedError(13011, "invalid verification code")
 	ErrRegistrationVerificationPending = NewExposedError(13012, "registration verification already pending for this email")
 	ErrDailyVerificationLimitReached   = NewExposedError(13013, "daily verification limit reached for email")
+	ErrEmailTooLong                    = NewExposedError(13014, "email address exceeds maximum length of 254 characters")
 
 	// Auth errors, prefixed with '14'
 	ErrInterimPasswordStateNotFound = NewExposedError(14001, "interim password state not found")
